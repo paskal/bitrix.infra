@@ -3,6 +3,8 @@ version: '2'
 services:
     certbot:
         image: certbot/certbot
+        hostname: certbot
+        container_name: certbot
         restart: unless-stopped
         volumes:
             - ./config/letsencrypt:/etc/letsencrypt
@@ -10,7 +12,10 @@ services:
 
     percona-server:
         image: percona:8
+        hostname: percona-server
+        container_name: percona-server
         restart: always
+        # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
         env_file: docker/environment/percona.env
         expose:
             - "3306"
@@ -26,9 +31,39 @@ services:
 
     adminer:
         image: adminer:fastcgi
+        hostname: adminer
+        container_name: adminer
         restart: always
         expose:
             - "9000"
+
+# Percona monitoring tools
+    pmm-server:
+        image: percona/pmm-server
+        hostname: pmm-server
+        container_name: pmm-server
+        restart: always
+        expose:
+            - "443"
+        # SERVER_PASSWORD
+        env_file: docker/environment/percona.env
+        environment:
+            - SERVER_USER=pmm_docker_user
+
+    pmm-client-ps:
+        image: perconalab/pmm-client
+        hostname: pmm-client-ps
+        container_name: pmm-client-ps
+        restart: always
+        # PMM_PASSWORD, DB_PASSWORD
+        env_file: docker/environment/percona.env
+        environment:
+            - PMM_SERVER=pmm-server:443
+            - PMM_USER=pmm_docker_user
+            - DB_TYPE=mysql
+            - DB_HOST=percona-server
+            - DB_PORT=3306
+            - DB_USER=root
 
 #    https://github.com/extremeshok/docker-nginx-pagespeed
 #    nginx:
