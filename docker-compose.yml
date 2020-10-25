@@ -8,6 +8,28 @@ services:
             - ./config/letsencrypt:/etc/letsencrypt
         entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 10d & wait $${!}; done;'"
 
+    percona-server:
+        image: percona:8
+        restart: always
+        env_file: docker/environment/percona.env
+        expose:
+            - "3306"
+        # TODO: remove after migration of app into docker
+        ports:
+            - "13306:3306"
+        volumes:
+            # Data persistence
+            - ./docker/percona-data:/var/lib/mysql
+        environment:
+            MYSQL_ROOT_HOST: localhost
+            MYSQL_DATABASE: admin_favorgroup
+
+    adminer:
+        image: adminer:fastcgi
+        restart: always
+        expose:
+            - "9000"
+
 #    https://github.com/extremeshok/docker-nginx-pagespeed
 #    nginx:
 #        image: nginx:1.15-alpine
