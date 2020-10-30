@@ -1,0 +1,48 @@
+[client]
+default_character_set = utf8
+
+[mysqld]
+skip_external_locking = 1
+key_buffer_size = 64M
+max_allowed_packet = 64M
+table_open_cache_instances=16
+table_open_cache = 5000
+sort_buffer_size = 8M
+read_buffer_size = 8M
+read_rnd_buffer_size = 16M
+myisam_sort_buffer_size = 128M
+
+max_connections=250
+max_user_connections=150
+wait_timeout=10
+interactive_timeout = 60
+long_query_time=5
+
+# https://www.percona.com/blog/2015/01/14/mysql-performance-implications-of-innodb-isolation-modes/
+# better than default
+transaction_isolation = read-committed
+
+# https://www.percona.com/doc/percona-monitoring-and-management/2.x/concepts/services-mysql.html
+innodb_monitor_enable = all
+
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+innodb_log_file_size = 256M
+sql_mode = ""
+thread_cache_size = 32
+
+# 50-70% of server's memory if it's dedicated to MySQL, or 100% of DB size (our case less than 2G)
+innodb_buffer_pool_size = 2G
+
+# https://www.percona.com/blog/2016/10/12/mysql-5-7-performance-tuning-immediately-after-installation/
+innodb_autoinc_lock_mode = 2
+
+
+# UTF8 support enforcement
+character_set_server=utf8mb4
+init_connect = "SET NAMES utf8mb4"
+
+
+# increased according to Bitrix recommendations
+tmp_table_size = 512M
+max_heap_table_size =512M
