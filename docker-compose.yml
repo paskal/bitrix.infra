@@ -23,6 +23,7 @@ services:
         ports:
             - "13306:3306"
         volumes:
+            - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
             # Data persistence
             - ./docker/percona-data:/var/lib/mysql
         environment:
@@ -37,33 +38,29 @@ services:
         expose:
             - "9000"
 
-# Percona monitoring tools
-    pmm-server:
-        image: percona/pmm-server
-        hostname: pmm-server
-        container_name: pmm-server
-        restart: always
-        expose:
-            - "443"
-        # SERVER_PASSWORD
-        env_file: docker/environment/percona.env
-        environment:
-            - SERVER_USER=pmm_docker_user
+    # Percona Monitoring and Management client
+    pmm-client:
+        image: perconalab/pmm-client:2
+        hostname: pmm-client-favor-group-percona
+        container_name: pmm-client
+        # depends_on section is needed if you're monitoring DB that is running in the docker-compose
+        depends_on:
+            - percona-server
+        volumes:
+            - ./docker/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
+        ports:
+            - "42000:42000"
+            - "42001:42001"
 
-    pmm-client-ps:
-        image: perconalab/pmm-client
-        hostname: pmm-client-ps
-        container_name: pmm-client-ps
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: always
-        # PMM_PASSWORD, DB_PASSWORD
-        env_file: docker/environment/percona.env
         environment:
-            - PMM_SERVER=pmm-server:443
-            - PMM_USER=pmm_docker_user
-            - DB_TYPE=mysql
-            - DB_HOST=percona-server
-            - DB_PORT=3306
-            - DB_USER=root
+            - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
 
 #    https://github.com/extremeshok/docker-nginx-pagespeed
 #    nginx:
