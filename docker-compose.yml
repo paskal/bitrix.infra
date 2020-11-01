@@ -41,7 +41,7 @@ services:
     # Percona Monitoring and Management client
     pmm-client:
         image: perconalab/pmm-client:2
-        hostname: pmm-client-favor-group-percona
+        hostname: favor-group.ru
         container_name: pmm-client
         # depends_on section is needed if you're monitoring DB that is running in the docker-compose
         depends_on:
