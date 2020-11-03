@@ -29,6 +29,7 @@ services:
         environment:
             MYSQL_ROOT_HOST: localhost
             MYSQL_DATABASE: admin_favorgroup
+            TZ: Europe/Moscow
         cap_add:
             - SYS_NICE  # CAP_SYS_NICE
 
