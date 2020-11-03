@@ -3,20 +3,15 @@ default_character_set = utf8
 
 [mysqld]
 skip_external_locking = 1
-key_buffer_size = 64M
-max_allowed_packet = 64M
 table_open_cache_instances=16
 table_open_cache = 5000
-sort_buffer_size = 8M
-read_buffer_size = 8M
-read_rnd_buffer_size = 16M
-myisam_sort_buffer_size = 128M
 
 max_connections=250
 max_user_connections=150
 wait_timeout=10
 interactive_timeout = 60
 long_query_time=5
+expire_logs_days=30
 
 # https://www.percona.com/blog/2015/01/14/mysql-performance-implications-of-innodb-isolation-modes/
 # better than default
@@ -37,11 +32,9 @@ innodb_buffer_pool_size = 2G
 # https://www.percona.com/blog/2016/10/12/mysql-5-7-performance-tuning-immediately-after-installation/
 innodb_autoinc_lock_mode = 2
 
-
 # UTF8 support enforcement
 character_set_server=utf8
-init_connect = "SET NAMES utf8"
-
+collation_server=utf8_unicode_ci
 
 # increased according to Bitrix recommendations
 tmp_table_size = 512M
