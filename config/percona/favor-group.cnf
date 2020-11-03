@@ -39,8 +39,8 @@ innodb_autoinc_lock_mode = 2
 
 
 # UTF8 support enforcement
-character_set_server=utf8mb4
-init_connect = "SET NAMES utf8mb4"
+character_set_server=utf8
+init_connect = "SET NAMES utf8"
 
 
 # increased according to Bitrix recommendations
