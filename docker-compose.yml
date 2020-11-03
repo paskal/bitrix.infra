@@ -7,7 +7,7 @@ services:
         container_name: certbot
         restart: unless-stopped
         volumes:
-            - ./config/letsencrypt:/etc/letsencrypt
+            - ./private/letsencrypt:/etc/letsencrypt
         entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 10d & wait $${!}; done;'"
 
     percona-server:
@@ -16,7 +16,7 @@ services:
         container_name: percona-server
         restart: always
         # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
-        env_file: docker/environment/percona.env
+        env_file: private/environment/percona.env
         expose:
             - "3306"
         # TODO: remove after migration of app into docker
@@ -25,7 +25,7 @@ services:
         volumes:
             - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
             # Data persistence
-            - ./docker/percona-data:/var/lib/mysql
+            - ./private/percona-data:/var/lib/mysql
         environment:
             MYSQL_ROOT_HOST: localhost
             MYSQL_DATABASE: admin_favorgroup
@@ -49,7 +49,7 @@ services:
         depends_on:
             - percona-server
         volumes:
-            - ./docker/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
+            - ./private/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
         ports:
             - "42000:42000"
             - "42001:42001"
