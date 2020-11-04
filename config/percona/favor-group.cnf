@@ -28,6 +28,10 @@ thread_cache_size = 32
 
 # 50-70% of server's memory if it's dedicated to MySQL, or 100% of DB size (our case less than 2G)
 innodb_buffer_pool_size = 2G
+# mysqltuner recommendations
+innodb_buffer_pool_instances = 2
+thread_pool_size = 16
+join_buffer_size = 32M
 
 # https://www.percona.com/blog/2016/10/12/mysql-5-7-performance-tuning-immediately-after-installation/
 innodb_autoinc_lock_mode = 2
