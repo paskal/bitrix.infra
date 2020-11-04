@@ -1,0 +1,24 @@
+# local git configuration
+.gitconfig
+
+# temp files
+*.swp
+# logs
+*.log
+
+# profile files
+.bash_history
+.bash_logout
+.bashrc
+.profile
+.ssh
+.selected_editor
+.viminfo
+.vimrc
+.gnupg/
+
+# temporary folder
+/tmp
+
+# site code
+web
