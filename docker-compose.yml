@@ -11,7 +11,7 @@ services:
         entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 10d & wait $${!}; done;'"
 
     percona-server:
-        image: percona:8
+        image: percona/percona-server:8.0
         hostname: percona-server
         container_name: percona-server
         restart: always
@@ -27,7 +27,6 @@ services:
             # Data persistence
             - ./private/percona-data:/var/lib/mysql
         environment:
-            MYSQL_ROOT_HOST: localhost
             MYSQL_DATABASE: admin_favorgroup
             TZ: Europe/Moscow
         cap_add:
