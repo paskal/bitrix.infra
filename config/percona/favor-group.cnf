@@ -4,7 +4,6 @@ default_character_set = utf8
 [mysqld]
 skip_external_locking = 1
 table_open_cache_instances=16
-table_open_cache = 5000
 
 max_connections=250
 max_user_connections=150
@@ -28,10 +27,12 @@ thread_cache_size = 32
 
 # 50-70% of server's memory if it's dedicated to MySQL, or 100% of DB size (our case less than 2G)
 innodb_buffer_pool_size = 2G
+
 # mysqltuner recommendations
 innodb_buffer_pool_instances = 2
 thread_pool_size = 16
-join_buffer_size = 32M
+join_buffer_size = 128M
+table_open_cache = 8192
 
 # https://www.percona.com/blog/2016/10/12/mysql-5-7-performance-tuning-immediately-after-installation/
 innodb_autoinc_lock_mode = 2
