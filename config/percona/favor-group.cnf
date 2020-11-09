@@ -1,5 +1,6 @@
 [client]
-default_character_set = utf8
+# https://bugs.mysql.com/bug.php?id=11673
+loose-default_character_set = utf8
 
 [mysqld]
 skip_external_locking = 1
