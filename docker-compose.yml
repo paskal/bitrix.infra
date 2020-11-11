@@ -19,18 +19,13 @@ services:
         depends_on:
             - adminer
         volumes:
-            - ./tmp:/home/admin/tmp
             - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
             - ./web/favor-group.ru:/home/admin/web/favor-group.ru
-            - ./private/letsencrypt:/home/admin/private/letsencrypt
-            - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
-            - ./config/nginx/status.conf:/etc/nginx/conf.d/status.conf
-            - ./config/nginx/adminer.conf:/etc/nginx/conf.d/adminer.conf
-            - ./config/nginx/server_name.conf:/home/admin/config/nginx/server_name.conf
-            - ./config/nginx/pagespeed.conf:/etc/nginx/conf.d/pagespeed.conf
-            - ./conf/web/dev.favor-group.ru.nginx.ssl.conf:/etc/nginx/conf.d/dev.favor-group.ru.nginx.ssl.conf
-            - ./conf/web/https.redirect.nginx.conf:/etc/nginx/conf.d/https.redirect.nginx.conf
-            - ./conf/web/favor-group.ru.nginx.ssl.conf:/etc/nginx/conf.d/favor-group.ru.nginx.ssl.conf
+            - ./private/letsencrypt:/home/admin/private/letsencrypt:ro
+            - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./config/nginx/conf.d/:/etc/nginx/conf.d/:ro
+            - ./config/nginx/server_name.conf:/home/admin/config/nginx/server_name.conf:ro
+            - ./tmp:/home/admin/tmp
             - /tmp/favor-logs/:/var/log/nginx/domains/
         ports:
             - "9080:80"
@@ -101,7 +96,7 @@ services:
         depends_on:
             - percona-server
             - nginx
-        # temoporary, remove after moving from Debian to Ubuntu where it would be possible
+        # temporary, remove after moving from Debian to Ubuntu where it would be possible
         # to set proper permissions for container user for /var/run/docker.sock
         user: root
 
