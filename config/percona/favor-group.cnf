@@ -11,7 +11,8 @@ max_user_connections=150
 wait_timeout=10
 interactive_timeout = 60
 long_query_time=5
-expire_logs_days=30
+# 5 days of binlogs
+binlog_expire_logs_seconds=18000
 
 # https://www.percona.com/blog/2015/01/14/mysql-performance-implications-of-innodb-isolation-modes/
 # better than default
