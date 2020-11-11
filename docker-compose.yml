@@ -10,6 +10,32 @@ services:
             - ./private/letsencrypt:/etc/letsencrypt
         entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 10d & wait $${!}; done;'"
 
+    nginx:
+        build: ./config/nginx
+        hostname: nginx
+        container_name: nginx
+        image: paskal/nginx-pagespeed:latest
+        restart: unless-stopped
+        command: /usr/sbin/nginx -g "daemon off;"
+        volumes:
+            - ./tmp:/home/admin/tmp
+            - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
+            - ./web/favor-group.ru:/home/admin/web/favor-group.ru
+            - ./private/letsencrypt:/home/admin/private/letsencrypt
+            - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
+            - ./config/nginx/status.conf:/etc/nginx/conf.d/status.conf
+            - ./config/nginx/server_name.conf:/home/admin/config/nginx/server_name.conf
+            - ./config/nginx/pagespeed.conf:/etc/nginx/conf.d/pagespeed.conf
+            - ./conf/web/dev.favor-group.ru.nginx.ssl.conf:/etc/nginx/conf.d/dev.favor-group.ru.nginx.ssl.conf
+            - ./conf/web/https.redirect.nginx.conf:/etc/nginx/conf.d/https.redirect.nginx.conf
+            - ./conf/web/favor-group.ru.nginx.ssl.conf:/etc/nginx/conf.d/favor-group.ru.nginx.ssl.conf
+            - /tmp/favor-logs/:/var/log/nginx/domains/
+        ports:
+            - "9080:80"
+            - "9443:443"
+        environment:
+            - TZ=Europe/Moscow
+
     percona-server:
         image: percona/percona-server:8.0
         hostname: percona-server
@@ -63,16 +89,3 @@ services:
         restart: always
         environment:
             - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
-
-#    https://github.com/extremeshok/docker-nginx-pagespeed
-#    nginx:
-#        image: nginx:1.15-alpine
-#        restart: unless-stopped
-#        volumes:
-#            - ./data/nginx:/etc/nginx/conf.d
-#            - ./data/certbot/conf:/etc/letsencrypt
-#            - ./data/certbot/www:/var/www/certbot
-#        ports:
-#            - "80:80"
-#            - "443:443"
-#        command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
