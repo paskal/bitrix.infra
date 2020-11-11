@@ -92,3 +92,32 @@ services:
         restart: always
         environment:
             - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
+
+    zabbix-agent:
+        image: zabbix/zabbix-agent2:latest
+        container_name: zabbix-agent
+        restart: always
+        privileged: true
+        depends_on:
+            - percona-server
+            - nginx
+        # temoporary, remove after moving from Debian to Ubuntu where it would be possible
+        # to set proper permissions for container user for /var/run/docker.sock
+        user: root
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+        volumes:
+            # this is needed in order to monitor docker
+            # to make it work you need to create user "zabbix" with id 1997 on the host system,
+            # and make sure it has enough permissions to read /var/run/docker.sock
+            - /var/run/docker.sock:/var/run/docker.sock
+
+        environment:
+            - TZ=Europe/Moscow
+            - ZBX_HOSTNAME=favor-group.ru.docker
+            - ZBX_SERVER_HOST=zabbix.terrty.net,46.101.10.22
