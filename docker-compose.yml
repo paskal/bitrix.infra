@@ -16,7 +16,8 @@ services:
         container_name: nginx
         image: paskal/nginx-pagespeed:latest
         restart: unless-stopped
-        command: /usr/sbin/nginx -g "daemon off;"
+        depends_on:
+            - adminer
         volumes:
             - ./tmp:/home/admin/tmp
             - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
@@ -24,6 +25,7 @@ services:
             - ./private/letsencrypt:/home/admin/private/letsencrypt
             - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
             - ./config/nginx/status.conf:/etc/nginx/conf.d/status.conf
+            - ./config/nginx/adminer.conf:/etc/nginx/conf.d/adminer.conf
             - ./config/nginx/server_name.conf:/home/admin/config/nginx/server_name.conf
             - ./config/nginx/pagespeed.conf:/etc/nginx/conf.d/pagespeed.conf
             - ./conf/web/dev.favor-group.ru.nginx.ssl.conf:/etc/nginx/conf.d/dev.favor-group.ru.nginx.ssl.conf
@@ -59,19 +61,20 @@ services:
             - SYS_NICE  # CAP_SYS_NICE
 
     adminer:
-        image: adminer:fastcgi
+        image: adminer
         hostname: adminer
         container_name: adminer
         restart: always
         expose:
-            - "9000"
+            - "8080"
+        environment:
+            ADMINER_DEFAULT_SERVER: percona-server
 
     # Percona Monitoring and Management client
     pmm-client:
         image: perconalab/pmm-client:2
         hostname: favor-group.ru
         container_name: pmm-client
-        # depends_on section is needed if you're monitoring DB that is running in the docker-compose
         depends_on:
             - percona-server
         volumes:
