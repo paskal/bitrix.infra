@@ -65,7 +65,9 @@ services:
         environment:
             ADMINER_DEFAULT_SERVER: percona-server
 
-    # Percona Monitoring and Management client
+    # Monitoring
+
+    ## Percona Monitoring and Management client
     pmm-client:
         image: perconalab/pmm-client:2
         hostname: favor-group.ru
@@ -88,6 +90,7 @@ services:
         environment:
             - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
 
+    ## Zabbix Agent 2
     zabbix-agent:
         image: zabbix/zabbix-agent2:latest
         container_name: zabbix-agent

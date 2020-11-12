@@ -11,12 +11,14 @@ max_user_connections=150
 wait_timeout=10
 interactive_timeout = 60
 long_query_time=5
+# https://www.percona.com/blog/2018/05/04/how-binary-logs-and-filesystems-affect-mysql-performance/
+sync_binlog=1000
 # 5 days of binlogs
 binlog_expire_logs_seconds=18000
 
 # https://www.percona.com/blog/2015/01/14/mysql-performance-implications-of-innodb-isolation-modes/
 # better than default
-transaction_isolation = read-committed
+transaction-isolation = READ-COMMITTED
 
 # https://www.percona.com/doc/percona-monitoring-and-management/2.x/concepts/services-mysql.html
 innodb_monitor_enable = all
