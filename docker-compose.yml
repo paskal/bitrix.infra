@@ -18,6 +18,7 @@ services:
         restart: unless-stopped
         depends_on:
             - adminer
+            - php
         volumes:
             - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
             - ./web/favor-group.ru:/home/admin/web/favor-group.ru
@@ -26,12 +27,30 @@ services:
             - ./config/nginx/conf.d/:/etc/nginx/conf.d/:ro
             - ./config/nginx/server_name.conf:/home/admin/config/nginx/server_name.conf:ro
             - ./tmp:/home/admin/tmp
-            - /tmp/favor-logs/:/var/log/nginx/domains/
+            - /tmp/favor-logs/nginx/:/var/log/nginx/
         ports:
             - "9080:80"
             - "9443:443"
         environment:
             - TZ=Europe/Moscow
+
+    php:
+        build: ./config/php-fpm
+        image: paskal/bitrix-php:latest
+        hostname: php
+        container_name: php
+        restart: always
+        expose:
+            - "9000"
+        volumes:
+            - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
+            - ./web/favor-group.ru:/home/admin/web/favor-group.ru
+            - /tmp/favor-logs/php/:/var/log/php
+            - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
+            - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+        depends_on:
+            - percona-server
+            - memcached
 
     percona-server:
         image: percona/percona-server:8.0
@@ -55,11 +74,23 @@ services:
         cap_add:
             - SYS_NICE  # CAP_SYS_NICE
 
+    memcached:
+        image: memcached:1-alpine
+        hostname: memcached
+        container_name: memcached
+        expose:
+            - "11211"
+        volumes:
+            - /tmp/favor-logs/memcached:/var/log/memcached
+            - ./private/memcached-data:/var/lib/memcached
+
     adminer:
         image: adminer
         hostname: adminer
         container_name: adminer
         restart: always
+        depends_on:
+            - percona-server
         expose:
             - "8080"
         environment:
