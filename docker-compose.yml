@@ -132,7 +132,7 @@ services:
             - nginx
         # temporary, remove after moving from Debian to Ubuntu where it would be possible
         # to set proper permissions for container user for /var/run/docker.sock
-        user: root
+        # user: root
 
         logging:
             driver: json-file
