@@ -16,5 +16,8 @@ RUN \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /etc/nginx/conf.d/*
 
+RUN usermod -u 1000 www-data
+RUN groupmod -g 1000 www-data
+
 # run nginx with configuration reload once in every 6 hours
 CMD /bin/sh -c 'while :; do /bin/sleep 6h & wait ${!}; /usr/sbin/nginx -s reload; done & /usr/sbin/nginx -g "daemon off;"'
