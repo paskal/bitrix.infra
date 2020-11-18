@@ -45,7 +45,8 @@ services:
         volumes:
             - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
             - ./web/favor-group.ru:/home/admin/web/favor-group.ru
-            - /tmp/favor-logs/php/:/var/log/php
+            - ./private/msmtprc:/etc/msmtprc
+            - /tmp/favor-logs/php:/var/log/php
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
         depends_on:
