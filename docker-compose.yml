@@ -29,8 +29,8 @@ services:
             - ./tmp:/home/admin/tmp
             - /tmp/favor-logs/nginx/:/var/log/nginx/
         ports:
-            - "9080:80"
-            - "9443:443"
+            - "80:80"
+            - "443:443"
         environment:
             - TZ=Europe/Moscow
 
