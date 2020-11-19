@@ -24,6 +24,7 @@ services:
             - ./web/favor-group.ru:/home/admin/web/favor-group.ru
             - ./private/letsencrypt:/home/admin/private/letsencrypt:ro
             - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro
             - ./config/nginx/conf.d/:/etc/nginx/conf.d/:ro
             - ./config/nginx/server_name.conf:/home/admin/config/nginx/server_name.conf:ro
             - ./tmp:/home/admin/tmp
