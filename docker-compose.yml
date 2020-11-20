@@ -30,10 +30,8 @@ services:
             - /tmp/favor-logs/nginx/:/var/log/nginx/
             - /tmp/favor-logs/pagespeed/:/var/log/pagespeed/
         ports:
-            #- "80:80"
-            #- "443:443"
-            - "9080:80"
-            - "9443:443"
+            - "80:80"
+            - "443:443"
         environment:
             - TZ=Europe/Moscow
 
@@ -52,6 +50,9 @@ services:
             - /tmp/favor-logs/php:/var/log/php
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+            # BX_TEMPORARY_FILES_DIRECTORY in bitrix/php_interface/dbconn.php
+            - /tmp/favor-group.ru/:/tmp/favor-group.ru/
+            - /tmp/dev.favor-group.ru/:/tmp/dev.favor-group.ru/
         depends_on:
             - percona-server
             - memcached
