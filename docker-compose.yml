@@ -20,18 +20,20 @@ services:
             - adminer
             - php
         volumes:
-            - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
-            - ./web/favor-group.ru:/home/admin/web/favor-group.ru
-            - ./private/letsencrypt:/home/admin/private/letsencrypt:ro
+            - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
+            - ./web/favor-group.ru/public_html:/web/favor-group.ru
             - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
             - ./config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro
+            - ./config/nginx/server_name.conf:/etc/nginx/server_name.conf:ro
             - ./config/nginx/conf.d/:/etc/nginx/conf.d/:ro
-            - ./config/nginx/server_name.conf:/home/admin/config/nginx/server_name.conf:ro
-            - ./tmp:/home/admin/tmp
+            - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
             - /tmp/favor-logs/nginx/:/var/log/nginx/
+            - /tmp/favor-logs/pagespeed/:/var/log/pagespeed/
         ports:
-            - "80:80"
-            - "443:443"
+            #- "80:80"
+            #- "443:443"
+            - "9080:80"
+            - "9443:443"
         environment:
             - TZ=Europe/Moscow
 
@@ -44,8 +46,8 @@ services:
         expose:
             - "9000"
         volumes:
-            - ./web/dev.favor-group.ru:/home/admin/web/dev.favor-group.ru
-            - ./web/favor-group.ru:/home/admin/web/favor-group.ru
+            - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
+            - ./web/favor-group.ru/public_html:/web/favor-group.ru
             - ./private/msmtprc:/etc/msmtprc
             - /tmp/favor-logs/php:/var/log/php
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
@@ -65,7 +67,7 @@ services:
             - "3306"
         # TODO: remove after migration of app into docker
         ports:
-            - "13306:3306"
+            - "3306:3306"
         volumes:
             - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
             # Data persistence
@@ -82,6 +84,8 @@ services:
         container_name: memcached
         expose:
             - "11211"
+        ports:
+            - "11211:11211"
         volumes:
             - /tmp/favor-logs/memcached:/var/log/memcached
             - ./private/memcached-data:/var/lib/memcached
