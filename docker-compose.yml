@@ -66,9 +66,6 @@ services:
         env_file: private/environment/percona.env
         expose:
             - "3306"
-        # TODO: remove after migration of app into docker
-        ports:
-            - "3306:3306"
         volumes:
             - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
             # Data persistence
@@ -85,8 +82,6 @@ services:
         container_name: memcached
         expose:
             - "11211"
-        ports:
-            - "11211:11211"
         volumes:
             - /tmp/favor-logs/memcached:/var/log/memcached
             - ./private/memcached-data:/var/lib/memcached

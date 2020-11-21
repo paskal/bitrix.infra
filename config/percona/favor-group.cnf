@@ -6,7 +6,7 @@ loose-default_character_set = utf8
 skip_external_locking = 1
 table_open_cache_instances=16
 
-max_connections=250
+max_connections=175
 max_user_connections=150
 wait_timeout=10
 interactive_timeout = 60
@@ -25,15 +25,15 @@ innodb_monitor_enable = all
 
 innodb_flush_log_at_trx_commit = 2
 innodb_flush_method = O_DIRECT
-innodb_log_file_size = 256M
+innodb_log_file_size = 512M
 sql_mode = ""
 thread_cache_size = 32
 
 # 50-70% of server's memory if it's dedicated to MySQL, or 100% of DB size (our case less than 2G)
-innodb_buffer_pool_size = 2G
+innodb_buffer_pool_size = 4G
 
 # mysqltuner recommendations
-innodb_buffer_pool_instances = 2
+innodb_buffer_pool_instances = 4
 thread_pool_size = 16
 join_buffer_size = 128M
 table_open_cache = 8192
@@ -46,5 +46,5 @@ character_set_server=utf8
 collation_server=utf8_unicode_ci
 
 # increased according to Bitrix recommendations
-tmp_table_size = 512M
-max_heap_table_size =512M
+tmp_table_size = 256M
+max_heap_table_size = 256M
