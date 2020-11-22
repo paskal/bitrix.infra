@@ -53,6 +53,8 @@ services:
             # BX_TEMPORARY_FILES_DIRECTORY in bitrix/php_interface/dbconn.php
             - /tmp/favor-group.ru/:/tmp/favor-group.ru/
             - /tmp/dev.favor-group.ru/:/tmp/dev.favor-group.ru/
+            # MySQL socket to prevent transfering data trough TCP
+            - /var/run/mysqld/:/var/run/mysqld/
         depends_on:
             - percona-server
             - memcached
@@ -70,6 +72,9 @@ services:
             - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
             # Data persistence
             - ./private/percona-data:/var/lib/mysql
+            # MySQL socket to prevent transfering data trough TCP
+            # do chmod user:1001 /var/run/mysqld/
+            - /var/run/mysqld/:/var/mysql-socket/
         environment:
             MYSQL_DATABASE: admin_favorgroup
             TZ: Europe/Moscow

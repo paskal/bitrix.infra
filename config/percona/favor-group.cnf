@@ -1,8 +1,13 @@
 [client]
 # https://bugs.mysql.com/bug.php?id=11673
 loose-default_character_set = utf8
+socket=/var/mysql-socket/mysqld.sock
+
+[mysqld_safe]
+socket=/var/mysql-socket/mysqld.sock
 
 [mysqld]
+socket=/var/mysql-socket/mysqld.sock
 skip_external_locking = 1
 table_open_cache_instances=16
 
