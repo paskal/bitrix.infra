@@ -35,12 +35,23 @@ docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_i
 docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e 'flush privileges;'
 
 # create and load database dump
-docker exec -u0 percona-server /bin/mysqldump --defaults-extra-file=${mysql_config_inside_container} --no-tablespaces ${PROD_DB} >prod-dump.sql
+# --no-tablespaces allows running not from root
+# --single-transaction will start a transaction before running
+docker exec -u0 percona-server /bin/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces ${PROD_DB} >prod-dump.sql
 echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" > ${mysql_config_file}
 cat prod-dump.sql | docker exec -u0 -i percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} ${DEV_DB}
 
-# remove active security filter
-docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "delete from b_module_to_module where MESSAGE_ID = 'OnPageStart' and TO_MODULE_ID = 'security';" ${DEV_DB}
+# change aspro and main site URL to reflect dev site value
+docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_iblock_element_property set VALUE = 'dev.favor-group.ru' where VALUE = 'favor-group.ru';" ${DEV_DB}
+docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_lang set SERVER_NAME = 'dev.favor-group.ru' where SERVER_NAME = 'favor-group.ru';" ${DEV_DB}
+# change security filter settings to use new domain
+docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'dev.favor-group.ru' where VALUE = 'favor-group.ru';" ${DEV_DB}
+docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'dev.favor-group.ru' where MODULE_ID = 'security' and NAME = 'restriction_hosts_hosts';" ${DEV_DB}
+docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'a:1:{s:4:\"host\";s:26:\"https://dev.favor-group.ru\";}' where MODULE_ID = 'security' AND name = 'restriction_hosts_action_options';" ${DEV_DB}
+# mark site as development one
+docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'update_devsrv';" ${DEV_DB}
+# disable external access to the site
+docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'site_stopped';" ${DEV_DB}
 
 # copy files
 # --archive preserves file permissions and so on
