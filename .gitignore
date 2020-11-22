@@ -17,6 +17,9 @@
 .vimrc
 .gnupg/
 
+# sql dumps
+*.sql
+
 # temporary folder
 /tmp
 
