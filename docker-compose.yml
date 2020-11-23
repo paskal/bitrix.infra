@@ -71,6 +71,7 @@ services:
             - "127.0.0.1:3306:3306"
         volumes:
             - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
+            - /tmp/favor-logs/mysql:/var/log/mysql
             # Data persistence
             - ./private/percona-data:/var/lib/mysql
             # MySQL socket to prevent transfering data trough TCP

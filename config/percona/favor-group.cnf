@@ -11,8 +11,8 @@ socket=/var/mysql-socket/mysqld.sock
 skip_external_locking = 1
 table_open_cache_instances=16
 
-max_connections=175
-max_user_connections=150
+max_connections=60
+max_user_connections=35
 wait_timeout=10
 interactive_timeout = 60
 long_query_time=5
@@ -53,3 +53,12 @@ collation_server=utf8_unicode_ci
 # increased according to Bitrix recommendations
 tmp_table_size = 256M
 max_heap_table_size = 256M
+
+# error log
+log_error=/var/log/mysql/error.log
+
+# slow log
+slow_query_log=1
+long_query_time=0.1
+log_output=FILE
+slow_query_log_file=/var/log/mysql/slow.log
