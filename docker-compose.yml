@@ -28,7 +28,6 @@ services:
             - ./config/nginx/conf.d/:/etc/nginx/conf.d/:ro
             - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
             - /tmp/favor-logs/nginx/:/var/log/nginx/
-            - /tmp/favor-logs/pagespeed/:/var/log/pagespeed/
         ports:
             - "80:80"
             - "443:443"
@@ -68,6 +67,8 @@ services:
         env_file: private/environment/percona.env
         expose:
             - "3306"
+        ports:
+            - "127.0.0.1:3306:3306"
         volumes:
             - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
             # Data persistence
