@@ -37,7 +37,10 @@ docker exec -u0 percona-server /bin/mysql --defaults-extra-file=${mysql_config_i
 # create and load database dump
 # --no-tablespaces allows running not from root
 # --single-transaction will start a transaction before running
-docker exec -u0 percona-server /bin/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces ${PROD_DB} >prod-dump.sql
+# first --no-data run just dumps the schema for all tables,
+# second --ignore-table run ignores data from user sessions as we don't need to transfer it
+docker exec -u0 percona-server /bin/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --no-data ${PROD_DB} >prod-dump.sql
+docker exec -u0 percona-server /bin/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>prod-dump.sql
 echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" > ${mysql_config_file}
 cat prod-dump.sql | docker exec -u0 -i percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} ${DEV_DB}
 
