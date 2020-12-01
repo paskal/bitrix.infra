@@ -40,8 +40,8 @@ innodb_buffer_pool_size = 4G
 # mysqltuner recommendations
 innodb_buffer_pool_instances = 4
 thread_pool_size = 16
-join_buffer_size = 128M
-table_open_cache = 8192
+join_buffer_size = 256M
+table_open_cache = 16384
 
 # https://www.percona.com/blog/2016/10/12/mysql-5-7-performance-tuning-immediately-after-installation/
 innodb_autoinc_lock_mode = 2
@@ -59,6 +59,6 @@ log_error=/var/log/mysql/error.log
 
 # slow log
 slow_query_log=1
-long_query_time=0.1
+long_query_time=0.5
 log_output=FILE
 slow_query_log_file=/var/log/mysql/slow.log
