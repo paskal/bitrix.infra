@@ -62,3 +62,6 @@ slow_query_log=1
 long_query_time=0.5
 log_output=FILE
 slow_query_log_file=/var/log/mysql/slow.log
+
+# user stats for PMM
+userstat=on
