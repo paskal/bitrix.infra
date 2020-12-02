@@ -109,13 +109,15 @@ services:
 
     ## Percona Monitoring and Management client
     pmm-client:
-        image: perconalab/pmm-client:2
+        image: percona/pmm-client:2
         hostname: favor-group.ru
         container_name: pmm-client
         depends_on:
             - percona-server
         volumes:
             - ./private/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
+            # MySQL socket to prevent transfering data trough TCP
+            - /var/run/mysqld/:/var/run/mysqld/
         ports:
             - "42000:42000"
             - "42001:42001"
