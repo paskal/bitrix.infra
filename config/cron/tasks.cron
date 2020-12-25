@@ -1,0 +1,24 @@
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+
+# default Bitrix cron events
+*  *  *  *  * www-data /usr/bin/php /web/favor-group.ru/bitrix/modules/main/tools/cron_events.php 2>&1 >>/var/log/cron/cron.log
+# recalculate price with discount
+30 0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/favor-group.ru/local/cron/update_base_discount_price.php 2>&1 >>/var/log/cron/cron.log
+# sitemap generation
+0  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/favor-group.ru/local/cron/bitrix.seo_sitemap_run.php 2>&1 >>/var/log/cron/cron.log
+5  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/favor-group.ru/local/cron/sotbit.seometa_sitemap_light_run.php 2>&1 >>/var/log/cron/cron.log
+10 0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/favor-group.ru/local/cron/aspro.next_generate_sitemap.php 2>&1 >>/var/log/cron/cron.log
+# exports to yandex and google
+0  1  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/favor-group.ru/bitrix/modules/acrit.export/cli/export.php profile=1 auto=Y site=s1 >> /web/favor-group.ru/upload/acrit.export/log/log_1.e63f31938c399df95752fe5013735c65.txt 2>&1
+30 1  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/favor-group.ru/bitrix/modules/acrit.export/cli/export.php profile=2 auto=Y site=s1 >> /web/favor-group.ru/upload/acrit.export/log/log_2.e63f31938c399df95752fe5013735c65.txt 2>&1
+0  2  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/favor-group.ru/bitrix/modules/acrit.export/cli/export.php profile=3 auto=Y site=s1 >> /web/favor-group.ru/upload/acrit.export/log/log_3.e63f31938c399df95752fe5013735c65.txt 2>&1
+30 2  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/favor-group.ru/bitrix/modules/acrit.export/cli/export.php profile=4 auto=Y site=s1 >> /web/favor-group.ru/upload/acrit.export/log/log_4.e63f31938c399df95752fe5013735c65.txt 2>&1
+0  3  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/favor-group.ru/bitrix/modules/acrit.export/cli/export.php profile=5 auto=Y site=s1 >> /web/favor-group.ru/upload/acrit.export/log/log_5.e63f31938c399df95752fe5013735c65.txt 2>&1
+30 3  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/favor-group.ru/bitrix/modules/acrit.export/cli/export.php profile=6 auto=Y site=s1 >> /web/favor-group.ru/upload/acrit.export/log/log_6.e63f31938c399df95752fe5013735c65.txt 2>&1

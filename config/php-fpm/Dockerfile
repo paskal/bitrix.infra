@@ -16,8 +16,16 @@ RUN apt-get update \
     php7.4-zip \
     php-pear php-dev libmcrypt-dev gcc make autoconf libc-dev pkg-config \
     msmtp \
-    && pecl install mcrypt-1.0.3 \
+    msmtp-mta \
+    sudo \
+    cron \
+    && pecl install mcrypt-1.0.4 \
     && apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
+
+# msmtp to allow email sending
+# msmtp-mta to allow sendmail usage with msmtp
+# sudo to allow create logfile with www-data user
+# cron to run cronjobs in a separate container
 
 RUN usermod -u 1000 www-data
 RUN groupmod -g 1000 www-data

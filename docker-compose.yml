@@ -58,6 +58,31 @@ services:
             - percona-server
             - memcached
 
+    php-cron:
+        command: cron && tail -f /var/log/cron.log
+        image: paskal/bitrix-php:latest
+        hostname: php-cron
+        container_name: php-cron
+        restart: always
+        volumes:
+            - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
+            - ./web/favor-group.ru/public_html:/web/favor-group.ru
+            - ./private/msmtprc:/etc/msmtprc
+            - /tmp/favor-logs/php:/var/log/php
+            - /tmp/favor-logs/cron:/var/log/cron
+            - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
+            - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+            # BX_TEMPORARY_FILES_DIRECTORY in bitrix/php_interface/dbconn.php
+            - /tmp/favor-group.ru/:/tmp/favor-group.ru/
+            - /tmp/dev.favor-group.ru/:/tmp/dev.favor-group.ru/
+            # MySQL socket to prevent transfering data trough TCP
+            - /var/run/mysqld/:/var/run/mysqld/
+            # cronjobs
+            - ./config/cron/tasks.cron:/etc/cron.d/tasks:ro
+        depends_on:
+            - percona-server
+            - memcached
+
     percona-server:
         image: percona/percona-server:8.0
         hostname: percona-server
