@@ -130,6 +130,23 @@ services:
         environment:
             ADMINER_DEFAULT_SERVER: percona-server
 
+    ftp:
+        image: stilliard/pure-ftpd
+        container_name: ftp
+        # FTP_USER_PASS
+        env_file: private/environment/ftp.env
+        ports:
+            - "21:21"
+            - "30000-30009:30000-30009"
+        volumes:
+            - ./web/favor-group.ru/public_html:/home/web
+            - "/folder_on_disk/passwd:/etc/pure-ftpd/passwd"
+        environment:
+            PUBLICHOST: "ftp.favor-group.ru"
+            FTP_USER_NAME: web
+            FTP_USER_HOME: /home/web
+        restart: always
+
     # Monitoring
 
     ## Percona Monitoring and Management client
