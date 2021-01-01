@@ -27,7 +27,7 @@ services:
             - ./config/nginx/server_name.conf:/etc/nginx/server_name.conf:ro
             - ./config/nginx/conf.d/:/etc/nginx/conf.d/:ro
             - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
-            - /tmp/favor-logs/nginx/:/var/log/nginx/
+            - ./logs/nginx/:/var/log/nginx/
         ports:
             - "80:80"
             - "443:443"
@@ -46,7 +46,7 @@ services:
             - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
             - ./web/favor-group.ru/public_html:/web/favor-group.ru
             - ./private/msmtprc:/etc/msmtprc
-            - /tmp/favor-logs/php:/var/log/php
+            - ./logs/php:/var/log/php
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # BX_TEMPORARY_FILES_DIRECTORY in bitrix/php_interface/dbconn.php
@@ -68,8 +68,8 @@ services:
             - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
             - ./web/favor-group.ru/public_html:/web/favor-group.ru
             - ./private/msmtprc:/etc/msmtprc
-            - /tmp/favor-logs/php:/var/log/php
-            - /tmp/favor-logs/cron:/var/log/cron
+            - ./logs/php:/var/log/php
+            - ./logs/cron:/var/log/cron
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # BX_TEMPORARY_FILES_DIRECTORY in bitrix/php_interface/dbconn.php
@@ -96,7 +96,7 @@ services:
             - "127.0.0.1:3306:3306"
         volumes:
             - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
-            - /tmp/favor-logs/mysql:/var/log/mysql
+            - ./logs/mysql:/var/log/mysql
             # Data persistence
             - ./private/percona-data:/var/lib/mysql
             # MySQL socket to prevent transfering data trough TCP
@@ -115,7 +115,7 @@ services:
         expose:
             - "11211"
         volumes:
-            - /tmp/favor-logs/memcached:/var/log/memcached
+            - ./logs/memcached:/var/log/memcached
             - ./private/memcached-data:/var/lib/memcached
 
     adminer:

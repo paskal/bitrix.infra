@@ -23,5 +23,8 @@
 # temporary folder
 /tmp
 
+# logs folder
+/logs
+
 # site code
 /web
