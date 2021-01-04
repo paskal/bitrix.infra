@@ -5,6 +5,13 @@ services:
         image: certbot/certbot
         hostname: certbot
         container_name: certbot
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: unless-stopped
         volumes:
             - ./private/letsencrypt:/etc/letsencrypt
@@ -15,6 +22,13 @@ services:
         hostname: nginx
         container_name: nginx
         image: paskal/nginx-pagespeed:latest
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: unless-stopped
         depends_on:
             - adminer
@@ -39,6 +53,13 @@ services:
         image: paskal/bitrix-php:latest
         hostname: php
         container_name: php
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: always
         expose:
             - "9000"
@@ -63,6 +84,13 @@ services:
         image: paskal/bitrix-php:latest
         hostname: php-cron
         container_name: php-cron
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: always
         volumes:
             - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
@@ -87,6 +115,13 @@ services:
         image: percona/percona-server:8.0
         hostname: percona-server
         container_name: percona-server
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: always
         # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
         env_file: private/environment/percona.env
@@ -112,6 +147,13 @@ services:
         image: memcached:1-alpine
         hostname: memcached
         container_name: memcached
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         expose:
             - "11211"
         volumes:
@@ -122,6 +164,13 @@ services:
         image: adminer
         hostname: adminer
         container_name: adminer
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: always
         depends_on:
             - percona-server
@@ -145,6 +194,13 @@ services:
             PUBLICHOST: "ftp.favor-group.ru"
             FTP_USER_NAME: web
             FTP_USER_HOME: /home/web
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
         restart: always
 
     # Monitoring
