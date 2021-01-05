@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e -u -o pipefail
 
@@ -35,6 +35,7 @@ mysql_config_file=$(
 mysql_binary_path="docker exec -u0 percona-server /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
+# bash echo required -e to write \n as a newline
 echo -e "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
 echo "Backing up MySQL to $DIRECTORY"
@@ -43,12 +44,7 @@ ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_conta
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} | pigz -p $PROC_NUM -c >>"$DIRECTORY/$FILE"
 chmod 0640 "$DIRECTORY/$FILE"
 
-LOCAL_RETENTION=20
-
-# TODO enable after making file backup work
-#echo "Removing old backups in directory: /backup"
-#find /backup -mtime +$LOCAL_RETENTION -type f -delete
-#find /backup -empty -type d -delete
-
 # clean up tmp file with credentials
 rm -f -- "${mysql_config_file}"
+
+echo "Backup is complete"
