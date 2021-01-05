@@ -21,10 +21,10 @@ mysql_config_file=$(
     m4 -D template="./private/percona-data/deleteme_XXXXXX"
 ) || exit
 
-mysql_binary_path = "docker exec -u0 percona-server /bin"
+mysql_binary_path="docker exec -u0 percona-server /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
-echo -e "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
+echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "drop database if exists ${DEV_DB};"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "drop user if exists '${DEV_USER}'@'%';"
@@ -42,7 +42,7 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 # second --ignore-table run ignores data from user sessions as we don't need to transfer it
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --no-data ${PROD_DB} >prod-dump.sql
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>prod-dump.sql
-echo -e "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" >${mysql_config_file}
+echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" >${mysql_config_file}
 cat prod-dump.sql | docker exec -u0 -i percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} ${DEV_DB}
 
 # change aspro and main site URL to reflect dev site value
