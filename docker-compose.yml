@@ -5,6 +5,9 @@ services:
         image: certbot/certbot
         hostname: certbot
         container_name: certbot
+        entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 10d & wait $${!}; done;'"
+        volumes:
+            - ./private/letsencrypt:/etc/letsencrypt
 
         logging:
             driver: json-file
@@ -13,26 +16,18 @@ services:
                 max-file: "5"
 
         restart: unless-stopped
-        volumes:
-            - ./private/letsencrypt:/etc/letsencrypt
-        entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 10d & wait $${!}; done;'"
 
     nginx:
         build: ./config/nginx
         hostname: nginx
         container_name: nginx
         image: paskal/nginx-pagespeed:latest
-
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
-
-        restart: unless-stopped
         depends_on:
             - adminer
             - php
+        ports:
+            - "80:80"
+            - "443:443"
         volumes:
             - ./web/dev.favor-group.ru:/web/dev.favor-group.ru
             - ./web/favor-group.ru:/web/favor-group.ru
@@ -43,17 +38,8 @@ services:
             - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
             # Logs
             - ./logs/nginx/:/var/log/nginx/
-        ports:
-            - "80:80"
-            - "443:443"
         environment:
             - TZ=Europe/Moscow
-
-    php:
-        build: ./config/php-fpm
-        image: paskal/bitrix-php:latest
-        hostname: php
-        container_name: php
 
         logging:
             driver: json-file
@@ -61,7 +47,16 @@ services:
                 max-size: "10m"
                 max-file: "5"
 
-        restart: always
+        restart: unless-stopped
+
+    php:
+        build: ./config/php-fpm
+        image: paskal/bitrix-php:latest
+        hostname: php
+        container_name: php
+        depends_on:
+            - mysql
+            - memcached
         expose:
             - "9000"
         volumes:
@@ -77,15 +72,6 @@ services:
             - /var/run/mysqld/:/var/run/mysqld/
             # Logs
             - ./logs/php:/var/log/php
-        depends_on:
-            - mysql
-            - memcached
-
-    php-cron:
-        command: cron && tail -f /var/log/cron.log
-        image: paskal/bitrix-php:latest
-        hostname: php-cron
-        container_name: php-cron
 
         logging:
             driver: json-file
@@ -93,7 +79,16 @@ services:
                 max-size: "10m"
                 max-file: "5"
 
-        restart: always
+        restart: unless-stopped
+
+    php-cron:
+        command: cron && tail -f /var/log/cron.log
+        image: paskal/bitrix-php:latest
+        hostname: php-cron
+        container_name: php-cron
+        depends_on:
+            - mysql
+            - memcached
         volumes:
             - ./web/dev.favor-group.ru:/web/dev.favor-group.ru
             - ./web/favor-group.ru:/web/favor-group.ru
@@ -110,14 +105,6 @@ services:
             # Logs
             - ./logs/php:/var/log/php
             - ./logs/cron:/var/log/cron
-        depends_on:
-            - mysql
-            - memcached
-
-    mysql:
-        image: percona/percona-server:8.0
-        hostname: mysql
-        container_name: mysql
 
         logging:
             driver: json-file
@@ -125,7 +112,12 @@ services:
                 max-size: "10m"
                 max-file: "5"
 
-        restart: always
+        restart: unless-stopped
+
+    mysql:
+        image: percona/percona-server:8.0
+        hostname: mysql
+        container_name: mysql
         # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
         env_file: private/environment/mysql.env
         expose:
@@ -147,6 +139,14 @@ services:
             TZ: Europe/Moscow
         cap_add:
             - SYS_NICE  # CAP_SYS_NICE
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+        restart: unless-stopped
 
     memcached:
         image: memcached:1-alpine
@@ -171,13 +171,14 @@ services:
             - "8080"
         environment:
             ADMINER_DEFAULT_SERVER: mysql
+
         logging:
             driver: json-file
             options:
                 max-size: "10m"
                 max-file: "5"
 
-        restart: always
+        restart: unless-stopped
 
     ftp:
         image: stilliard/pure-ftpd
@@ -200,7 +201,7 @@ services:
                 max-size: "10m"
                 max-file: "5"
 
-        restart: always
+        restart: unless-stopped
 
     # Monitoring
 
@@ -211,15 +212,17 @@ services:
         container_name: pmm-client
         depends_on:
             - mysql
+        ports:
+            - "42000:42000"
+            - "42001:42001"
         volumes:
             # Configuration, should be generated using that doc:
             # https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b
             - ./private/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
             # MySQL socket to prevent transferring data trough TCP
             - /var/run/mysqld/:/var/run/mysqld/
-        ports:
-            - "42000:42000"
-            - "42001:42001"
+        environment:
+            - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
 
         logging:
             driver: json-file
@@ -227,36 +230,29 @@ services:
                 max-size: "10m"
                 max-file: "5"
 
-        restart: always
-        environment:
-            - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
+        restart: unless-stopped
 
     ## Zabbix Agent 2
     zabbix-agent:
         image: zabbix/zabbix-agent2:latest
         container_name: zabbix-agent
-        restart: always
         privileged: true
         depends_on:
             - mysql
             - nginx
-        # temporary, remove after moving from Debian to Ubuntu where it would be possible
-        # to set proper permissions for container user for /var/run/docker.sock
-        # user: root
+        volumes:
+            # this is needed in order to monitor docker
+            # to make it work you need to create user "zabbix" with id 1997 on the host system,
+            # and make sure it has enough permissions to read /var/run/docker.sock
+            - /var/run/docker.sock:/var/run/docker.sock
+        environment:
+            - TZ=Europe/Moscow
+            - ZBX_HOSTNAME=favor-group.ru.docker
+            - ZBX_SERVER_HOST=zabbix.terrty.net,46.101.10.22
 
         logging:
             driver: json-file
             options:
                 max-size: "10m"
                 max-file: "5"
-
-        volumes:
-            # this is needed in order to monitor docker
-            # to make it work you need to create user "zabbix" with id 1997 on the host system,
-            # and make sure it has enough permissions to read /var/run/docker.sock
-            - /var/run/docker.sock:/var/run/docker.sock
-
-        environment:
-            - TZ=Europe/Moscow
-            - ZBX_HOSTNAME=favor-group.ru.docker
-            - ZBX_SERVER_HOST=zabbix.terrty.net,46.101.10.22
+        restart: unless-stopped

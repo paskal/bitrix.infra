@@ -26,5 +26,5 @@
 # logs folder
 /logs
 
-# site code
-/web
+# private folder
+private
