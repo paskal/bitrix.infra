@@ -2,8 +2,8 @@
 
 # This script recreates dev site from current prod one with deleting old dev in the process
 
-PROD_LOCATION=/home/admin/web/favor-group.ru/public_html
-DEV_LOCATION=/home/admin/web/dev.favor-group.ru/public_html
+PROD_LOCATION=/home/admin/web/favor-group.ru
+DEV_LOCATION=/home/admin/web/dev.favor-group.ru
 
 # MySQL variables
 PROD_DB=admin_favorgroup
