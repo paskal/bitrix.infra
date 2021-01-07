@@ -26,5 +26,8 @@
 # logs folder
 /logs
 
+# web files folder
+/web
+
 # private folder
 private
