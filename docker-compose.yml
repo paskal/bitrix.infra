@@ -66,7 +66,7 @@ services:
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # MySQL socket to prevent transferring data trough TCP
-            - /var/run/mysqld:/var/run/mysqld
+            - ./private/mysqld:/var/run/mysqld
             # Logs
             - ./logs/php:/var/log/php
 
@@ -93,7 +93,7 @@ services:
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # MySQL socket to prevent transferring data trough TCP
-            - /var/run/mysqld:/var/run/mysqld
+            - ./private/mysqld:/var/run/mysqld
             # Cronjobs
             - ./config/cron/tasks.cron:/etc/cron.d/tasks:ro
             # Logs
@@ -124,8 +124,8 @@ services:
             # Data persistence
             - ./private/mysql-data:/var/lib/mysql
             # MySQL socket to prevent transferring data trough TCP
-            # do chmod user:1001 /var/run/mysqld/
-            - /var/run/mysqld:/var/mysql-socket
+            # do chmod user:1001 ./private/mysqld
+            - ./private/mysqld:/var/mysql-socket
             # Logs
             - ./logs/mysql:/var/log/mysql
         environment:
@@ -214,7 +214,7 @@ services:
             # https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b
             - ./private/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
             # MySQL socket to prevent transferring data trough TCP
-            - /var/run/mysqld:/var/run/mysqld
+            - ./private/mysqld:/var/run/mysqld
         environment:
             - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
 
