@@ -41,6 +41,7 @@ services:
             - ./config/nginx/server_name.conf:/etc/nginx/server_name.conf:ro
             - ./config/nginx/conf.d/:/etc/nginx/conf.d/:ro
             - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
+            # Logs
             - ./logs/nginx/:/var/log/nginx/
         ports:
             - "80:80"
@@ -67,16 +68,17 @@ services:
             - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
             - ./web/favor-group.ru/public_html:/web/favor-group.ru
             - ./private/msmtprc:/etc/msmtprc
-            - ./logs/php:/var/log/php
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # BX_TEMPORARY_FILES_DIRECTORY in bitrix/php_interface/dbconn.php
             - /tmp/favor-group.ru/:/tmp/favor-group.ru/
             - /tmp/dev.favor-group.ru/:/tmp/dev.favor-group.ru/
-            # MySQL socket to prevent transfering data trough TCP
+            # MySQL socket to prevent transferring data trough TCP
             - /var/run/mysqld/:/var/run/mysqld/
+            # Logs
+            - ./logs/php:/var/log/php
         depends_on:
-            - percona-server
+            - mysql
             - memcached
 
     php-cron:
@@ -96,25 +98,26 @@ services:
             - ./web/dev.favor-group.ru/public_html:/web/dev.favor-group.ru
             - ./web/favor-group.ru/public_html:/web/favor-group.ru
             - ./private/msmtprc:/etc/msmtprc
-            - ./logs/php:/var/log/php
-            - ./logs/cron:/var/log/cron
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # BX_TEMPORARY_FILES_DIRECTORY in bitrix/php_interface/dbconn.php
             - /tmp/favor-group.ru/:/tmp/favor-group.ru/
             - /tmp/dev.favor-group.ru/:/tmp/dev.favor-group.ru/
-            # MySQL socket to prevent transfering data trough TCP
+            # MySQL socket to prevent transferring data trough TCP
             - /var/run/mysqld/:/var/run/mysqld/
-            # cronjobs
+            # Cronjobs
             - ./config/cron/tasks.cron:/etc/cron.d/tasks:ro
+            # Logs
+            - ./logs/php:/var/log/php
+            - ./logs/cron:/var/log/cron
         depends_on:
-            - percona-server
+            - mysql
             - memcached
 
-    percona-server:
+    mysql:
         image: percona/percona-server:8.0
-        hostname: percona-server
-        container_name: percona-server
+        hostname: mysql
+        container_name: mysql
 
         logging:
             driver: json-file
@@ -124,19 +127,21 @@ services:
 
         restart: always
         # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
-        env_file: private/environment/percona.env
+        env_file: private/environment/mysql.env
         expose:
             - "3306"
         ports:
             - "127.0.0.1:3306:3306"
         volumes:
-            - ./config/percona/favor-group.cnf:/etc/my.cnf.d/favor-group.cnf
-            - ./logs/mysql:/var/log/mysql
+            # Configuration
+            - ./config/mysql/my.cnf:/etc/my.cnf.d/my.cnf
             # Data persistence
-            - ./private/percona-data:/var/lib/mysql
-            # MySQL socket to prevent transfering data trough TCP
+            - ./private/mysql-data:/var/lib/mysql
+            # MySQL socket to prevent transferring data trough TCP
             # do chmod user:1001 /var/run/mysqld/
             - /var/run/mysqld/:/var/mysql-socket/
+            # Logs
+            - ./logs/mysql:/var/log/mysql
         environment:
             MYSQL_DATABASE: admin_favorgroup
             TZ: Europe/Moscow
@@ -147,6 +152,8 @@ services:
         image: memcached:1-alpine
         hostname: memcached
         container_name: memcached
+        expose:
+            - "11211"
 
         logging:
             driver: json-file
@@ -154,17 +161,16 @@ services:
                 max-size: "10m"
                 max-file: "5"
 
-        expose:
-            - "11211"
-        volumes:
-            - ./logs/memcached:/var/log/memcached
-            - ./private/memcached-data:/var/lib/memcached
-
     adminer:
         image: adminer
         hostname: adminer
         container_name: adminer
-
+        depends_on:
+            - mysql
+        expose:
+            - "8080"
+        environment:
+            ADMINER_DEFAULT_SERVER: mysql
         logging:
             driver: json-file
             options:
@@ -172,17 +178,11 @@ services:
                 max-file: "5"
 
         restart: always
-        depends_on:
-            - percona-server
-        expose:
-            - "8080"
-        environment:
-            ADMINER_DEFAULT_SERVER: percona-server
 
     ftp:
         image: stilliard/pure-ftpd
         container_name: ftp
-        # FTP_USER_PASS
+        # FTP_USER_NAME, FTP_USER_PASS
         env_file: private/environment/ftp.env
         ports:
             - "21:21"
@@ -191,8 +191,7 @@ services:
             - ./web/favor-group.ru/public_html:/home/web
             - "/folder_on_disk/passwd:/etc/pure-ftpd/passwd"
         environment:
-            PUBLICHOST: "ftp.favor-group.ru"
-            FTP_USER_NAME: web
+            PUBLICHOST: "favor-group.ru"
             FTP_USER_HOME: /home/web
 
         logging:
@@ -211,10 +210,12 @@ services:
         hostname: favor-group.ru
         container_name: pmm-client
         depends_on:
-            - percona-server
+            - mysql
         volumes:
+            # Configuration, should be generated using that doc:
+            # https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b
             - ./private/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
-            # MySQL socket to prevent transfering data trough TCP
+            # MySQL socket to prevent transferring data trough TCP
             - /var/run/mysqld/:/var/run/mysqld/
         ports:
             - "42000:42000"
@@ -237,7 +238,7 @@ services:
         restart: always
         privileged: true
         depends_on:
-            - percona-server
+            - mysql
             - nginx
         # temporary, remove after moving from Debian to Ubuntu where it would be possible
         # to set proper permissions for container user for /var/run/docker.sock
