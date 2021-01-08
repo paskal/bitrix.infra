@@ -23,16 +23,16 @@ elif [ "$PROC_NUM" -lt 1 ]; then
 fi
 
 # read MYSQL_ROOT_PASSWORD
-. ./private/environment/percona.env
+. ./private/environment/mysql.env
 
 # create temp file to store mysql login and password for the time of the script
 # location for it should be the directory which is passed inside the container
 mysql_config_file=$(
   echo 'mkstemp(template)' |
-    m4 -D template="./private/percona-data/deleteme_XXXXXX"
+    m4 -D template="./private/mysql-data/deleteme_XXXXXX"
 ) || exit
 
-mysql_binary_path="docker exec -u0 percona-server /bin"
+mysql_binary_path="docker exec -u0 mysql-server /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
 # bash echo required -e to write \n as a newline

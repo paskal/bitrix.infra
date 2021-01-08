@@ -12,16 +12,16 @@ DEV_USER=dev_favor_group_ru
 DEV_PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 
 # read MYSQL_ROOT_PASSWORD
-. ./private/environment/percona.env
+. ./private/environment/mysql.env
 
 # create temp file to store mysql login and password for the time of the script
 # location for it should be the directory which is passed inside the container
 mysql_config_file=$(
   echo 'mkstemp(template)' |
-    m4 -D template="./private/percona-data/deleteme_XXXXXX"
+    m4 -D template="./private/mysql-data/deleteme_XXXXXX"
 ) || exit
 
-mysql_binary_path="docker exec -u0 percona-server /bin"
+mysql_binary_path="docker exec -u0 mysql-server /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
 echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
@@ -43,7 +43,7 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --no-data ${PROD_DB} >prod-dump.sql
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>prod-dump.sql
 echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" >${mysql_config_file}
-cat prod-dump.sql | docker exec -u0 -i percona-server /bin/mysql --defaults-extra-file=${mysql_config_inside_container} ${DEV_DB}
+cat prod-dump.sql | docker exec -u0 -i mysql /bin/mysql --defaults-extra-file=${mysql_config_inside_container} ${DEV_DB}
 
 # change aspro and main site URL to reflect dev site value
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_iblock_element_property set VALUE = 'dev.favor-group.ru' where VALUE = 'favor-group.ru';" ${DEV_DB}
