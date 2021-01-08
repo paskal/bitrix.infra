@@ -12,6 +12,12 @@ It couldn't be used as-is without alterations elsewhere, however I tried to make
 as possible to make adoption for other project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
 and then read the rest of this Readme.
 
+After you'll make adjustments to configuration and docker-compose.yml, run it as following:
+
+```bash
+docker-compose up --build -d
+```
+
 ## What's inside?
 
 - [certbot](https://certbot.eff.org/) for certificate generation
@@ -58,9 +64,20 @@ Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-grou
 
 - `private/environment` is a directory with environment files for docker-compose
 
-    - `private/environment/mysql.env` should contain `MYSQL_ROOT_PASSWORD`, `MYSQL_USER` and `MYSQL_PASSWORD`.
+    - `private/environment/mysql.env` should contain following variables:
 
-    - `private/environment/ftp.env` should contain `FTP_USER_NAME`, `FTP_USER_PASS`.
+      ```bash
+      MYSQL_ROOT_PASSWORD=mysql_root_password
+      MYSQL_USER=bitrix_user
+      MYSQL_PASSWORD=bitrix_mysql_password
+      ```
+
+    - `private/environment/ftp.env` should contain following variables:
+  
+      ```bash
+      FTP_USER_NAME=ftp_username
+      FTP_USER_PASS=ftp_password
+      ```
 
 - `private/pmm/pmm-agent.yaml` should contain agent setup which is done according to
   [this doc](https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b).
