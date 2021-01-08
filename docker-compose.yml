@@ -184,9 +184,7 @@ services:
             - "30000-30009:30000-30009"
         volumes:
             - ./web/favor-group.ru:/home/web
-            - "/folder_on_disk/passwd:/etc/pure-ftpd/passwd"
         environment:
-            PUBLICHOST: "favor-group.ru"
             FTP_USER_HOME: /home/web
 
         logging:
