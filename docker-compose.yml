@@ -57,6 +57,7 @@ services:
         depends_on:
             - mysql
             - memcached
+            - memcached-sessions
         expose:
             - "9000"
         volumes:
@@ -86,6 +87,7 @@ services:
         depends_on:
             - mysql
             - memcached
+            - memcached-sessions
         volumes:
             - ./web/favor-group.ru:/web/prod
             - ./web/dev.favor-group.ru:/web/dev
@@ -149,11 +151,12 @@ services:
         expose:
             - "11211"
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    memcached-sessions:
+        image: memcached:1-alpine
+        hostname: memcached-sessions
+        container_name: memcached-sessions
+        expose:
+            - "11211"
 
     adminer:
         image: adminer

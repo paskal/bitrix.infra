@@ -20,15 +20,20 @@ docker-compose up --build -d
 
 ## What's inside?
 
-- [certbot](https://certbot.eff.org/) for certificate generation
+### Core
+
 - [Nginx](https://www.nginx.com/) with [pagespeed](https://developers.google.com/speed/pagespeed/module), proxying requests to php-fpm and serving static assets directly
 - [php-fpm](https://www.php.net/manual/en/install.fpm.php) for bitrix with msmtp for mail sending
-- PHP cron container with same settings as PHP serving web requests
 - [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) because of it's monitoring capabilities
+- [memcached](https://memcached.org/) for bitrix cache, plus additional only for user sessions
+
+### Optional
+
+- PHP cron container with same settings as PHP serving web requests
 - [adminer](https://www.adminer.org/) as phpmyadmin alternative for work with MySQL
-- [Percona Monitoring and Management](https://www.percona.com/doc/percona-monitoring-and-management/2.x/index.html) client for MySQL metrics
-- [memcached](https://memcached.org/) for bitrix cache
 - [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) for ftp access
+- [certbot](https://certbot.eff.org/) for HTTPS certificate generation
+- [Percona Monitoring and Management](https://www.percona.com/doc/percona-monitoring-and-management/2.x/index.html) client for MySQL metrics
 - [zabbix-agent](https://www.zabbix.com/zabbix_agent) for monitoring
 
 ## File structure
@@ -183,3 +188,6 @@ return array(
 ```
 
 </details>
+
+For sessions in memcached: [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=2465&LESSON_PATH=3913.4568.2465), [2](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.4568.14028.14026).
+
