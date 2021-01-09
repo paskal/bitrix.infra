@@ -141,6 +141,8 @@ define("BX_CACHE_TYPE", "memcache");
 define("BX_CACHE_SID", "prod"); // or "dev" in case of dev config
 define("BX_MEMCACHE_HOST", "memcached");
 define("BX_MEMCACHE_PORT", "11211");
+define('BX_SECURITY_SESSION_MEMCACHE_HOST', 'memcached-sessions');
+define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
 ```
 
 </details>
@@ -148,6 +150,22 @@ define("BX_MEMCACHE_PORT", "11211");
 <details><summary>bitrix/.settings.php</summary>
 
 ```php
+  'session' => array (
+  'value' =>
+  array (
+    'mode' => 'default',
+    'handlers' =>
+    array (
+      'general' =>
+      array (
+        'type' => 'memcache',
+        'host' => 'memcached-sessions',
+        'port' => '11211',
+      ),
+    ),
+  ),
+  'readonly' => true,
+  ),
   'connections' =>
   array (
     'value' =>
@@ -188,6 +206,4 @@ return array(
 ```
 
 </details>
-
-For sessions in memcached: [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=2465&LESSON_PATH=3913.4568.2465), [2](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.4568.14028.14026).
 
