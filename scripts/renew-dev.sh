@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+set -e
 
 # This script recreates dev site from current prod one with deleting old dev in the process
 
@@ -14,6 +15,8 @@ DEV_PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 # read MYSQL_ROOT_PASSWORD
 . ./private/environment/mysql.env
 
+echo "Creating dev copy of the site in $DEV_LOCATION"
+
 # create temp file to store mysql login and password for the time of the script
 # location for it should be the directory which is passed inside the container
 mysql_config_file=$(
@@ -21,11 +24,12 @@ mysql_config_file=$(
     m4 -D template="./private/mysql-data/deleteme_XXXXXX"
 ) || exit
 
-mysql_binary_path="docker exec -u0 mysql-server /bin"
+mysql_binary_path="docker exec -u0 mysql /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
 echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
+echo "Recreating DB base and user"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "drop database if exists ${DEV_DB};"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "drop user if exists '${DEV_USER}'@'%';"
 
@@ -35,16 +39,20 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "grant all on ${DEV_DB}.* to '${DEV_USER}'@'%';"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e 'flush privileges;'
 
+
 # create and load database dump
 # --no-tablespaces allows running not from root
 # --single-transaction will start a transaction before running
 # first --no-data run just dumps the schema for all tables,
 # second --ignore-table run ignores data from user sessions as we don't need to transfer it
+echo "Creating mysql dump"
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --no-data ${PROD_DB} >prod-dump.sql
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>prod-dump.sql
 echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" >${mysql_config_file}
+echo "Restoring mysql dump for dev"
 cat prod-dump.sql | docker exec -u0 -i mysql /bin/mysql --defaults-extra-file=${mysql_config_inside_container} ${DEV_DB}
 
+echo "Changing settings on dev site after DB restore"
 # change aspro and main site URL to reflect dev site value
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_iblock_element_property set VALUE = 'dev.favor-group.ru' where VALUE = 'favor-group.ru';" ${DEV_DB}
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_lang set SERVER_NAME = 'dev.favor-group.ru' where SERVER_NAME = 'favor-group.ru';" ${DEV_DB}
@@ -62,8 +70,10 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 # --delete deletes files from destination if they are not present in the source
 # --no-inc-recursive calculates file size for progress bar at the beginning
 # / in the end of src location avoid creating additional directory level at destination
+echo "Copying files"
 rsync --archive --no-inc-recursive --delete --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
 
+echo "Changing DB and memcached connection settings"
 # change settings in files to reflect dev site
 sed -i "s/.*\$DBName.*/\$DBName = '${DEV_DB}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBLogin.*/\$DBLogin = '${DEV_USER}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
@@ -75,6 +85,7 @@ sed -i "s/.*'database' =>.*/'database' => '${DEV_DB}',/" ${DEV_LOCATION}/bitrix/
 sed -i "s/.*'login' =>.*/'login' => '${DEV_USER}',/" ${DEV_LOCATION}/bitrix/.settings.php
 sed -i "s/.*'password' =>.*/'password' => '${DEV_PASSWORD}',/" ${DEV_LOCATION}/bitrix/.settings.php
 
+echo "Cleaning up"
 # clean up bitrix file cache
 rm -rf ${DEV_LOCATION}/bitrix/cache/*
 rm -rf ${DEV_LOCATION}/bitrix/managed_cache/*
@@ -84,3 +95,4 @@ rm -f prod-dump.sql
 
 # clean up tmp file with credentials
 rm -f -- "${mysql_config_file}"
+echo "Dev renewal from prod is complete"

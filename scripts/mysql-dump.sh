@@ -32,7 +32,7 @@ mysql_config_file=$(
     m4 -D template="./private/mysql-data/deleteme_XXXXXX"
 ) || exit
 
-mysql_binary_path="docker exec -u0 mysql-server /bin"
+mysql_binary_path="docker exec -u0 mysql /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
 # bash echo required -e to write \n as a newline
