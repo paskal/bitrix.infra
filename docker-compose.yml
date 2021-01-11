@@ -188,6 +188,7 @@ services:
         volumes:
             - ./web/favor-group.ru:/home/web
         environment:
+            PUBLICHOST: favor-group.ru
             FTP_USER_HOME: /home/web
 
         logging:
