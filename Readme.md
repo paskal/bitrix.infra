@@ -1,18 +1,17 @@
 # [favor-group.ru](https://favor-group.ru) infrastructure as a code
 
 This repository contains infrastructure code behind Bitrix-based [favor-group.ru](https://favor-group.ru), a site
-of my father's metal decking business operating in Moscow, Sankt-Petesburg and Tula.
+of my father's metal decking business operating in Moscow, Sankt-Petersburg and Tula.
 
-It's a Bitrix web-site completely enclosed within docker-compose to be as portable and maintainable as possible,
-as well as set of scripts around its maintenance like dev site redeploy or prouction site backup.
+It's a Bitrix web-site completely enclosed within docker-compose to be as portable and maintainable as possible and set of scripts around its maintenance like dev site redeploy or production site backup.
 
 ## How to make use of it
 
-It couldn't be used as-is without alterations elsewhere, however I tried to make everything as generic
-as possible to make adoption for other project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
+You couldn't use it as-is without alterations, however, I tried to make everything as generic
+as possible to make adoption for another project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
 and then read the rest of this Readme.
 
-After you'll make adjustments to configuration and docker-compose.yml, run it as following:
+After you make adjustments to configuration and docker-compose.yml, run it as follows:
 
 ```bash
 docker-compose up --build -d
@@ -44,14 +43,14 @@ docker-compose up --build -d
 
 - `mysql/my.cnf` is a MySQL configuration, applied on top of package-provided my.cnf
 
-- `nginx` directory contains build Dockerfile, as well as following (HTTPS) configuration:
+- `nginx` directory contains the build Dockerfile, as well as following (HTTPS) configuration:
   - pagespeed setup
   - bitrix proxy, separate for dev and prod
   - adminer proxy
   - HTTP to HTTPS redirects
   - stub status page listening on localhost for Zabbix monitoring
 
-- `php-fpm` directory contains build Dockerfile and php configuration, applied on top of package-provided one
+- `php-fpm` directory contains the build Dockerfile and php configuration, applied on top of package-provided one
 
 ### /logs
 
@@ -69,7 +68,7 @@ Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-grou
 
 - `private/environment` is a directory with environment files for docker-compose
 
-    - `private/environment/mysql.env` should contain following variables:
+    - `private/environment/mysql.env` should contain the following variables:
 
       ```bash
       MYSQL_ROOT_PASSWORD=mysql_root_password
@@ -77,7 +76,7 @@ Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-grou
       MYSQL_PASSWORD=bitrix_mysql_password
       ```
 
-    - `private/environment/ftp.env` should contain following variables:
+    - `private/environment/ftp.env` should contain the following variables:
   
       ```bash
       FTP_USER_NAME=ftp_username
@@ -98,7 +97,7 @@ Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-grou
 
 ## Certificate renewal
 
-At this moment DNS verification of wildcard certificate is not yet set up.
+At this moment, DNS verification of a wildcard certificate is not yet set up.
 To renew the certificate, run the following command and follow the interactive prompt:
 
 ```shell
@@ -111,11 +110,11 @@ docker-compose run --rm --entrypoint "\
     --preferred-challenges dns" certbot
 ```
 
-In order to add required TXT entries, head to [DNS edit page](https://fornex.com/my/dns/favor-group.ru/).
+To add required TXT entries, head to [DNS edit page](https://fornex.com/my/dns/favor-group.ru/).
 
 ## Permissions
 
-Everything touched by MySQL uses UID/GID 1001, and PHP and Nginx uses UID/GID 1000.
+All files touched by MySQL use UID/GID 1001, and PHP and Nginx use UID/GID 1000.
 
 It would be easier to switch everything to User and Group 1000 for consistency later.
 
@@ -206,4 +205,3 @@ return array(
 ```
 
 </details>
-
