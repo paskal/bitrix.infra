@@ -8,7 +8,7 @@
 # *  *  *  *  * user-name command to be executed
 
 # default Bitrix cron events
-*  *  *  *  * www-data /usr/bin/php /web/prod/bitrix/modules/main/tools/cron_events.php 2>&1 >>/var/log/php/cron.log
+*  *  *  *  * www-data /usr/bin/php /web/prod/bitrix/modules/main/tools/cron_events.php
 # recalculate price with discount
 30 0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/update_base_discount_price.php 2>&1 >>/web/prod/local/cron/update_base_discount_price.log
 # sitemap generation

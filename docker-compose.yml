@@ -80,7 +80,7 @@ services:
         restart: unless-stopped
 
     php-cron:
-        command: cron && tail -f /var/log/php/cron.log
+        command: cron -f
         image: paskal/bitrix-php:latest
         hostname: php-cron
         container_name: php-cron
