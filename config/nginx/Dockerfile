@@ -1,17 +1,12 @@
 # Build
 FROM nginx:1.19.6 as build
 
-LABEL name=paskal/nginx
-LABEL maintainer="paskal.07@gmail.com"
-
 WORKDIR /build
 
 # install brotli build dependencies
 RUN \
     apt-get update > /dev/null \
-    && apt-get install gcc git libpcre3-dev libssl-dev make zlib1g-dev -y \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /etc/nginx/conf.d/*
+    && apt-get install gcc git libpcre3-dev libssl-dev make zlib1g-dev -y
 
 # build brotli
 RUN git clone https://github.com/google/ngx_brotli.git --recurse-submodules
@@ -35,9 +30,6 @@ LABEL maintainer="paskal.07@gmail.com"
 # add compiled brotli module
 COPY --from=build /build/nginx/objs/ngx_http_brotli_filter_module.so /usr/lib/nginx/modules/
 COPY --from=build /build/nginx/objs/ngx_http_brotli_static_module.so /usr/lib/nginx/modules/
-
-#RUN echo http://dl-2.alpinelinux.org/alpine/edge/community/ >> /etc/apk/repositories
-#RUN apk --no-cache add shadow
 
 RUN usermod -u 1000 nginx
 RUN groupmod -g 1000 nginx
