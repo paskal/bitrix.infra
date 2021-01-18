@@ -21,7 +21,7 @@ services:
         build: ./config/nginx
         hostname: nginx
         container_name: nginx
-        image: paskal/nginx-pagespeed:latest
+        image: paskal/nginx:latest
         depends_on:
             - adminer
             - php
