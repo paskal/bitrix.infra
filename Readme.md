@@ -21,7 +21,7 @@ docker-compose up --build -d
 
 ### Core
 
-- [Nginx](https://www.nginx.com/) proxying requests to php-fpm and serving static assets directly
+- [Nginx](https://www.nginx.com/) with [brotli](https://github.com/google/ngx_brotli) proxying requests to php-fpm and serving static assets directly
 - [php-fpm](https://www.php.net/manual/en/install.fpm.php) for bitrix with msmtp for mail sending
 - [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) because of it's monitoring capabilities
 - [memcached](https://memcached.org/) for bitrix cache, plus additional only for user sessions
