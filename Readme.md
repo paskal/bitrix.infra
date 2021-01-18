@@ -54,7 +54,7 @@ docker-compose up --build -d
 
 ### /logs
 
-cron, mysql, php, nginx and msmtp logs.
+`mysql`, `nginx`, `php` logs. cron and msmtp logs are written to the `php` directory.
 
 ### /scripts
 

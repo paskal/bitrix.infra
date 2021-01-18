@@ -80,7 +80,7 @@ services:
         restart: unless-stopped
 
     php-cron:
-        command: cron && tail -f /var/log/cron.log
+        command: cron && tail -f /var/log/php/cron.log
         image: paskal/bitrix-php:latest
         hostname: php-cron
         container_name: php-cron
@@ -100,7 +100,6 @@ services:
             - ./config/cron/tasks.cron:/etc/cron.d/tasks:ro
             # Logs
             - ./logs/php:/var/log/php
-            - ./logs/cron:/var/log/cron
 
         logging:
             driver: json-file
@@ -186,7 +185,7 @@ services:
             - "21:21"
             - "30000-30009:30000-30009"
         volumes:
-            - ./web/favor-group.ru:/home/web
+            - ./web:/home/web
         environment:
             PUBLICHOST: favor-group.ru
             FTP_USER_HOME: /home/web
