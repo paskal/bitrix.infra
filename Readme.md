@@ -91,7 +91,7 @@ Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-grou
 
 - `private/mysql-data` directory will be filled with database data automatically after the start of mysql container
 
-- `private/mysqlq` directory will contain MySQL unix socket for connections without network
+- `private/mysqld` directory will contain MySQL unix socket for connections without network
 
 - `private/msmtprc` is a file with [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp)
 
