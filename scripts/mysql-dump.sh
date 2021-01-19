@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-set -e -u -o pipefail
+set -e
 
 PROD_DB=admin_favorgroup
-SHORTHOSTNAME="${HOSTNAME/.*/}"
+SHORTHOSTNAME=$(hostname -s)
 DATE="$(date +%Y-%m-%d)"
 TIME="$(date +%H-%M-%S)"
 DIRECTORY="/backup/$SHORTHOSTNAME/$DATE"
@@ -35,8 +35,7 @@ mysql_config_file=$(
 mysql_binary_path="docker exec -u0 mysql /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
-# bash echo required -e to write \n as a newline
-echo -e "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
+echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
 echo "Backing up MySQL to $DIRECTORY"
 
