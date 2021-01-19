@@ -13,13 +13,17 @@ PROD_DB=admin_favorgroup
 # use production domain as-is as DB name and username, but replace dots with underscores
 DEV_DB=$(echo ${DEV_DOMAIN} | tr '.' '_')
 DEV_USER=$(echo ${DEV_DOMAIN} | tr '.' '_')
-DEV_PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+DEV_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1)
 
 # File path variables
 PROD_LOCATION="./web/${DOMAIN}"
 DEV_LOCATION="./web/${DEV_DOMAIN}"
 
+# Sanity checks before the run
+[ -d "${PROD_LOCATION}" ] || (echo "${PROD_LOCATION} (prod location) directory is absent" && exit 45)
+
 # read MYSQL_ROOT_PASSWORD
+[ -f "./private/environment/mysql.env" ] || (echo "./private/environment/mysql.env file is absent, couldn't read MYSQL_ROOT_PASSWORD variable" && exit 46)
 . ./private/environment/mysql.env
 
 echo "Creating dev copy of the site in $DEV_LOCATION"
@@ -46,9 +50,8 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "grant all on ${DEV_DB}.* to '${DEV_USER}'@'%';"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e 'flush privileges;'
 
-
 # create and load database dump
-# --no-tablespaces allows running not from root
+# --no-tablespaces allows running not from root (not used currently)
 # --single-transaction will start a transaction before running
 # first --no-data run just dumps the schema for all tables,
 # second --ignore-table run ignores data from user sessions as we don't need to transfer it
@@ -72,13 +75,16 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 # disable external access to the site
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'site_stopped';" ${DEV_DB}
 
+echo "Copying files"
+# install -d is the same as mkdir -p, but it allows setting owner user and group for created folder
+install -d -o 1000 -g 1000 ${DEV_LOCATION}
 # copy files
 # --archive preserves file permissions and so on
 # --delete deletes files from destination if they are not present in the source
 # --no-inc-recursive calculates file size for progress bar at the beginning
+# --exclude excludes cache folders from the sync
 # / in the end of src location avoid creating additional directory level at destination
-echo "Copying files"
-rsync --archive --no-inc-recursive --delete --exclude '**/cache/'  --exclude '**/managed_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
+rsync --archive --no-inc-recursive --delete --exclude '**/cache/' --exclude '**/managed_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
 
 echo "Changing DB and memcached connection settings"
 # change settings in files to reflect dev site
@@ -100,4 +106,4 @@ rm -f prod-dump.sql
 # clean up tmp files with credentials (even from other runs)
 rm -f ./private/mysql-data/deleteme_*
 
-echo "Dev renewal from prod is complete, available at https://${DEV_DOMAIN}"
+echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
