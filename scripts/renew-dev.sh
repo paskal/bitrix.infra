@@ -71,7 +71,7 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 # --no-inc-recursive calculates file size for progress bar at the beginning
 # / in the end of src location avoid creating additional directory level at destination
 echo "Copying files"
-rsync --archive --no-inc-recursive --delete --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
+rsync --archive --no-inc-recursive --delete --exclude '**/cache/'  --exclude '**/managed_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
 
 echo "Changing DB and memcached connection settings"
 # change settings in files to reflect dev site
@@ -86,9 +86,6 @@ sed -i "s/.*'login' =>.*/'login' => '${DEV_USER}',/" ${DEV_LOCATION}/bitrix/.set
 sed -i "s/.*'password' =>.*/'password' => '${DEV_PASSWORD}',/" ${DEV_LOCATION}/bitrix/.settings.php
 
 echo "Cleaning up"
-# clean up bitrix file cache
-rm -rf ${DEV_LOCATION}/bitrix/cache/*
-rm -rf ${DEV_LOCATION}/bitrix/managed_cache/*
 
 # remove mysql dump
 rm -f prod-dump.sql
