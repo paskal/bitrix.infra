@@ -10,9 +10,9 @@ DEV_DOMAIN="${DEV_SUBDOMAIN}.${DOMAIN}"
 
 # MySQL variables
 PROD_DB=admin_favorgroup
-# use production domain as-is as DB name and username, but replace dots with underscores
-DEV_DB=$(echo ${DEV_DOMAIN} | tr '.' '_')
-DEV_USER=$(echo ${DEV_DOMAIN} | tr '.' '_')
+# use production domain as-is as DB name and username, but replace dots and dashes with underscores
+DEV_DB=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
+DEV_USER=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
 DEV_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1)
 
 # File path variables
