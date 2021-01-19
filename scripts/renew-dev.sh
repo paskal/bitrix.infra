@@ -3,14 +3,21 @@ set -e
 
 # This script recreates dev site from current prod one with deleting old dev in the process
 
-PROD_LOCATION=/home/admin/web/favor-group.ru
-DEV_LOCATION=/home/admin/web/dev.favor-group.ru
+# Domain names
+DOMAIN=favor-group.ru
+DEV_SUBDOMAIN=dev
+DEV_DOMAIN="${DEV_SUBDOMAIN}.${DOMAIN}"
 
 # MySQL variables
 PROD_DB=admin_favorgroup
-DEV_DB=dev_favor_group_ru
-DEV_USER=dev_favor_group_ru
+# use production domain as-is as DB name and username, but replace dots with underscores
+DEV_DB=$(echo ${DEV_DOMAIN} | tr '.' '_')
+DEV_USER=$(echo ${DEV_DOMAIN} | tr '.' '_')
 DEV_PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+
+# File path variables
+PROD_LOCATION="./web/${DOMAIN}"
+DEV_LOCATION="./web/${DEV_DOMAIN}"
 
 # read MYSQL_ROOT_PASSWORD
 . ./private/environment/mysql.env
@@ -54,12 +61,12 @@ cat prod-dump.sql | docker exec -u0 -i mysql /bin/mysql --defaults-extra-file=${
 
 echo "Changing settings on dev site after DB restore"
 # change aspro and main site URL to reflect dev site value
-${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_iblock_element_property set VALUE = 'dev.favor-group.ru' where VALUE = 'favor-group.ru';" ${DEV_DB}
-${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_lang set SERVER_NAME = 'dev.favor-group.ru' where SERVER_NAME = 'favor-group.ru';" ${DEV_DB}
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_iblock_element_property set VALUE = '${DEV_DOMAIN}' where VALUE = '${DOMAIN}';" ${DEV_DB}
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_lang set SERVER_NAME = '${DEV_DOMAIN}' where SERVER_NAME = '${DOMAIN}';" ${DEV_DB}
 # change security filter settings to use new domain
-${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'dev.favor-group.ru' where VALUE = 'favor-group.ru';" ${DEV_DB}
-${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'dev.favor-group.ru' where MODULE_ID = 'security' and NAME = 'restriction_hosts_hosts';" ${DEV_DB}
-${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'a:1:{s:4:\"host\";s:26:\"https://dev.favor-group.ru\";}' where MODULE_ID = 'security' AND name = 'restriction_hosts_action_options';" ${DEV_DB}
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = '${DEV_DOMAIN}' where VALUE = '${DOMAIN}';" ${DEV_DB}
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = '${DEV_DOMAIN}' where MODULE_ID = 'security' and NAME = 'restriction_hosts_hosts';" ${DEV_DB}
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'a:1:{s:4:\"host\";s:26:\"https://${DEV_DOMAIN}\";}' where MODULE_ID = 'security' AND name = 'restriction_hosts_action_options';" ${DEV_DB}
 # mark site as development one
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'update_devsrv';" ${DEV_DB}
 # disable external access to the site
@@ -78,9 +85,9 @@ echo "Changing DB and memcached connection settings"
 sed -i "s/.*\$DBName.*/\$DBName = '${DEV_DB}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBLogin.*/\$DBLogin = '${DEV_USER}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBPassword.*/\$DBPassword = '${DEV_PASSWORD}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
-sed -i "s/.*BX_CACHE_SID.*/define('BX_CACHE_SID', 'dev');/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
-sed -i "s/.*BX_TEMPORARY_FILES_DIRECTORY.*/define('BX_TEMPORARY_FILES_DIRECTORY', '\/tmp\/dev.favor-group.ru');/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
-sed -i "s/.*'sid'.*/'sid' => 'dev'/" ${DEV_LOCATION}/bitrix/.settings_extra.php
+sed -i "s/.*BX_CACHE_SID.*/define('BX_CACHE_SID', '${DEV_SUBDOMAIN}');/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
+sed -i "s/.*BX_TEMPORARY_FILES_DIRECTORY.*/define('BX_TEMPORARY_FILES_DIRECTORY', '\/tmp\/${DEV_DOMAIN}');/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
+sed -i "s/.*'sid'.*/'sid' => '${DEV_SUBDOMAIN}'/" ${DEV_LOCATION}/bitrix/.settings_extra.php
 sed -i "s/.*'database' =>.*/'database' => '${DEV_DB}',/" ${DEV_LOCATION}/bitrix/.settings.php
 sed -i "s/.*'login' =>.*/'login' => '${DEV_USER}',/" ${DEV_LOCATION}/bitrix/.settings.php
 sed -i "s/.*'password' =>.*/'password' => '${DEV_PASSWORD}',/" ${DEV_LOCATION}/bitrix/.settings.php
@@ -90,6 +97,7 @@ echo "Cleaning up"
 # remove mysql dump
 rm -f prod-dump.sql
 
-# clean up tmp file with credentials
-rm -f -- "${mysql_config_file}"
-echo "Dev renewal from prod is complete"
+# clean up tmp files with credentials (even from other runs)
+rm -f ./private/mysql-data/deleteme_*
+
+echo "Dev renewal from prod is complete, available at https://${DEV_DOMAIN}"
