@@ -50,7 +50,7 @@ services:
         restart: unless-stopped
 
     php:
-        build: ./config/php-fpm
+        build: ./config/php
         image: paskal/bitrix-php:latest
         hostname: php
         container_name: php
@@ -64,8 +64,8 @@ services:
             - ./web/favor-group.ru:/web/prod
             - ./web/dev.favor-group.ru:/web/dev
             - ./private/msmtprc:/etc/msmtprc
-            - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
-            - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+            - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
+            - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # MySQL socket to prevent transferring data trough TCP
             - ./private/mysqld:/var/run/mysqld
             # Logs
@@ -92,8 +92,8 @@ services:
             - ./web/favor-group.ru:/web/prod
             - ./web/dev.favor-group.ru:/web/dev
             - ./private/msmtprc:/etc/msmtprc
-            - ./config/php-fpm/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
-            - ./config/php-fpm/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+            - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
+            - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
             # MySQL socket to prevent transferring data trough TCP
             - ./private/mysqld:/var/run/mysqld
             # Cronjobs
