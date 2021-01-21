@@ -12,18 +12,16 @@ chmod 0644 ./config/cron/*
 # mysql container files
 echo "Fixing mysql permissions..."
 chown -R 1001:1001 ./config/mysql
-chown -R 1001:1001 ./logs/mysql
-chown -R 1001:1001 ./private/mysql-data
-chown -R 1001:1001 ./private/mysqld
+[ -d ./logs/mysql ] && chown -R 1001:1001 ./logs/mysql
+[ -d ./private/mysql-data ] && chown -R 1001:1001 ./private/mysql-data
+[ -d ./private/mysqld ] && chown -R 1001:1001 ./private/mysqld
 
 # php and nginx containers files
 echo "Fixing php and nginx permissions..."
-chown -R 0:0 ./config/nginx
-chown -R 0:0 ./config/php
-chown -R 1000:1000 ./logs/nginx
-chown -R 1000:1000 ./logs/php
-chown -R 1000:1000 ./private/letsencrypt
-chown -R 1000:1000 ./private/msmtprc
+[ -d ./logs/nginx ] && chown -R 1000:1000 ./logs/nginx
+[ -d ./logs/php ] && chown -R 1000:1000 ./logs/php
+[ -d ./private/letsencrypt ] && chown -R 1000:1000 ./private/letsencrypt
+[ -f ./private/msmtprc ] && chown -R 1000:1000 ./private/msmtprc
 echo "web folder will be processed now, hold on..."
 chown -R 1000:1000 ./web
 
