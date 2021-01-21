@@ -97,7 +97,7 @@ services:
             # MySQL socket to prevent transferring data trough TCP
             - ./private/mysqld:/var/run/mysqld
             # Cronjobs
-            - ./config/cron/tasks.cron:/etc/cron.d/tasks:ro
+            - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
             # Logs
             - ./logs/php:/var/log/php
 

@@ -1,3 +1,5 @@
+# This is cron file for php-cron docker container
+
 # Example of job definition:
 # .---------------- minute (0 - 59)
 # |  .------------- hour (0 - 23)
