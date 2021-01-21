@@ -21,7 +21,7 @@ echo "Fixing php and nginx permissions..."
 [ -d ./logs/nginx ] && chown -R 1000:1000 ./logs/nginx
 [ -d ./logs/php ] && chown -R 1000:1000 ./logs/php
 [ -d ./private/letsencrypt ] && chown -R 1000:1000 ./private/letsencrypt
-[ -f ./private/msmtprc ] && chown -R 1000:1000 ./private/msmtprc
+[ -f ./private/msmtprc ] && chown 1000:1000 ./private/msmtprc
 echo "web folder will be processed now, hold on..."
 chown -R 1000:1000 ./web
 
