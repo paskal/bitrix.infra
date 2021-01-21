@@ -1,0 +1,21 @@
+# This is cron file of the host machine
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+
+# once a day fix access rights in case they are screwed
+0  1  *  *  * root cd /home/admin && ./scripts/fix-rights.sh >/dev/null 2>&1
+
+# twice a day make MySQL dump of production data
+5  1,15  *  *  * admin cd /home/admin && ./scripts/mysql-dump.sh >/dev/null 2>&1
+
+# every 10 minutes check Google block using robots.txt for non-main domains,
+# so that these domains won't fight for place under the sun with main ones
+# which is easy in Google because their location precision is nowhere.
+*/10  *  *  *  * root cd /home/admin && ./scripts/block_google_in_regions.sh >/dev/null 2>&1

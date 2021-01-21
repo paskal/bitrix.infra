@@ -39,7 +39,9 @@ docker-compose up --build -d
 
 ### /config
 
-- `cron/php-cron.cron` is a list of cron tasks to run in php-cron container, only `cron_events.php` is required for Bitrix and others are specific to this site, [must](http://manpages.ubuntu.com/manpages/trusty/man8/cron.8.html) be owner by root:root and have access rights 0644.
+- `cron/php-cron.cron` is a list of cron tasks to run in php-cron container, only `cron_events.php` is required for Bitrix and others are specific to this site, [must](http://manpages.ubuntu.com/manpages/trusty/man8/cron.8.html) be owner by root:root and have access rights 0644 - fixable by running `scripts/fix-rights.sh`
+
+- `cron/host.cron` is a list of cron tasks to run on the host machine
 
 - `mysql/my.cnf` is a MySQL configuration, applied on top of package-provided my.cnf
 
