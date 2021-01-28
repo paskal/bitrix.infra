@@ -147,6 +147,7 @@ services:
         image: memcached:1-alpine
         hostname: memcached
         container_name: memcached
+        restart: unless-stopped
         expose:
             - "11211"
 
@@ -154,6 +155,7 @@ services:
         image: memcached:1-alpine
         hostname: memcached-sessions
         container_name: memcached-sessions
+        restart: unless-stopped
         expose:
             - "11211"
 
