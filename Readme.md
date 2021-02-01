@@ -3,11 +3,12 @@
 This repository contains infrastructure code behind Bitrix-based [favor-group.ru](https://favor-group.ru), a site
 of my father's metal decking business operating in Moscow, Sankt-Petersburg and Tula.
 
-It's a Bitrix web-site completely enclosed within docker-compose to be as portable and maintainable as possible and set of scripts around its maintenance like dev site redeploy or production site backup.
+It's a Bitrix website completely enclosed within docker-compose to be as portable and maintainable
+as possible, and a set of scripts around its maintenance like dev site redeploy or production site backup.
 
 ## How to make use of it
 
-You couldn't use it as-is without alterations, however, I tried to make everything as generic
+You couldn't use it as-is without alterations. However, I tried to make everything as generic
 as possible to make adoption for another project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
 and then read the rest of this Readme.
 
@@ -17,111 +18,19 @@ After you make adjustments to configuration and docker-compose.yml, run it as fo
 docker-compose up --build -d
 ```
 
-## What's inside?
+[bitrixdock](https://github.com/bitrixdock/bitrixdock) (Russian) project was an inspiration for this
+one and had way better setup instructions. Please start with it if you don't know what to do with
+many files in that repo.
 
-### Core
-
-- [Nginx](https://www.nginx.com/) with [brotli](https://github.com/google/ngx_brotli) proxying requests to php-fpm and serving static assets directly
-- [php-fpm](https://www.php.net/manual/en/install.fpm.php) for bitrix with msmtp for mail sending
-- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) because of it's monitoring capabilities
-- [memcached](https://memcached.org/) for bitrix cache, plus additional only for user sessions
-
-### Optional
-
-- PHP cron container with same settings as PHP serving web requests
-- [adminer](https://www.adminer.org/) as phpmyadmin alternative for work with MySQL
-- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) for ftp access
-- [certbot](https://certbot.eff.org/) for HTTPS certificate generation
-- [Percona Monitoring and Management](https://www.percona.com/doc/percona-monitoring-and-management/2.x/index.html) client for MySQL metrics
-- [zabbix-agent](https://www.zabbix.com/zabbix_agent) for monitoring
-
-## File structure
-
-### /config
-
-- `cron/php-cron.cron` is a list of cron tasks to run in php-cron container, only `cron_events.php` is required for Bitrix and others are specific to this site, [must](http://manpages.ubuntu.com/manpages/trusty/man8/cron.8.html) be owner by root:root and have access rights 0644 - fixable by running `scripts/fix-rights.sh`
-
-- `cron/host.cron` is a list of cron tasks to run on the host machine
-
-- `mysql/my.cnf` is a MySQL configuration, applied on top of package-provided my.cnf
-
-- `nginx` directory contains the build Dockerfile, as well as following (HTTPS) configuration:
-  - pagespeed setup
-  - bitrix proxy, separate for dev and prod
-  - adminer proxy
-  - HTTP to HTTPS redirects
-  - stub status page listening on localhost for Zabbix monitoring
-
-- `php-fpm` directory contains the build Dockerfile and php configuration, applied on top of package-provided one
-
-### /logs
-
-`mysql`, `nginx`, `php` logs. cron and msmtp logs are written to the `php` directory.
-
-### /scripts
-
-Bunch of scripts, see their source code for purpose and comments.
-
-### /web
-
-Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-group.ru`.
-
-### /private
-
-- `private/environment` is a directory with environment files for docker-compose
-
-    - `private/environment/mysql.env` should contain the following variables:
-
-      ```bash
-      MYSQL_ROOT_PASSWORD=mysql_root_password
-      MYSQL_USER=bitrix_user
-      MYSQL_PASSWORD=bitrix_mysql_password
-      ```
-
-    - `private/environment/ftp.env` should contain the following variables:
-  
-      ```bash
-      FTP_USER_NAME=ftp_username
-      FTP_USER_PASS=ftp_password
-      ```
-
-- `private/pmm/pmm-agent.yaml` should contain agent setup which is done according to
-  [this doc](https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b).
-  Server counterpart sets up by the same doc and is running [there](https://github.com/paskal/terrty/).
-
-- `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
-
-- `private/mysql-data` directory will be filled with database data automatically after the start of mysql container
-
-- `private/mysqld` directory will contain MySQL unix socket for connections without network
-
-- `private/msmtprc` is a file with [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp)
-
-## Certificate renewal
-
-At this moment, DNS verification of a wildcard certificate is not yet set up.
-To renew the certificate, run the following command and follow the interactive prompt:
-
-```shell
-docker-compose run --rm --entrypoint "\
-  certbot certonly \
-    --email msk@favor-group.ru \
-    -d favor-group.ru -d *.favor-group.ru \
-    --agree-tos \
-    --manual \
-    --preferred-challenges dns" certbot
-```
-
-To add required TXT entries, head to [DNS edit page](https://fornex.com/my/dns/favor-group.ru/).
-
-## Permissions
+### File system permissions
 
 All files touched by MySQL use UID/GID 1001, and PHP and Nginx use UID/GID 1000.
+Running `scripts/fix-rights.sh` script would set the permissions appropriately for all
+containers to run correctly.
 
-It would be easier to switch everything to User and Group 1000 for consistency later.
+It might be easier to switch everything to User and Group 1000 for consistency later.
 
-
-## Relevant parts of Bitrix config
+### Relevant parts of Bitrix config
 
 <details><summary>bitrix/php_interface/dbconn.php</summary>
 
@@ -207,3 +116,122 @@ return array(
 ```
 
 </details>
+
+## What's inside?
+
+### Core
+
+- [Nginx](https://www.nginx.com/) with [brotli](https://github.com/google/ngx_brotli)
+  proxying requests to php-fpm and serving static assets directly
+- [php-fpm](https://www.php.net/manual/en/install.fpm.php) for bitrix with msmtp for mail sending
+- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server)
+  because of it's monitoring capabilities
+- [memcached](https://memcached.org/) for bitrix cache, plus additional only for user sessions
+
+### Optional
+
+- PHP cron container with same settings as PHP serving web requests
+- [adminer](https://www.adminer.org/) as phpmyadmin alternative for work with MySQL
+- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) for ftp access
+- [certbot](https://certbot.eff.org/) for HTTPS certificate generation
+- [Percona Monitoring and Management](https://www.percona.com/doc/percona-monitoring-and-management/2.x/index.html)
+  client for MySQL metrics
+- [zabbix-agent](https://www.zabbix.com/zabbix_agent) for monitoring
+
+## File structure
+
+### /config
+
+- `cron/php-cron.cron` is a list of cron tasks to run in php-cron container,
+  only `cron_events.php` is required for Bitrix and others are specific to this site,
+  [must](http://manpages.ubuntu.com/manpages/trusty/man8/cron.8.html) be owned by root:root
+  and have access rights 0644 - fixable by running `scripts/fix-rights.sh`
+
+- `cron/host.cron` is a list of cron tasks to run on the host machine
+
+- `mysql/my.cnf` is a MySQL configuration, applied on top of package-provided my.cnf
+
+- `nginx` directory contains the build Dockerfile, as well as following (HTTPS) configuration:
+  - pagespeed setup
+  - bitrix proxy, separate for dev and prod
+  - adminer proxy
+  - HTTP to HTTPS redirects
+  - stub status page listening on localhost for Zabbix monitoring
+
+- `php-fpm` directory contains the build Dockerfile and php configuration, applied on top of package-provided one
+
+### /logs
+
+`mysql`, `nginx`, `php` logs. cron and msmtp logs will be written to the `php` directory.
+
+### /scripts
+
+Bunch of scripts, see their source code for purpose and comments.
+
+### /web
+
+Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-group.ru`.
+
+### /private
+
+- `private/environment` is a directory with environment files for docker-compose
+
+    - `private/environment/mysql.env` should contain the following variables:
+
+      ```bash
+      MYSQL_ROOT_PASSWORD=mysql_root_password
+      MYSQL_USER=bitrix_user
+      MYSQL_PASSWORD=bitrix_mysql_password
+      ```
+
+    - `private/environment/ftp.env` should contain the following variables:
+  
+      ```bash
+      FTP_USER_NAME=ftp_username
+      FTP_USER_PASS=ftp_password
+      ```
+
+- `private/pmm/pmm-agent.yaml` should contain agent setup which is done according to
+  [this doc](https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b).
+  Server counterpart sets up by the same doc and is running [there](https://github.com/paskal/terrty/).
+
+- `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
+
+- `private/mysql-data` directory will be filled with database data automatically after the start of mysql container
+
+- `private/mysqld` directory will contain MySQL unix socket for connections without network
+
+- `private/msmtprc` is a file with [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp)
+
+## Routines
+
+## Cleaning cache
+
+There are two memcached instances in use, one for site cache and another for sessions. Here are the commands
+to clean them completely:
+
+```shell
+# to flush site cache
+echo "flush_all" | docker exec -i memcached /usr/bin/nc 127.0.0.1 11211
+# to flush all user sessions
+echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
+```
+
+[Here](https://github.com/memcached/memcached/wiki/Commands) is the complete list of commands you can send to it.
+
+## Certificate renewal
+
+At this moment, DNS verification of a wildcard certificate is not yet set up.
+To renew the certificate, run the following command and follow the interactive prompt:
+
+```shell
+docker-compose run --rm --entrypoint "\
+  certbot certonly \
+    --email msk@favor-group.ru \
+    -d favor-group.ru -d *.favor-group.ru \
+    --agree-tos \
+    --manual \
+    --preferred-challenges dns" certbot
+```
+
+To add required TXT entries, head to [DNS edit page](https://fornex.com/my/dns/favor-group.ru/).
