@@ -84,7 +84,7 @@ install -d -o 1000 -g 1000 ${DEV_LOCATION}
 # --no-inc-recursive calculates file size for progress bar at the beginning
 # --exclude excludes cache folders from the sync
 # / in the end of src location avoid creating additional directory level at destination
-rsync --archive --no-inc-recursive --delete --exclude '**/cache/' --exclude '**/managed_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
+rsync --archive --no-inc-recursive --delete --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
 
 echo "Changing DB and memcached connection settings"
 # change settings in files to reflect dev site
