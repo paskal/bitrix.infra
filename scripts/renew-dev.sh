@@ -9,7 +9,7 @@ DEV_SUBDOMAIN=dev
 DEV_DOMAIN="${DEV_SUBDOMAIN}.${DOMAIN}"
 
 # MySQL variables
-PROD_DB=admin_favorgroup
+PROD_DB=$(echo ${DOMAIN} | tr '.' '_' | tr '-' '_')
 # use production domain as-is as DB name and username, but replace dots and dashes with underscores
 DEV_DB=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
 DEV_USER=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
@@ -38,6 +38,7 @@ mysql_config_file=$(
 mysql_binary_path="docker exec -u0 mysql /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
+# shellcheck disable=SC2028
 echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
 echo "Recreating DB base and user"
@@ -58,6 +59,7 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 echo "Creating mysql dump"
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --no-data ${PROD_DB} >prod-dump.sql
 ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>prod-dump.sql
+# shellcheck disable=SC2028
 echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" >${mysql_config_file}
 echo "Restoring mysql dump for dev"
 cat prod-dump.sql | docker exec -u0 -i mysql /bin/mysql --defaults-extra-file=${mysql_config_inside_container} ${DEV_DB}

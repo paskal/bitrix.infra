@@ -2,12 +2,13 @@
 
 set -e
 
-PROD_DB=admin_favorgroup
-SHORTHOSTNAME=$(hostname -s)
+DOMAIN=favor-group.ru
+PROD_DB=$(echo ${DOMAIN} | tr '.' '_' | tr '-' '_')
+SHORT_HOSTNAME=$(hostname -s)
 DATE="$(date +%Y-%m-%d)"
 TIME="$(date +%H-%M-%S)"
-DIRECTORY="/backup/$SHORTHOSTNAME/$DATE"
-FILE="$DATE-$TIME-$SHORTHOSTNAME-$PROD_DB-mysqldump.sql.gz"
+DIRECTORY="/backup/$SHORT_HOSTNAME/$DATE"
+FILE="$DATE-$TIME-$SHORT_HOSTNAME-$PROD_DB-mysqldump.sql.gz"
 
 if [ ! -d "$DIRECTORY" ]; then
   echo "Creating backup directory: $DIRECTORY"
@@ -35,6 +36,9 @@ mysql_config_file=$(
 mysql_binary_path="docker exec -u0 mysql /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
+# shellcheck disable=SC2028
+# echo will expand everything properly in sh (which we are using)
+# but will require -e flag in bash to work
 echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
 echo "Backing up MySQL to $DIRECTORY"
