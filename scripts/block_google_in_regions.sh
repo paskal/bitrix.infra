@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-set -e
+set -e -u
 
 # This script blocks Google via robots.txt for regions other than
 # Moscow, Tula and SPB, so that they are indexed only in Yandex

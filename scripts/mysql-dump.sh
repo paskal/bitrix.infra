@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-set -e
+set -e -u
 
 DOMAIN=favor-group.ru
 PROD_DB=$(echo ${DOMAIN} | tr '.' '_' | tr '-' '_')

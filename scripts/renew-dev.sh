@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-set -e
+set -e -u
 
 # This script recreates dev site from current prod one with deleting old dev in the process
 

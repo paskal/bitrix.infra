@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-set -e
+set -e -u
 
 # This script sets proper owner and group for files in the repo
 
