@@ -207,7 +207,7 @@ services:
     ## Percona Monitoring and Management client
     pmm-client:
         image: percona/pmm-client:2
-        hostname: favor-group.ru
+        hostname: pmm-client
         container_name: pmm-client
         depends_on:
             - mysql
