@@ -234,4 +234,4 @@ docker-compose run --rm --entrypoint "\
     --preferred-challenges dns" certbot
 ```
 
-To add required TXT entries, head to [DNS edit page](https://fornex.com/my/dns/favor-group.ru/).
+To add required TXT entries, head to DNS edit page: [Fornex](https://fornex.com/my/dns/favor-group.ru/) or [Yandex](https://connect.yandex.ru/portal/services/webmaster/resources/favor-group.ru).
