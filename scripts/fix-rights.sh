@@ -26,6 +26,6 @@ echo "web folder will be processed now, hold on..."
 chown -R 1000:1000 ./web
 
 echo "Fixing backup folder permissions..."
-[ -d /backup/ ] && chown -R 1000:1000 /backup/
+[ -d ./backup/ ] && chown -R 1000:1000 ./backup/
 
 echo "Access rights fix is complete"
