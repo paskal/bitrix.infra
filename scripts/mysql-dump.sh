@@ -4,23 +4,15 @@ set -e -u
 
 DOMAIN=favor-group.ru
 PROD_DB=$(echo ${DOMAIN} | tr '.' '_' | tr '-' '_')
-SHORT_HOSTNAME=$(hostname -s)
 DATE="$(date +%Y-%m-%d)"
 TIME="$(date +%H-%M-%S)"
-DIRECTORY="/backup/$SHORT_HOSTNAME/$DATE"
-FILE="$DATE-$TIME-$SHORT_HOSTNAME-$PROD_DB-mysqldump.sql.gz"
+DIRECTORY="/web/backup/$DATE"
+FILE="$DATE-$TIME-$PROD_DB-mysqldump.sql.gz"
 
 if [ ! -d "$DIRECTORY" ]; then
   echo "Creating backup directory: $DIRECTORY"
   mkdir -p "$DIRECTORY"
-fi
-
-PROC_NUM=$(echo "$(nproc)/2" | bc)
-
-if [ -z "$PROC_NUM" ]; then
-  PROC_NUM=1
-elif [ "$PROC_NUM" -lt 1 ]; then
-  PROC_NUM=1
+  chown 1000:1000 "$DIRECTORY"
 fi
 
 # read MYSQL_ROOT_PASSWORD
@@ -43,9 +35,10 @@ echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_
 
 echo "Backing up MySQL to $DIRECTORY"
 
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --no-data ${PROD_DB} | pigz -p $PROC_NUM -c >"$DIRECTORY/$FILE"
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} | pigz -p $PROC_NUM -c >>"$DIRECTORY/$FILE"
+${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --no-data "${PROD_DB}" | pigz -c >"$DIRECTORY/$FILE"
+${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --ignore-table="${PROD_DB}".b_user_session "${PROD_DB}" | pigz -c >>"$DIRECTORY/$FILE"
 chmod 0640 "$DIRECTORY/$FILE"
+chown 1000:1000 "$DIRECTORY/$FILE"
 
 # clean up tmp file with credentials
 rm -f -- "${mysql_config_file}"
