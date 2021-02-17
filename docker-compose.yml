@@ -244,6 +244,8 @@ services:
             # to make it work you need to create user "zabbix" with id 1997 on the host system,
             # and make sure it has enough permissions to read /var/run/docker.sock
             - /var/run/docker.sock:/var/run/docker.sock
+            # MySQL socket to prevent transferring data trough TCP
+            - ./private/mysqld:/var/run/mysqld
         environment:
             - TZ=Europe/Moscow
             - ZBX_HOSTNAME=favor-group.ru.docker
