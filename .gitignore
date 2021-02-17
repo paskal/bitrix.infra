@@ -1,27 +1,13 @@
-# local git configuration
-.gitconfig
-
 # temp files
 *.swp
 # logs
 *.log
 
-# profile files
-.bash_history
-.bash_logout
-.bashrc
-.profile
-.ssh
-.selected_editor
-.viminfo
-.vimrc
-.gnupg/
-
 # sql dumps
 *.sql
 
-# temporary folder
-/tmp
+# backups folder
+/backup
 
 # logs folder
 /logs
@@ -30,4 +16,4 @@
 /web
 
 # private folder
-private
+/private
