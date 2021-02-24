@@ -2,17 +2,18 @@
 
 set -e -u
 
-DOMAIN=favor-group.ru
-PROD_DB=$(echo ${DOMAIN} | tr '.' '_' | tr '-' '_')
-DATE="$(date +%Y-%m-%d)"
-TIME="$(date +%H-%M-%S)"
-DIRECTORY="/web/backup/$DATE"
-FILE="$DATE-$TIME-$PROD_DB-mysqldump.sql.gz"
+backup_s3_directory=favor-group-backup
+domain=favor-group.ru
+prod_db=$(echo ${domain} | tr '.' '_' | tr '-' '_')
+date="$(date +%Y-%m-%d)"
+time="$(date +%H-%M-%S)"
+backup_directory="/web/backup/$date"
+backup_file="$date-$time-$prod_db-mysqldump.sql.gz"
 
-if [ ! -d "$DIRECTORY" ]; then
-  echo "Creating backup directory: $DIRECTORY"
-  mkdir -p "$DIRECTORY"
-  chown 1000:1000 "$DIRECTORY"
+if [ ! -d "$backup_directory" ]; then
+  echo "Creating backup directory: $backup_directory"
+  mkdir -p "$backup_directory"
+  chown 1000:1000 "$backup_directory"
 fi
 
 # read MYSQL_ROOT_PASSWORD
@@ -33,14 +34,19 @@ mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 # but will require -e flag in bash to work
 echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
-echo "Backing up MySQL to $DIRECTORY"
+echo "Backing up MySQL to $backup_directory, $date $time"
 
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --no-data "${PROD_DB}" | pigz -c >"$DIRECTORY/$FILE"
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --ignore-table="${PROD_DB}".b_user_session "${PROD_DB}" | pigz -c >>"$DIRECTORY/$FILE"
-chmod 0640 "$DIRECTORY/$FILE"
-chown 1000:1000 "$DIRECTORY/$FILE"
+${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --no-data "${prod_db}" | pigz -c >"$backup_directory/$backup_file"
+${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --ignore-table="${prod_db}".b_user_session "${prod_db}" | pigz -c >>"$backup_directory/$backup_file"
+chmod 0640 "$backup_directory/$backup_file"
+chown 1000:1000 "$backup_directory/$backup_file"
 
 # clean up tmp file with credentials
 rm -f -- "${mysql_config_file}"
+
+echo "Syncing backups to s3://$backup_s3_directory"
+
+# sync with S3 (Yandex in that case)
+HOME=/home/admin /usr/local/bin/aws --endpoint-url=https://storage.yandexcloud.net s3 sync ./backup/ "s3://${backup_s3_directory}/"
 
 echo "Backup is complete"
