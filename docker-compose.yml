@@ -204,33 +204,6 @@ services:
 
     # Monitoring
 
-    ## Percona Monitoring and Management client
-    pmm-client:
-        image: percona/pmm-client:2
-        hostname: pmm-client
-        container_name: pmm-client
-        depends_on:
-            - mysql
-        ports:
-            - "42000:42000"
-            - "42001:42001"
-        volumes:
-            # Configuration, should be generated using that doc:
-            # https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b
-            - ./private/pmm/pmm-agent.yaml:/etc/pmm-agent.yaml
-            # MySQL socket to prevent transferring data trough TCP
-            - ./private/mysqld:/var/run/mysqld
-        environment:
-            - PMM_AGENT_CONFIG_FILE=/etc/pmm-agent.yaml
-
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
-
-        restart: unless-stopped
-
     ## Zabbix Agent 2
     zabbix-agent:
         image: zabbix/zabbix-agent2:latest

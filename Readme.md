@@ -134,8 +134,6 @@ return array(
 - [adminer](https://www.adminer.org/) as phpmyadmin alternative for work with MySQL
 - [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) for ftp access
 - [certbot](https://certbot.eff.org/) for HTTPS certificate generation
-- [Percona Monitoring and Management](https://www.percona.com/doc/percona-monitoring-and-management/2.x/index.html)
-  client for MySQL metrics
 - [zabbix-agent](https://www.zabbix.com/zabbix_agent) for monitoring
 
 ## File structure
@@ -190,10 +188,6 @@ Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-grou
       FTP_USER_NAME=ftp_username
       FTP_USER_PASS=ftp_password
       ```
-
-- `private/pmm/pmm-agent.yaml` should contain agent setup which is done according to
-  [this doc](https://gist.github.com/paskal/48f10a0a584f4849be6b0889ede9262b).
-  Server counterpart sets up by the same doc and is running [there](https://github.com/paskal/terrty/).
 
 - `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
 
