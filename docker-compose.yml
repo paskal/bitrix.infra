@@ -215,6 +215,8 @@ services:
         volumes:
             # for monitoring purposes
             - ./logs/nginx:/var/log/nginx
+            # for monitoring purposes
+            - ./web/prod/web/prod/upload:/web/prod/web/prod/upload
             # this is needed in order to monitor docker
             # to make it work you need to create user "zabbix" with id 1997 on the host system,
             # and make sure it has enough permissions to read /var/run/docker.sock
