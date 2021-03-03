@@ -213,6 +213,8 @@ services:
             - mysql
             - nginx
         volumes:
+            # for monitoring purposes, to be able to extract events from logs
+            - ./logs/nginx:/var/log/nginx
             # this is needed in order to monitor docker
             # to make it work you need to create user "zabbix" with id 1997 on the host system,
             # and make sure it has enough permissions to read /var/run/docker.sock
@@ -222,7 +224,9 @@ services:
         environment:
             - TZ=Europe/Moscow
             - ZBX_HOSTNAME=favor-group.ru.docker
-            - ZBX_SERVER_HOST=zabbix.terrty.net,46.101.10.22
+            - ZBX_SERVER_HOST=zabbix.terrty.net
+            - ZBX_DENYKEY=
+            - ZBX_ALLOWKEY=system.run[*]
 
         logging:
             driver: json-file
