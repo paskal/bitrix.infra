@@ -168,7 +168,7 @@ Bunch of scripts, see their source code for purpose and comments.
 
 ### /web
 
-Site files, in this case in folders `web/favor-group.ru` and `web/dev.favor-group.ru`.
+Site files in directories `web/prod` and `web/dev`.
 
 ### /private
 
