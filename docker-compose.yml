@@ -216,7 +216,7 @@ services:
             # for monitoring purposes
             - ./logs/nginx:/var/log/nginx
             # for monitoring purposes
-            - ./web/prod/web/prod/upload:/web/prod/web/prod/upload
+            - ./web/prod/upload:/web/prod/upload
             # this is needed in order to monitor docker
             # to make it work you need to create user "zabbix" with id 1997 on the host system,
             # and make sure it has enough permissions to read /var/run/docker.sock
@@ -226,7 +226,7 @@ services:
         environment:
             - TZ=Europe/Moscow
             - ZBX_HOSTNAME=favor-group.ru.docker
-            - ZBX_SERVER_HOST=zabbix.terrty.net
+            - ZBX_SERVER_HOST=46.101.10.22
             - ZBX_DENYKEY=
             - ZBX_ALLOWKEY=system.run[*]
 
