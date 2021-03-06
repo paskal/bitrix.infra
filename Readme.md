@@ -189,6 +189,13 @@ Site files in directories `web/prod` and `web/dev`.
       FTP_USER_PASS=ftp_password
       ```
 
+    - `private/environment/certbot.env` should contain Yandex PDD API key for [actionm/certbot-dns-pddyandex](https://github.com/actionm/certbot-dns-pddyandex/):
+
+      ```bash
+      # Get your API key from https://pddimp.yandex.ru/api2/admin/get_token_result
+      API_KEY="insert_key_there"
+      ```
+
 - `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
 
 - `private/mysql-data` directory will be filled with database data automatically after the start of mysql container
@@ -215,8 +222,9 @@ echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
 
 ## Certificate renewal
 
-At this moment, DNS verification of a wildcard certificate is not yet set up.
-To renew the certificate, run the following command and follow the interactive prompt:
+At this moment, DNS verification of a wildcard certificate is set up automatically trough [Yandex PDD](https://yandex.com/dev/connect/directory/api/concepts/domains/dns-records-via-pdd.html).
+
+To renew the certificate manually, run the following command and follow the interactive prompt:
 
 ```shell
 docker-compose run --rm --entrypoint "\
@@ -228,4 +236,4 @@ docker-compose run --rm --entrypoint "\
     --preferred-challenges dns" certbot
 ```
 
-To add required TXT entries, head to DNS edit page: [Fornex](https://fornex.com/my/dns/favor-group.ru/) or [Yandex](https://connect.yandex.ru/portal/services/webmaster/resources/favor-group.ru).
+To add required TXT entries, head to DNS entries page, [Yandex](https://connect.yandex.ru/portal/services/webmaster/resources/favor-group.ru) in that example.

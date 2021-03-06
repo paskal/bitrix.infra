@@ -5,9 +5,13 @@ services:
         image: certbot/certbot
         hostname: certbot
         container_name: certbot
-        entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 10d & wait $${!}; done;'"
+        env_file: private/environment/certbot.env
+        # timeout is heve because apk hangs when the package is already installed
+        entrypoint: "/bin/sh -c 'timeout 30 apk add --no-cache curl; trap exit TERM; while :; do certbot renew --manual --manual-auth-hook /scripts/authenticator.sh --manual-cleanup-hook /scripts/cleanup.sh --preferred-challenges dns-01 --server https://acme-v02.api.letsencrypt.org/directory; sleep 10d & wait $${!}; done;'"
         volumes:
             - ./private/letsencrypt:/etc/letsencrypt
+            - ./config/certbot-dns-pddyandex/authenticator.sh:/scripts/authenticator.sh
+            - ./config/certbot-dns-pddyandex/cleanup.sh:/scripts/cleanup.sh
 
         logging:
             driver: json-file
@@ -212,6 +216,7 @@ services:
         depends_on:
             - mysql
             - nginx
+            - memcached
         volumes:
             # for monitoring purposes
             - ./logs/nginx:/var/log/nginx
