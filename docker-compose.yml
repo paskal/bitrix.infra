@@ -217,9 +217,12 @@ services:
 
     ## Zabbix Agent 2
     zabbix-agent:
-        image: zabbix/zabbix-agent2:latest
+        build: ./config/zabbix
+        image: paskal/zabbix-agent2:latest
         container_name: zabbix-agent
         privileged: true
+        # MYSQL_USER, MYSQL_PASSWORD
+        env_file: private/environment/mysql.env
         depends_on:
             - mysql
             - nginx
