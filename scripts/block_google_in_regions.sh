@@ -16,7 +16,7 @@ for f in $robots_files; do
   *)
     echo "Processing ${f}"
     # add text in the beginning of the file only if it's not already there
-    sed -i '1s/^\(User-agent: [^G][^o][^o][^g]\)/User-agent: Googlebot\nDisallow: \/\n\n\1/' "${f}"
+    sed -i '1s/^\(User-agent: [^G]\)/User-agent: Googlebot\nDisallow: \/\n\n\1/' "${f}"
     ;;
   esac
 done
