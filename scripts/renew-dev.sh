@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -e -u
 
+if [ `id -u` -ne 0 ]; then
+  echo "Please run with sudo, 'sudo $0'"
+  exit
+fi
+
 # This script recreates dev site from current prod one with deleting old dev in the process
 
 # Domain names
@@ -13,11 +18,11 @@ PROD_DB=$(echo ${DOMAIN} | tr '.' '_' | tr '-' '_')
 # use production domain as-is as DB name and username, but replace dots and dashes with underscores
 DEV_DB=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
 DEV_USER=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
-DEV_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1)
+DEV_PASSWORD=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 32 | head -n 1)
 
 # File path variables
-PROD_LOCATION="./web/${DOMAIN}"
-DEV_LOCATION="./web/${DEV_DOMAIN}"
+PROD_LOCATION="./web/prod"
+DEV_LOCATION="./web/dev"
 
 # Sanity checks before the run
 [ -d "${PROD_LOCATION}" ] || (echo "${PROD_LOCATION} (prod location) directory is absent" && exit 45)
@@ -109,3 +114,4 @@ rm -f prod-dump.sql
 rm -f ./private/mysql-data/deleteme_*
 
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
+
