@@ -20,9 +20,7 @@ RUN apt-get update \
     sudo \
     cron \
     libssl1.1=1.1.1f-1ubuntu2.2 \
-    jpegoptim optipng pngquant gifsicle webp nodejs npm \
     && pecl install mcrypt-1.0.4 \
-    && npm install uglify-js uglify-js2 terser babel-minify html-minifier svgo -g \
     && apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 # msmtp to allow email sending
