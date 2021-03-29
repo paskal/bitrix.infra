@@ -204,9 +204,27 @@ Site files in directories `web/prod` and `web/dev`.
 
 - `private/msmtprc` is a file with [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp)
 
-## Routines
+## Routine operations
 
-## Cleaning cache
+<details>
+<summary>Disaster recovery</summary>
+
+To start the recovery you should have a machine with the latest Debian with an external IP attached to it, likely [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute).
+
+SSH to the machine you want to set up as a new server and then execute the following:
+
+```shell
+sudo mkdir /web
+sudo chown $USER:$(id -g -n) /web
+git clone https://github.com/paskal/bitrix.infra.git /web
+cd /web
+sudo ./scripts/disaster_recovery.sh
+```
+
+</details>
+
+<details>
+<summary>Cleaning (mem)cache</summary>
 
 There are two memcached instances in use, one for site cache and another for sessions. Here are the commands
 to clean them completely:
@@ -220,7 +238,10 @@ echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
 
 [Here](https://github.com/memcached/memcached/wiki/Commands) is the complete list of commands you can send to it.
 
-## Certificate renewal
+</details>
+
+<details>
+<summary>Certificate renewal</summary>
 
 At this moment, DNS verification of a wildcard certificate is set up automatically trough [Yandex PDD](https://yandex.com/dev/connect/directory/api/concepts/domains/dns-records-via-pdd.html).
 
@@ -237,3 +258,5 @@ docker-compose run --rm --entrypoint "\
 ```
 
 To add required TXT entries, head to DNS entries page, [Yandex](https://connect.yandex.ru/portal/services/webmaster/resources/favor-group.ru) in that example.
+
+</details>
