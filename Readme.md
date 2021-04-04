@@ -209,7 +209,7 @@ Site files in directories `web/prod` and `web/dev`.
 <details>
 <summary>Disaster recovery</summary>
 
-To start the recovery you should have a machine with the latest Debian with an external IP attached to it, likely [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute).
+To start the recovery you should have a machine with the latest Ubuntu with an external IP attached to it, likely [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute).
 
 SSH to the machine you want to set up as a new server and then execute the following:
 
