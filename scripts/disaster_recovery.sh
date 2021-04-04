@@ -64,29 +64,40 @@ EOF
   echo "done, mtu is $(cat /sys/class/net/eth0/mtu)"
 }
 
-### Prepare packages
+create_host_cronjob_if_not_exist() {
+  [ -f "/etc/cron.d/bitrix_infra" ] && return
+  echo "creating /etc/cron.d/bitrix_infra from ./config/cron/host.cron..."
+  ln -s "${PWD}/config/cron/host.cron" /etc/cron.d/bitrix_infra
+  echo "created /etc/cron.d/bitrix_infra"
+}
 
+final_ip_check() {
+  server_ip=$(dig +short myip.opendns.com @resolver1.opendns.com)
+  site_a_entry=$(dig +short ${domain})
+
+  if [ "${server_ip}" != "${site_a_entry}" ]; then
+    echo "Current IP for ${domain} is: ${site_a_entry}"
+    echo "This machine external IP (best guess): ${server_ip}"
+
+    echo "\
+Please ensure DNS A entries are pointing to this machine external IP: \
+https://connect.yandex.ru/portal/services/webmaster/resources/${domain} \
+"
+  else
+    echo "Server IP (${server_ip}) matches A entry for ${domain}, by now site should be working at https://${domain}"
+  fi
+
+}
+
+# Pre-setup
 set_mtu_1450_if_not_set
 install_docker_if_not_installed
 install_docker_compose_if_not_installed
 
-### Start recovery
+# Backup restoration
+create_host_cronjob_if_not_exist
 
 echo "Server has latest backup of files and DB restored!"
 
-### Final DNS recommendation
-
-server_ip=$(dig +short myip.opendns.com @resolver1.opendns.com)
-site_a_entry=$(dig +short ${domain})
-
-if [ "${server_ip}" != "${site_a_entry}" ]; then
-  echo "Current IP for ${domain} is: ${site_a_entry}"
-  echo "This machine external IP (best guess): ${server_ip}"
-
-  echo "\
-Please ensure DNS A entries are pointing to this machine external IP: \
-https://connect.yandex.ru/portal/services/webmaster/resources/${domain} \
-"
-else
-  echo "Server IP (${server_ip}) matches A entry for ${domain}, by now site should be working at https://${domain}"
-fi
+# Final DNS recommendation
+final_ip_check
