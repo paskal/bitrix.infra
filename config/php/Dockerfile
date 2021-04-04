@@ -19,7 +19,6 @@ RUN apt-get update \
     msmtp-mta \
     sudo \
     cron \
-    libssl1.1=1.1.1f-1ubuntu2.2 \
     && pecl install mcrypt-1.0.4 \
     && apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
