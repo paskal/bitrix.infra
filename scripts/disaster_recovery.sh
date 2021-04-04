@@ -50,7 +50,7 @@ install_docker_compose_if_not_installed() {
 }
 
 # Necessary for Yandex with DDoS Protection enabled https://cloud.yandex.com/en/docs/vpc/concepts/mtu-mss
-set_mtu_1450() {
+set_mtu_1450_if_not_set() {
   if [ "$(cat /sys/class/net/eth0/mtu)" -eq 1450 ]; then return; fi
   echo "setting mtu to 1450..."
   cat <<EOF >/etc/netplan/90-mtu.yaml
@@ -61,12 +61,12 @@ network:
       mtu: 1450
 EOF
   netplan apply
-  echo "mtu is $(cat /sys/class/net/eth0/mtu)"
+  echo "done, mtu is $(cat /sys/class/net/eth0/mtu)"
 }
 
 ### Prepare packages
 
-set_mtu_1450
+set_mtu_1450_if_not_set
 install_docker_if_not_installed
 install_docker_compose_if_not_installed
 

@@ -214,7 +214,7 @@ To start the recovery you should have a machine with the latest Ubuntu with an e
 SSH to the machine you want to set up as a new server and then execute the following:
 
 ```shell
-sudo mkdir /web
+sudo mkdir -p /web
 sudo chown $USER:$(id -g -n) /web
 git clone https://github.com/paskal/bitrix.infra.git /web
 cd /web
