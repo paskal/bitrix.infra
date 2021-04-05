@@ -38,6 +38,8 @@ install_docker_if_not_installed() {
   fi
 
   apt-get -y install docker-ce docker-ce-cli containerd.io >/dev/null
+  # add current user to docker group
+  [ "$(logname)" != "root" ] && usermod -aG docker "$(logname)"
   echo "docker is installed"
 }
 
@@ -71,6 +73,39 @@ create_host_cronjob_if_not_exist() {
   echo "created /etc/cron.d/bitrix_infra"
 }
 
+zabbix_setup() {
+  [ -f "/etc/systemd/system/set-zabbix-docker-acl.service" ] && return
+  echo "creating zabbix user and group"
+  groupadd -g 1997 zabbix
+  useradd -u 1997 -g zabbix -G docker zabbix
+  echo "creating a service 'set-zabbix-docker-acl' which will allow zabbix to read and write docker socket"
+  cat <<EOF >/etc/systemd/system/set-zabbix-docker-acl.service
+[Unit]
+ Description=Zabbix docker ACL Hack
+ Requires=local-fs.target
+ After=local-fs.target
+
+[Service]
+ ExecStart=/usr/bin/setfacl -m u:zabbix:rw /var/run/docker.sock
+
+[Install]
+ WantedBy=multi-user.target
+EOF
+  # acl provides setfacl package
+  apt-get -y install acl >/dev/null
+  # enable the service on startup and start it
+  systemctl enable set-zabbix-docker-acl >/dev/null
+  systemctl start set-zabbix-docker-acl
+  echo "done the zabbix set up"
+}
+
+set_up_duplicity() {
+  command -v duplicity >/dev/null && return
+  echo "installing duplicity for backups..."
+  apt-get -y install duplicity >/dev/null
+  echo "done setting up duplicity"
+}
+
 final_ip_check() {
   server_ip=$(dig +short myip.opendns.com @resolver1.opendns.com)
   site_a_entry=$(dig +short ${domain})
@@ -86,13 +121,16 @@ https://connect.yandex.ru/portal/services/webmaster/resources/${domain} \
   else
     echo "Server IP (${server_ip}) matches A entry for ${domain}, by now site should be working at https://${domain}"
   fi
-
 }
+
+### Main script logic
 
 # Pre-setup
 set_mtu_1450_if_not_set
 install_docker_if_not_installed
 install_docker_compose_if_not_installed
+zabbix_setup
+set_up_duplicity
 
 # Backup restoration
 create_host_cronjob_if_not_exist
