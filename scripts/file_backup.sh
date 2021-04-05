@@ -12,7 +12,7 @@ HOME="/home/admin" duplicity \
   --asynchronous-upload \
   --s3-use-ia \
   --s3-endpoint-url https://storage.yandexcloud.net \
-  --log-file /var/log/duplicity.log \
+  --log-file /web/logs/duplicity.log \
   --archive-dir /root/.cache/duplicity \
   --exclude '**/.git' \
   --exclude '**/backup/' \
