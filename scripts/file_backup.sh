@@ -18,4 +18,9 @@ HOME="/home/admin" duplicity \
   --exclude '**/backup/' \
   --exclude '**/logs/' \
   --exclude '**/web/dev' \
+  --exclude '**/web/prod/upload/tmp/' \
+  --exclude '**/web/prod/upload/esol.importxml' \
+  --exclude '**/web/prod/upload/acrit.core/.tmp' \
+  --exclude '**/web/prod/bitrix/managed_cache' \
+  --exclude '**/web/prod/bitrix/cache' \
   "${src}" "${dest}"
