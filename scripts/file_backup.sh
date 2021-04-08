@@ -17,7 +17,9 @@ HOME="/home/admin" duplicity \
   --exclude '**/.git' \
   --exclude '**/backup/' \
   --exclude '**/logs/' \
-  --exclude '**/web/dev' \
+  --exclude '**/private/mysqld/' \
+  --exclude '**/private/mysql-data/' \
+  --exclude '**/web/dev/' \
   --exclude '**/web/prod/upload/tmp/' \
   --exclude '**/web/prod/upload/esol.importxml' \
   --exclude '**/web/prod/upload/acrit.core/.tmp' \
