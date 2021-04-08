@@ -209,15 +209,28 @@ Site files in directories `web/prod` and `web/dev`.
 <details>
 <summary>Disaster recovery</summary>
 
-To start the recovery you should have a machine with the latest Ubuntu with an external IP attached to it, likely [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute).
+To start the recovery you should have a machine with the latest Ubuntu with static external IP with DDoS protection attached to it, created [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute). It should be created with at least 100Gb disk space.
+
+First, [create](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn?section=service-accounts) and store a static key for existing service account. You'll have ID and secret key after creation, write them down in following format:
+
+```
+[default]
+aws_access_key_id = KEY
+aws_secret_access_key = SECRET_KEY
+```
 
 SSH to the machine you want to set up as a new server and then execute the following:
 
 ```shell
+# execute this first and write down credentials you created above to the file
+mkdir -p ~/.aws
+vim ~/.aws/credentials
+# that is preparation for backup restoration
 sudo mkdir -p /web
 sudo chown $USER:$(id -g -n) /web
 git clone https://github.com/paskal/bitrix.infra.git /web
 cd /web
+# backup restoration, it's safe to run it multiple times
 sudo ./scripts/disaster_recovery.sh
 ```
 
