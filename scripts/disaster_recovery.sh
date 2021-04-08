@@ -102,7 +102,8 @@ EOF
 set_up_duplicity() {
   command -v duplicity >/dev/null && return
   echo "installing duplicity for backups..."
-  apt-get -y install duplicity >/dev/null
+  add-apt-repository -y ppa:duplicity-team/duplicity-release-git >/dev/null
+  apt-get -y install duplicity python3-boto3 >/dev/null
   echo "done setting up duplicity"
 }
 
