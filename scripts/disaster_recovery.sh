@@ -126,11 +126,6 @@ final_ip_check() {
 Please ensure DNS A entries are pointing to this machine external IP: \
 https://connect.yandex.ru/portal/services/webmaster/resources/${domain} \
 "
-  echo "\
-As an alternative, you can try attach current IP address from DNS to this machine in the VPC interface, \
-it would be easier and faster than changing the DNS: \
-https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/vpc/addresses \
-"
   else
     echo "Server IP (${server_ip}) matches A entry for ${domain}, by now site should be working at https://${domain}"
   fi
@@ -148,6 +143,7 @@ backup_restore() {
     --archive-dir /root/.cache/duplicity \
     --force \
     "${duplicity_backup_location}" "${PWD}"
+  ./scripts/fix-rights.sh
   echo "Server has latest backup of files and DB restored!"
 }
 
@@ -155,7 +151,7 @@ start_services(){
   echo "pulling docker images..."
   docker-compose pull >/dev/null 2>&1 || true
   echo "building docker images..."
-  docker-compose build
+  docker-compose build >/dev/null 2>&1 || true
   echo "starting services..."
   docker-compose up -d
 }
@@ -171,7 +167,6 @@ set_up_duplicity
 
 # Backup restoration
 backup_restore
-./scripts/fix-rights.sh
 create_host_cronjob_if_not_exist
 start_services
 
