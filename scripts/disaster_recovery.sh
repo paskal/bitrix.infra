@@ -5,6 +5,7 @@ set -e -u
 # and recovers site files and the DB content from the backup.
 
 domain="favor-group.ru"
+duplicity_backup_location="boto3+s3://favor-group-backup/duplicity_web_favor-group"
 
 ### Pre-checks
 
@@ -16,11 +17,17 @@ if [ "$(id -u)" -ne 0 ]; then
   exit
 fi
 
+echo "Note: it's safe to run the script multiple times"
+
 ### Functions
 
 install_docker_if_not_installed() {
   command -v docker >/dev/null && return
   echo "docker is installing..."
+  # set low enough docker MTU to work with host machine MTU of 1450
+  mkdir -p /etc/docker
+  echo '{"mtu": 1422}' >/etc/docker/daemon.json
+
   apt-get update >/dev/null
   apt-get -y install \
     apt-transport-https \
@@ -119,9 +126,38 @@ final_ip_check() {
 Please ensure DNS A entries are pointing to this machine external IP: \
 https://connect.yandex.ru/portal/services/webmaster/resources/${domain} \
 "
+  echo "\
+As an alternative, you can try attach current IP address from DNS to this machine in the VPC interface, \
+it would be easier and faster than changing the DNS: \
+https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/vpc/addresses \
+"
   else
     echo "Server IP (${server_ip}) matches A entry for ${domain}, by now site should be working at https://${domain}"
   fi
+}
+
+backup_restore() {
+  if [ -d "./private" ]; then
+    echo "${PWD}/private folder already exist, delete it if you want to restore files from backup"
+    return
+  fi
+  HOME="/home/$(logname)" duplicity \
+    --no-encryption \
+    --s3-endpoint-url https://storage.yandexcloud.net \
+    --log-file /web/logs/duplicity.log \
+    --archive-dir /root/.cache/duplicity \
+    --force \
+    "${duplicity_backup_location}" "${PWD}"
+  echo "Server has latest backup of files and DB restored!"
+}
+
+start_services(){
+  echo "pulling docker images..."
+  docker-compose pull >/dev/null 2>&1 || true
+  echo "building docker images..."
+  docker-compose build
+  echo "starting services..."
+  docker-compose up -d
 }
 
 ### Main script logic
@@ -134,9 +170,10 @@ zabbix_setup
 set_up_duplicity
 
 # Backup restoration
+backup_restore
+./scripts/fix-rights.sh
 create_host_cronjob_if_not_exist
-
-echo "Server has latest backup of files and DB restored!"
+start_services
 
 # Final DNS recommendation
 final_ip_check
