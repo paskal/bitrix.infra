@@ -119,11 +119,11 @@ final_ip_check() {
   site_a_entry=$(dig +short ${domain})
 
   if [ "${server_ip}" != "${site_a_entry}" ]; then
-    echo "Current IP for ${domain} is: ${site_a_entry}"
+    echo "\nCurrent IP for ${domain} is: ${site_a_entry}"
     echo "This machine external IP (best guess): ${server_ip}"
 
     echo "\
-Please ensure DNS A entries are pointing to this machine external IP: \
+\nPlease ensure DNS A entries are pointing to this machine external IP: \
 https://connect.yandex.ru/portal/services/webmaster/resources/${domain} \
 "
   else
@@ -161,7 +161,7 @@ check_zabbix_hostname(){
   default_zabbix_hostname="favor-group.ru.docker"
   if [ "$(fgrep ZBX_HOSTNAME docker-compose.yml | cut -d '=' -f 2)" = "${default_zabbix_hostname}" ]; then
     echo "\
-Change ZBX_HOSTNAME=$default_zabbix_hostname to other hostname in docker-compose.yml \
+\n\nChange ZBX_HOSTNAME=$default_zabbix_hostname to other hostname in docker-compose.yml \
 and run 'docker-compose up -d' to prevent having two hosts sending data to same Zabbix hostname.
 "
   fi
@@ -182,5 +182,6 @@ create_host_cronjob_if_not_exist
 start_services
 
 # Final recommendations
+echo "\n\n=== Recommendations ==="
 final_ip_check
 check_zabbix_hostname
