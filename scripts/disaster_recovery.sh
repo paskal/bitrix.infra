@@ -154,6 +154,17 @@ start_services(){
   docker-compose build >/dev/null 2>&1 || true
   echo "starting services..."
   docker-compose up -d
+  echo "docker setup is complete"
+}
+
+check_zabbix_hostname(){
+  default_zabbix_hostname="favor-group.ru.docker"
+  if [ "$(fgrep ZBX_HOSTNAME docker-compose.yml | cut -d '=' -f 2)" = "${default_zabbix_hostname}" ]; then
+    echo "\
+Change ZBX_HOSTNAME=$default_zabbix_hostname to other hostname in docker-compose.yml \
+and run 'docker-compose up -d' to prevent having two hosts sending data to same Zabbix hostname.
+"
+  fi
 }
 
 ### Main script logic
@@ -170,5 +181,6 @@ backup_restore
 create_host_cronjob_if_not_exist
 start_services
 
-# Final DNS recommendation
+# Final recommendations
 final_ip_check
+check_zabbix_hostname
