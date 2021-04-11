@@ -144,7 +144,7 @@ services:
             # Logs
             - ./logs/mysql:/var/log/mysql
         environment:
-            MYSQL_DATABASE: admin_favorgroup
+            MYSQL_DATABASE: favor_group_ru
             TZ: Europe/Moscow
         cap_add:
             - SYS_NICE  # CAP_SYS_NICE
