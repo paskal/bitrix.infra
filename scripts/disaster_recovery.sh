@@ -5,7 +5,9 @@ set -e -u
 # and recovers site files and the DB content from the backup.
 
 domain="favor-group.ru"
-duplicity_backup_location="boto3+s3://favor-group-backup/duplicity_web_favor-group"
+backup_s3_directory=favor-group-backup
+duplicity_backup_location="boto3+s3://${backup_s3_directory}/duplicity_web_favor-group"
+mysql_restore_hostname="favor-group"
 
 ### Pre-checks
 
@@ -20,6 +22,20 @@ fi
 echo "Note: it's safe to run the script multiple times"
 
 ### Functions
+
+setup_aws() {
+  if [ ! -f /usr/local/bin/aws ]; then
+    curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    apt-get install unzip >/dev/null
+    unzip -o awscliv2.zip >/dev/null
+    ./aws/install >/dev/null
+    rm -rf awscliv2.zip ./aws
+  fi
+  if [ ! -f ~/.aws/config ]; then
+    echo "[default]\nregion = ru-central1\n" >"/home/$(logname)/.aws/config"
+    chown "$(logname)":"$(logname)" "/home/$(logname)/.aws/config"
+  fi
+}
 
 install_docker_if_not_installed() {
   command -v docker >/dev/null && return
@@ -147,7 +163,31 @@ backup_restore() {
   echo "Server has latest backup of files and DB restored!"
 }
 
-start_services(){
+restore_mysql() {
+  backup_directory_path="./backup/"
+
+  # retrieving last backup from the S3
+  echo -n "searching for the last mysql backup..."
+  HOME="/home/$(logname)" backup_filepath=$(/usr/local/bin/aws \
+    --endpoint-url=https://storage.yandexcloud.net \
+    --recursive \
+    s3 ls "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/" |
+    grep .gz |
+    tail -1 |
+    cut -d '/' -f 2-)
+  echo " found s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}"
+  backup_dir=$(echo "${backup_filepath}" | cut -d "/" -f -1)
+  if [ ! -f "${backup_directory_path}${backup_filepath}" ]; then
+    HOME="/home/$(logname)" /usr/local/bin/aws \
+      --endpoint-url=https://storage.yandexcloud.net \
+      s3 cp \
+      "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}" \
+      "${backup_directory_path}${backup_dir}/" >/dev/null
+    echo "mysql backup downloaded to ${backup_directory_path}${backup_filepath}"
+  fi
+}
+
+start_services() {
   echo "pulling docker images..."
   docker-compose pull >/dev/null 2>&1 || true
   echo "building docker images..."
@@ -157,11 +197,11 @@ start_services(){
   echo "docker setup is complete"
 }
 
-check_zabbix_hostname(){
+check_zabbix_hostname() {
   default_zabbix_hostname="favor-group.ru.docker"
   if [ "$(fgrep ZBX_HOSTNAME docker-compose.yml | cut -d '=' -f 2)" = "${default_zabbix_hostname}" ]; then
     echo "\
-\n\nChange ZBX_HOSTNAME=$default_zabbix_hostname to other hostname in docker-compose.yml \
+\n\nChange ZBX_HOSTNAME=${default_zabbix_hostname} to other hostname in docker-compose.yml \
 and run 'docker-compose up -d' to prevent having two hosts sending data to same Zabbix hostname.
 "
   fi
@@ -175,11 +215,13 @@ install_docker_if_not_installed
 install_docker_compose_if_not_installed
 zabbix_setup
 set_up_duplicity
+setup_aws
 
 # Backup restoration
 backup_restore
 create_host_cronjob_if_not_exist
 start_services
+restore_mysql
 
 # Final recommendations
 echo "\n\n=== Recommendations ==="
