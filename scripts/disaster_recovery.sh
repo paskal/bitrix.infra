@@ -16,7 +16,7 @@ mysql_restore_hostname="favor-group"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Please run with sudo, 'sudo $0'"
-  exit
+  exit 46
 fi
 
 echo "Note: it's safe to run the script multiple times"
@@ -24,6 +24,7 @@ echo "Note: it's safe to run the script multiple times"
 ### Functions
 
 setup_aws() {
+  mkdir -p "/home/$(logname)/.aws"
   if [ ! -f /usr/local/bin/aws ]; then
     curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     apt-get install unzip >/dev/null
@@ -31,9 +32,21 @@ setup_aws() {
     ./aws/install >/dev/null
     rm -rf awscliv2.zip ./aws
   fi
-  if [ ! -f ~/.aws/config ]; then
+  if [ ! -f "/home/$(logname)/.aws/config" ]; then
     echo "[default]\nregion = ru-central1\n" >"/home/$(logname)/.aws/config"
     chown "$(logname)":"$(logname)" "/home/$(logname)/.aws/config"
+  fi
+  if [ ! -f "/home/$(logname)/.aws/credentials" ]; then
+    echo "!! AWS credentials file is absent, won't be able to restore backups without it !!\n"
+    echo "Please go by the link and create new static key for the existing service account:"
+    echo "https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn?section=service-accounts\n"
+    echo "\
+You'll get ID and secret key, write them to /home/$(logname)/.aws/credentials in the following format:\n\n\
+[default]\n\
+aws_access_key_id = KEY\n\
+aws_secret_access_key = SECRET_KEY\
+"
+    exit 47
   fi
 }
 
@@ -199,7 +212,7 @@ start_services() {
 
 check_zabbix_hostname() {
   default_zabbix_hostname="favor-group.ru.docker"
-  if [ "$(fgrep ZBX_HOSTNAME docker-compose.yml | cut -d '=' -f 2)" = "${default_zabbix_hostname}" ]; then
+  if [ "$(grep ZBX_HOSTNAME docker-compose.yml | cut -d '=' -f 2)" = "${default_zabbix_hostname}" ]; then
     echo "\
 \n\nChange ZBX_HOSTNAME=${default_zabbix_hostname} to other hostname in docker-compose.yml \
 and run 'docker-compose up -d' to prevent having two hosts sending data to same Zabbix hostname.

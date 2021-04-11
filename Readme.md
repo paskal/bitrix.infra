@@ -1,15 +1,12 @@
 # [favor-group.ru](https://favor-group.ru) infrastructure as a code
 
-This repository contains infrastructure code behind Bitrix-based [favor-group.ru](https://favor-group.ru), a site
-of my father's metal decking business operating in Moscow, Sankt-Petersburg and Tula.
+This repository contains infrastructure code behind Bitrix-based [favor-group.ru](https://favor-group.ru), a site of my father's metal decking business operating in Moscow, Sankt-Petersburg and Tula.
 
-It's a Bitrix website completely enclosed within docker-compose to be as portable and maintainable
-as possible, and a set of scripts around its maintenance like dev site redeploy or production site backup.
+It's a Bitrix website completely enclosed within docker-compose to be as portable and maintainable as possible, and a set of scripts around its maintenance like dev site redeploy or production site backup.
 
 ## How to make use of it
 
-You couldn't use it as-is without alterations. However, I tried to make everything as generic
-as possible to make adoption for another project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
+You couldn't use it as-is without alterations. However, I tried to make everything as generic as possible to make adoption for another project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
 and then read the rest of this Readme.
 
 After you make adjustments to configuration and docker-compose.yml, run it as follows:
@@ -18,15 +15,11 @@ After you make adjustments to configuration and docker-compose.yml, run it as fo
 docker-compose up --build -d
 ```
 
-[bitrixdock](https://github.com/bitrixdock/bitrixdock) (Russian) project was an inspiration for this
-one and had way better setup instructions. Please start with it if you don't know what to do with
-many files in that repo.
+[bitrixdock](https://github.com/bitrixdock/bitrixdock) (Russian) project was an inspiration for this one and had way better setup instructions. Please start with it if you don't know what to do with many files in that repo.
 
 ### File system permissions
 
-All files touched by MySQL use UID/GID 1001, and PHP and Nginx use UID/GID 1000.
-Running `scripts/fix-rights.sh` script would set the permissions appropriately for all
-containers to run correctly.
+All files touched by MySQL use UID/GID 1001, and PHP and Nginx use UID/GID 1000. Running `scripts/fix-rights.sh` script would set the permissions appropriately for all containers to run correctly.
 
 It might be easier to switch everything to User and Group 1000 for consistency later.
 
@@ -140,21 +133,19 @@ return array(
 
 ### /config
 
-- `cron/php-cron.cron` is a list of cron tasks to run in php-cron container,
-  only `cron_events.php` is required for Bitrix and others are specific to this site,
-  [must](http://manpages.ubuntu.com/manpages/trusty/man8/cron.8.html) be owned by root:root
-  and have access rights 0644 - fixable by running `scripts/fix-rights.sh`
+- `cron/php-cron.cron` is a list of cron tasks to run in php-cron container, only `cron_events.php` is required for Bitrix and others are specific to this site,
+  [must](http://manpages.ubuntu.com/manpages/trusty/man8/cron.8.html) be owned by root:root and have access rights 0644 - fixable by running `scripts/fix-rights.sh`
 
 - `cron/host.cron` is a list of cron tasks to run on the host machine
 
 - `mysql/my.cnf` is a MySQL configuration, applied on top of package-provided my.cnf
 
 - `nginx` directory contains the build Dockerfile, as well as following (HTTPS) configuration:
-  - pagespeed setup
-  - bitrix proxy, separate for dev and prod
-  - adminer proxy
-  - HTTP to HTTPS redirects
-  - stub status page listening on localhost for Zabbix monitoring
+    - pagespeed setup
+    - bitrix proxy, separate for dev and prod
+    - adminer proxy
+    - HTTP to HTTPS redirects
+    - stub status page listening on localhost for Zabbix monitoring
 
 - `php-fpm` directory contains the build Dockerfile and php configuration, applied on top of package-provided one
 
@@ -183,7 +174,7 @@ Site files in directories `web/prod` and `web/dev`.
       ```
 
     - `private/environment/ftp.env` should contain the following variables:
-  
+
       ```bash
       FTP_USER_NAME=ftp_username
       FTP_USER_PASS=ftp_password
@@ -211,20 +202,9 @@ Site files in directories `web/prod` and `web/dev`.
 
 To start the recovery you should have a machine with the latest Ubuntu with static external IP with DDoS protection attached to it, created [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute). It should be created with at least 100Gb disk space.
 
-First, [create](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn?section=service-accounts) and store a static key for existing service account. You'll have ID and secret key after creation, write them down in following format:
-
-```
-[default]
-aws_access_key_id = KEY
-aws_secret_access_key = SECRET_KEY
-```
-
-SSH to the machine you want to set up as a new server and then execute the following:
+SSH to the machine you want to set up as a new server and then execute the following, then follow the instructions of the script:
 
 ```shell
-# execute this first and write down credentials you created above to the file
-mkdir -p ~/.aws
-vim ~/.aws/credentials
 # that is preparation for backup restoration
 sudo mkdir -p /web
 sudo chown $USER:$(id -g -n) /web
@@ -239,8 +219,7 @@ sudo ./scripts/disaster_recovery.sh
 <details>
 <summary>Cleaning (mem)cache</summary>
 
-There are two memcached instances in use, one for site cache and another for sessions. Here are the commands
-to clean them completely:
+There are two memcached instances in use, one for site cache and another for sessions. Here are the commands to clean them completely:
 
 ```shell
 # to flush site cache
