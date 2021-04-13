@@ -26,6 +26,7 @@ echo "Note: it's safe to run the script multiple times"
 
 setup_aws() {
   mkdir -p "/home/$(logname)/.aws"
+  chown "$(logname)":"$(id -gn "$(logname)")" "/home/$(logname)/.aws"
   if [ ! -f /usr/local/bin/aws ]; then
     curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     apt-get -y install unzip >/dev/null
@@ -35,7 +36,7 @@ setup_aws() {
   fi
   if [ ! -f "/home/$(logname)/.aws/config" ]; then
     echo "[default]\nregion = ru-central1\n" >"/home/$(logname)/.aws/config"
-    chown "$(logname)":"$(logname)" "/home/$(logname)/.aws/config"
+    chown "$(logname)":"$(id -gn "$(logname)")" "/home/$(logname)/.aws/config"
   fi
   if [ ! -f "/home/$(logname)/.aws/credentials" ]; then
     echo "!! AWS credentials file is absent, won't be able to restore backups without it !!\n"
@@ -178,6 +179,7 @@ backup_restore() {
 }
 
 restore_mysql() {
+  rm -f ./private/mysql-data/deleteme_* || true
   backup_directory_path="./backup/"
 
   # retrieving last backup from the S3
@@ -262,9 +264,9 @@ setup_aws
 
 # Backup restoration
 backup_restore
-create_host_cronjob_if_not_exist
 start_services
 restore_mysql
+create_host_cronjob_if_not_exist
 
 # Final recommendations
 echo "\n\n=== Recommendations ==="

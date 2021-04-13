@@ -200,7 +200,7 @@ Site files in directories `web/prod` and `web/dev`.
 <details>
 <summary>Disaster recovery</summary>
 
-To start the recovery you should have a machine with the latest Ubuntu with static external IP with DDoS protection attached to it, created [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute). It should be created with at least 100Gb disk space.
+To start the recovery you should have a machine with the latest Ubuntu with static external IP with DDoS protection attached to it, created [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute). It should be created with 100Gb of disk space, 12Gb of RAM and 8 cores.
 
 SSH to the machine you want to set up as a new server and then execute the following, then follow the instructions of the script:
 
@@ -208,6 +208,8 @@ SSH to the machine you want to set up as a new server and then execute the follo
 # that is preparation for backup restoration
 sudo mkdir -p /web
 sudo chown $USER:$(id -g -n) /web
+sudo apt-get update >/dev/null
+sudo apt-get -y install git >/dev/null
 git clone https://github.com/paskal/bitrix.infra.git /web
 cd /web
 # backup restoration, it's safe to run it multiple times
