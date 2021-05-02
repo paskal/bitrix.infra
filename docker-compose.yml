@@ -223,7 +223,10 @@ services:
         container_name: zabbix-agent
         privileged: true
         # MYSQL_USER, MYSQL_PASSWORD
-        env_file: private/environment/mysql.env
+        # ZBX_HOSTNAME, ZBX_SERVER_HOST
+        env_file:
+            - private/environment/mysql.env
+            - private/environment/zabbix.env
         depends_on:
             - mysql
             - nginx
@@ -239,12 +242,6 @@ services:
             - /var/run/docker.sock:/var/run/docker.sock
             # MySQL socket to prevent transferring data trough TCP
             - ./private/mysqld:/var/run/mysqld
-        environment:
-            - TZ=Europe/Moscow
-            - ZBX_HOSTNAME=favor-group.ru.docker
-            - ZBX_SERVER_HOST=46.101.10.22
-            - ZBX_DENYKEY=
-            - ZBX_ALLOWKEY=system.run[*]
 
         logging:
             driver: json-file
