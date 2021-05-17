@@ -10,4 +10,4 @@ RECORD_ID=$(curl -s -X POST "https://pddimp.yandex.ru/api2/admin/dns/add" \
 echo $RECORD_ID > /tmp/CERTBOT_$CERTBOT_DOMAIN
 
 # Sleep to make sure the change has time to propagate over to DNS
-sleep 4800
+sleep 9600
