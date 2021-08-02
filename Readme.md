@@ -141,7 +141,6 @@ return array(
 - `mysql/my.cnf` is a MySQL configuration, applied on top of package-provided my.cnf
 
 - `nginx` directory contains the build Dockerfile, as well as following (HTTPS) configuration:
-    - pagespeed setup
     - bitrix proxy, separate for dev and prod
     - adminer proxy
     - HTTP to HTTPS redirects
