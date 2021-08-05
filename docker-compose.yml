@@ -10,15 +10,18 @@ networks:
 
 services:
     certbot:
-        image: certbot/certbot
+        image: certbot/dns-cloudflare
         hostname: certbot
         container_name: certbot
-        env_file: private/environment/certbot.env
-        entrypoint: "/bin/sh -c 'apk add --no-cache curl; trap exit TERM; while :; do certbot renew --manual --manual-auth-hook /scripts/authenticator.sh --manual-cleanup-hook /scripts/cleanup.sh --preferred-challenges dns-01 --server https://acme-v02.api.letsencrypt.org/directory; sleep 10d & wait $${!}; done;'"
+        entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/cloudflare.ini --dns-cloudflare-propagation-seconds 60 --email $${EMAIL}@$${DOMAIN} --agree-tos --keep --renew-with-new-domains -d $${DOMAIN} -d *.$${DOMAIN}; sleep 10d & wait $${!}; done;'"
         volumes:
             - ./private/letsencrypt:/etc/letsencrypt
-            - ./config/certbot-dns-pddyandex/authenticator.sh:/scripts/authenticator.sh
-            - ./config/certbot-dns-pddyandex/cleanup.sh:/scripts/cleanup.sh
+            # should be in the following format:
+            # https://certbot-dns-cloudflare.readthedocs.io/en/stable/#certbot-cloudflare-token-ini
+            - ./private/environment/cloudflare.ini:/etc/cloudflare.ini
+        environment:
+            DOMAIN: favor-group.ru
+            EMAIL: msk
 
         logging:
             driver: json-file

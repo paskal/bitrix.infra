@@ -179,11 +179,11 @@ Site files in directories `web/prod` and `web/dev`.
       FTP_USER_PASS=ftp_password
       ```
 
-    - `private/environment/certbot.env` should contain Yandex PDD API key for [actionm/certbot-dns-pddyandex](https://github.com/actionm/certbot-dns-pddyandex/):
+    - `private/environment/cloudflare.ini` should contain CloudFlare DNS API key for [certbot/dns-cloudflare](https://certbot-dns-cloudflare.readthedocs.io/en/stable/#certbot-cloudflare-token-ini):
 
-      ```bash
-      # Get your API key from https://pddimp.yandex.ru/api2/admin/get_token_result
-      API_KEY="insert_key_there"
+      ```
+      # Get your API key from https://dash.cloudflare.com/profile/api-tokens
+      dns_cloudflare_api_token = insert_key_there
       ```
 
 - `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
@@ -234,22 +234,22 @@ echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
 </details>
 
 <details>
-<summary>Certificate renewal</summary>
+<summary>Manual certificate renewal</summary>
 
-At this moment, DNS verification of a wildcard certificate is set up automatically trough [Yandex PDD](https://yandex.com/dev/connect/directory/api/concepts/domains/dns-records-via-pdd.html).
+DNS verification of a wildcard certificate is set up automatically trough [CloudFlare](https://cloudflare.com/) DNS.
 
 To renew the certificate manually, run the following command and follow the interactive prompt:
 
 ```shell
 docker-compose run --rm --entrypoint "\
   certbot certonly \
-    --email msk@favor-group.ru \
-    -d favor-group.ru -d *.favor-group.ru \
+    --email email@example.com \
+    -d example.com -d *.example.com \
     --agree-tos \
     --manual \
     --preferred-challenges dns" certbot
 ```
 
-To add required TXT entries, head to DNS entries page, [Yandex](https://connect.yandex.ru/portal/services/webmaster/resources/favor-group.ru) in that example.
+To add required TXT entries, head to DNS entries page of your provider.
 
 </details>
