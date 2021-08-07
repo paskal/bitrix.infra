@@ -195,27 +195,27 @@ services:
 
         restart: unless-stopped
 
-    ftp:
-        image: stilliard/pure-ftpd
-        container_name: ftp
-        # FTP_USER_NAME, FTP_USER_PASS
-        env_file: private/environment/ftp.env
-        ports:
-            - "21:21"
-            - "30000-30009:30000-30009"
-        volumes:
-            - ./web:/home/web
-        environment:
-            PUBLICHOST: favor-group.ru
-            FTP_USER_HOME: /home/web
-
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
-
-        restart: unless-stopped
+#    ftp:
+#        image: stilliard/pure-ftpd
+#        container_name: ftp
+#        # FTP_USER_NAME, FTP_USER_PASS
+#        env_file: private/environment/ftp.env
+#        ports:
+#            - "21:21"
+#            - "30000-30009:30000-30009"
+#        volumes:
+#            - ./web:/home/web
+#        environment:
+#            PUBLICHOST: favor-group.ru
+#            FTP_USER_HOME: /home/web
+#
+#        logging:
+#            driver: json-file
+#            options:
+#                max-size: "10m"
+#                max-file: "5"
+#
+#        restart: unless-stopped
 
     # Monitoring
 
