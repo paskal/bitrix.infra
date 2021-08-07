@@ -1,6 +1,6 @@
-# [favor-group.ru](https://favor-group.ru) infrastructure as a code
+# Bitrix infrastructure as a code
 
-This repository contains infrastructure code behind Bitrix-based [favor-group.ru](https://favor-group.ru), a site of my father's metal decking business operating in Moscow, Sankt-Petersburg and Tula.
+This repository contains infrastructure code behind Bitrix-based [site](https://favor-group.ru) of my father's metal decking business operating in multiple cities.
 
 It's a Bitrix website completely enclosed within docker-compose to be as portable and maintainable as possible, and a set of scripts around its maintenance like dev site redeploy or production site backup.
 
