@@ -164,7 +164,7 @@ Site files in directories `web/prod` and `web/dev`.
 
 - `private/environment` is a directory with environment files for docker-compose
 
-    - `private/environment/mysql.env` should contain the following variables:
+    - `private/environment/mysql.env` should contain the [following variables](https://hub.docker.com/r/percona/percona-server):
 
       ```bash
       MYSQL_ROOT_PASSWORD=mysql_root_password
@@ -172,7 +172,7 @@ Site files in directories `web/prod` and `web/dev`.
       MYSQL_PASSWORD=bitrix_mysql_password
       ```
 
-    - `private/environment/ftp.env` should contain the following variables:
+    - `private/environment/ftp.env` should contain the [following variables](https://hub.docker.com/r/stilliard/pure-ftpd):
 
       ```bash
       FTP_USER_NAME=ftp_username
@@ -185,6 +185,13 @@ Site files in directories `web/prod` and `web/dev`.
       # Get your API key from https://dash.cloudflare.com/profile/api-tokens
       dns_cloudflare_api_token = insert_key_there
       ```
+
+  - `private/environment/zabbix.env` should contain the [following variables](https://hub.docker.com/r/zabbix/zabbix-agent2):
+
+    ```bash
+    ZBX_HOSTNAME=myhostname
+    ZBX_SERVER_HOST=zabbix.example.com
+    ```
 
 - `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
 
