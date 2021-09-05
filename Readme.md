@@ -1,4 +1,6 @@
 # Bitrix infrastructure as a code
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpaskal%2Fbitrix.infra.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpaskal%2Fbitrix.infra?ref=badge_shield)
+
 
 This repository contains infrastructure code behind Bitrix-based [site](https://favor-group.ru) of my father's metal decking business operating in multiple cities.
 
@@ -260,3 +262,7 @@ docker-compose run --rm --entrypoint "\
 To add required TXT entries, head to DNS entries page of your provider.
 
 </details>
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpaskal%2Fbitrix.infra.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpaskal%2Fbitrix.infra?ref=badge_large)
