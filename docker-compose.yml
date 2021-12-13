@@ -39,6 +39,7 @@ services:
         depends_on:
             - adminer
             - php
+            - php-8
         ports:
             - "80:80"
             - "443:443"
@@ -48,6 +49,7 @@ services:
             - ./web/next.favor-group.ru:/web/next
             - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
             - ./config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro
+            - ./config/nginx/bitrix-8.conf:/etc/nginx/bitrix-8.conf:ro
             - ./config/nginx/fastcgi.conf:/etc/nginx/fastcgi.conf:ro
             - ./config/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
             - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
@@ -83,6 +85,39 @@ services:
             - ./private/msmtprc:/etc/msmtprc
             - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
             - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+            # MySQL socket to prevent transferring data trough TCP
+            - ./private/mysqld:/var/run/mysqld
+            # Logs
+            - ./logs/php:/var/log/php
+
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "5"
+
+        restart: unless-stopped
+
+    php-8:
+        build:
+          context: ./config/php
+          dockerfile: Dockerfile.8
+        image: paskal/bitrix-php:8
+        hostname: php-8
+        container_name: php-8
+        depends_on:
+            - mysql
+            - memcached
+            - memcached-sessions
+        expose:
+            - "9000"
+        volumes:
+            - ./web/prod:/web/prod
+            - ./web/dev:/web/dev
+            - ./web/next.favor-group.ru:/web/next
+            - ./private/msmtprc:/etc/msmtprc
+            - ./config/php/90-php.ini:/etc/php/8.1/fpm/conf.d/90-php.ini
+            - ./config/php/90-php.ini:/etc/php/8.1/cli/conf.d/90-php.ini
             # MySQL socket to prevent transferring data trough TCP
             - ./private/mysqld:/var/run/mysqld
             # Logs

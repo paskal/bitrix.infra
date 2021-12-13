@@ -1,20 +1,20 @@
-FROM phpdockerio/php:7.4-fpm
+FROM phpdockerio/php:8.1-fpm
 # https://github.com/bitrixdock/bitrixdock/blob/master/php74/Dockerfile
 
 RUN apt-get update \
     && apt-get -y --allow-downgrades --no-install-recommends install \
-    php7.4-memcached \
-    php7.4-memcache \
-    php7.4-mbstring \
-    php7.4-mysql \
-    php7.4-intl \
-    php7.4-interbase \
-    php7.4-soap \
-    php7.4-gd \
-    php7.4-imagick \
-    php7.4-opcache \
-    php7.4-zip \
-    php-pear php7.4-dev libmcrypt-dev gcc make autoconf libc-dev pkg-config \
+    php8.1-memcached \
+    php8.1-memcache \
+    php8.1-mbstring \
+    php8.1-mysql \
+    php8.1-intl \
+    php8.1-interbase \
+    php8.1-soap \
+    php8.1-gd \
+    php8.1-imagick \
+    php8.1-opcache \
+    php8.1-zip \
+    php-pear php8.1-dev libmcrypt-dev gcc make autoconf libc-dev pkg-config \
     msmtp \
     msmtp-mta \
     sudo \
