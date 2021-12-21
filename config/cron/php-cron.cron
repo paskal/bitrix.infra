@@ -17,7 +17,6 @@
 30 *  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/find_and_fix_bugs_in_new_url.php 2>&1 >>/web/prod/local/cron/find_and_fix_bugs_in_new_url.log
 # sitemap generation
 0  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/bitrix.seo_sitemap_run.php 2>&1 >>/web/prod/local/cron/bitrix.seo_sitemap_run.log
-5  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/sotbit.seometa_sitemap_light_run.php 2>&1 >>/web/prod/local/cron/sotbit.seometa_sitemap_light_run.log
 10 0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/aspro.max_generate_sitemap.php 2>&1 >>/web/prod/local/cron/aspro.max_generate_sitemap.log
 # exports to yandex and google
 0  1  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/prod/bitrix/modules/acrit.export/cli/export.php profile=1 auto=Y site=s1 >> /web/prod/upload/acrit.export/log/log_1.e63f31938c399df95752fe5013735c65.txt 2>&1
