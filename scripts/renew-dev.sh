@@ -54,6 +54,7 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "create database ${DEV_DB};"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "create user '${DEV_USER}'@'%' identified by '${DEV_PASSWORD}';"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "grant all on ${DEV_DB}.* to '${DEV_USER}'@'%';"
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "grant system_variables_admin on *.* to '${DEV_USER}'@'%';"
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e 'flush privileges;'
 
 # create and load database dump
