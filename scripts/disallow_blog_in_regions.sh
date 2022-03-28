@@ -15,8 +15,9 @@ for f in $robots_files; do
     ;;
   *)
     echo "Processing ${f}"
-    # add text in the beginning of the file only if it's not already there
-    sed -i '1s/^\(Disallow: \/bitrix\/\*\n\)\(Allow: \/bitrix\/cache\/\)/\1Disallow: /info/blog/\n\2/' "${f}"
+    # add text in the file only if it's not already there
+    # \n doesn't work here for god knows why, so replaced it with \s
+    perl -0777 -pi -e 's/^(Disallow: \/bitrix\/\*)\s+Allow/\1\nDisallow: \/info\/blog\/\nAllow/gm' "${f}"
     ;;
   esac
 done
