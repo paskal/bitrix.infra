@@ -6,6 +6,9 @@
 # sql dumps
 *.sql
 
+# urls file used in urls.py
+/scripts/urls.txt
+
 # backups folder
 /backup
 
