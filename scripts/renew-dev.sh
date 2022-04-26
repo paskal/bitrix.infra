@@ -22,7 +22,7 @@ DEV_PASSWORD=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 32 | head -n 1)
 
 # File path variables
 PROD_LOCATION="./web/prod"
-DEV_LOCATION="./web/dev"
+DEV_LOCATION="./web/${DEV_SUBDOMAIN}"
 
 # Sanity checks before the run
 [ -d "${PROD_LOCATION}" ] || (echo "${PROD_LOCATION} (prod location) directory is absent" && exit 45)
@@ -31,7 +31,7 @@ DEV_LOCATION="./web/dev"
 [ -f "./private/environment/mysql.env" ] || (echo "./private/environment/mysql.env file is absent, couldn't read MYSQL_ROOT_PASSWORD variable" && exit 46)
 . ./private/environment/mysql.env
 
-echo "Creating dev copy of the site in $DEV_LOCATION"
+echo "Creating dev copy of the production site in $DEV_LOCATION for $DEV_DOMAIN"
 
 # create temp file to store mysql login and password for the time of the script
 # location for it should be the directory which is passed inside the container
@@ -95,7 +95,7 @@ install -d -o 1000 -g 1000 ${DEV_LOCATION}
 rsync --archive --no-inc-recursive --delete --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
 
 echo "Changing DB and memcached connection settings"
-# change settings in files to reflect dev site
+# change settings in files to reflect dev site domain and user
 sed -i "s/.*\$DBName.*/\$DBName = '${DEV_DB}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBLogin.*/\$DBLogin = '${DEV_USER}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBPassword.*/\$DBPassword = '${DEV_PASSWORD}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
