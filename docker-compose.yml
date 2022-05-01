@@ -25,7 +25,7 @@ services:
         env_file: private/environment/dnsrobocert.env
         environment:
             - PROVIDER=yandexcloud
-            - EMAIL=tech
+            - EMAIL=tech@favor-group.ru
             - DOMAIN=favor-group.ru
 
         logging:
