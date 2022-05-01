@@ -19,7 +19,14 @@ services:
             - /var/run/docker.sock:/var/run/docker.sock
             # should be in the following format:
             # https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
-            - ./private/dnsrobocert.yml:/etc/dnsrobocert/config.yml
+            - ./config/dnsrobocert.yml:/etc/dnsrobocert/config.yml
+
+        # AUTH_KEY, DNS_ZONE_ID
+        env_file: private/environment/dnsrobocert.env
+        environment:
+            - PROVIDER=yandexcloud
+            - EMAIL=tech
+            - DOMAIN=favor-group.ru
 
         logging:
             driver: json-file

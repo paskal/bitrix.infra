@@ -1,0 +1,18 @@
+# format: https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
+acme:
+  email_account: ${EMAIL}@${DOMAIN}
+  staging: false
+profiles:
+  - name: ${PROVIDER}
+    provider: ${PROVIDER}
+    provider_options:
+      auth_token: ${AUTH_KEY}
+      dns_zone_id: ${DNS_ZONE_ID}
+certificates:
+  - profile: ${PROVIDER}
+    domains:
+    - "*.${DOMAIN}"
+    - "${DOMAIN}"
+  autorestart:
+  - containers:
+    - nginx
