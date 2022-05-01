@@ -15,6 +15,8 @@ services:
         container_name: certbot
         volumes:
             - ./private/letsencrypt:/etc/letsencrypt
+            # needed for nginx container autorestart, https://dnsrobocert.readthedocs.io/en/latest/configuration_reference.html#autorestart
+            - /var/run/docker.sock:/var/run/docker.sock
             # should be in the following format:
             # https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
             - ./private/dnsrobocert.yml:/etc/dnsrobocert/config.yml
