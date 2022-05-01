@@ -10,18 +10,14 @@ networks:
 
 services:
     certbot:
-        image: certbot/dns-cloudflare
+        image: adferrand/dnsrobocert
         hostname: certbot
         container_name: certbot
-        entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/cloudflare.ini --dns-cloudflare-propagation-seconds 60 --email $${EMAIL}@$${DOMAIN} --agree-tos --keep --renew-with-new-domains -d $${DOMAIN} -d *.$${DOMAIN}; sleep 10d & wait $${!}; done;'"
         volumes:
             - ./private/letsencrypt:/etc/letsencrypt
             # should be in the following format:
-            # https://certbot-dns-cloudflare.readthedocs.io/en/stable/#certbot-cloudflare-token-ini
-            - ./private/environment/cloudflare.ini:/etc/cloudflare.ini
-        environment:
-            DOMAIN: favor-group.ru
-            EMAIL: msk
+            # https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
+            - ./private/dnsrobocert.yml:/etc/dnsrobocert/config.yml
 
         logging:
             driver: json-file
