@@ -1,6 +1,6 @@
 # format: https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
 acme:
-  email_account: ${EMAIL}@${DOMAIN}
+  email_account: ${EMAIL}
   staging: false
 profiles:
   - name: ${PROVIDER}
@@ -13,6 +13,6 @@ certificates:
     domains:
     - "*.${DOMAIN}"
     - "${DOMAIN}"
-  autorestart:
-  - containers:
-    - nginx
+    autorestart:
+    - containers:
+      - nginx
