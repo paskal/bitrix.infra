@@ -126,7 +126,7 @@ return array(
 - PHP cron container with same settings as PHP serving web requests
 - [adminer](https://www.adminer.org/) as phpmyadmin alternative for work with MySQL
 - [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) for ftp access
-- [certbot](https://certbot.eff.org/) for HTTPS certificate generation
+- [DNSroboCert](https://github.com/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation
 - [zabbix-agent](https://www.zabbix.com/zabbix_agent) for monitoring
 
 ## File structure
@@ -179,11 +179,12 @@ Site files in directories `web/prod` and `web/dev`.
       FTP_USER_PASS=ftp_password
       ```
 
-    - `private/environment/cloudflare.ini` should contain CloudFlare DNS API key for [certbot/dns-cloudflare](https://certbot-dns-cloudflare.readthedocs.io/en/stable/#certbot-cloudflare-token-ini):
+    - `private/environment/dnsrobocert.env` should contain Yandex Cloud DNS API key for [adferrand/dnsrobocert](https://hub.docker.com/r/adferrand/dnsrobocert):
 
       ```
-      # Get your API key from https://dash.cloudflare.com/profile/api-tokens
-      dns_cloudflare_api_token = insert_key_there
+      # Run `yc components update` once to get the key, and `update_dns_token.sh` script will renew it automatically afterwards
+      AUTH_KEY=insert_key_there
+      DNS_ZONE_ID=insert_zone_id_there
       ```
 
   - `private/environment/zabbix.env` should contain the [following variables](https://hub.docker.com/r/zabbix/zabbix-agent2):
