@@ -5,6 +5,7 @@
 	extension .log
 	rotate 36500
 	monthly
+	minsize 1M
 	missingok
 	notifempty
 	compress
@@ -24,6 +25,7 @@
 	extension .log
 	rotate 36500
 	monthly
+	minsize 1M
 	missingok
 	notifempty
 	compress
