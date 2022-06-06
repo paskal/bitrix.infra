@@ -1,0 +1,13 @@
+/web/logs/duplicity.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 36500
+	monthly
+	missingok
+	notifempty
+	compress
+	delaycompress
+}
+

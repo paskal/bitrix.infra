@@ -1,0 +1,39 @@
+/web/logs/nginx/access.log
+/web/logs/nginx/error.log
+/web/logs/nginx/dev.favor-group.ru.access.log
+/web/logs/nginx/dev.favor-group.ru.error.log
+/web/logs/nginx/favor-group.ru.error.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 36500
+	monthly
+	missingok
+	notifempty
+	compress
+	delaycompress
+	sharedscripts
+	postrotate
+		/usr/bin/docker exec nginx /bin/sh -c '/usr/sbin/nginx -s reopen > /dev/null 2>/dev/null'
+	endscript
+}
+
+
+/web/logs/nginx/favor-group.ru.access.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 36500
+	weekly
+	missingok
+	notifempty
+	compress
+	delaycompress
+	sharedscripts
+	postrotate
+		/usr/bin/docker exec nginx /bin/sh -c '/usr/sbin/nginx -s reopen > /dev/null 2>/dev/null'
+	endscript
+}
+

@@ -9,6 +9,12 @@ echo "Fixing cron permissions..."
 chown -R 0:0 ./config/cron
 chmod 0644 ./config/cron/*
 
+# logrotate configuration should be owned by root,
+# otherwise it will be ignored
+echo "Fixing logrotate permissions..."
+chown -R 0:0 ./config/logrotate
+chmod 0644 ./config/logrotate/*
+
 # mysql container files
 echo "Fixing mysql permissions..."
 chown -R 1001:1001 ./config/mysql

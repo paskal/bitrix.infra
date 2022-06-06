@@ -1,0 +1,19 @@
+/web/logs/mysql/error.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 36500
+	monthly
+	missingok
+	notifempty
+	compress
+	delaycompress
+	sharedscripts
+	postrotate
+		# read MYSQL_ROOT_PASSWORD
+		. ./private/environment/mysql.env
+		/usr/bin/docker exec mysql /bin/sh -c "/usr/bin/mysqladmin -uroot -p\"${MYSQL_ROOT_PASSWORD}\" flush-logs > /dev/null 2>/dev/null"
+	endscript
+}
+

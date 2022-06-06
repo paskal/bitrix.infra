@@ -1,0 +1,32 @@
+/web/logs/php/error.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 36500
+	monthly
+	missingok
+	notifempty
+	compress
+	delaycompress
+	sharedscripts
+	postrotate
+		/usr/bin/docker exec php /bin/sh -c '[ ! -f /var/run/php-fpm.pid ] || kill -USR1 $(cat /var/run/php-fpm.pid) > /dev/null 2>/dev/null'
+		/usr/bin/docker exec php-8 /bin/sh -c '[ ! -f /var/run/php-fpm.pid ] || kill -USR1 $(cat /var/run/php-fpm.pid) > /dev/null 2>/dev/null'
+	endscript
+}
+
+/web/logs/php/cron_events.log
+/web/logs/php/msmtp.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 36500
+	monthly
+	missingok
+	notifempty
+	compress
+	delaycompress
+}
+

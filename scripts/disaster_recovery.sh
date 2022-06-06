@@ -167,6 +167,7 @@ backup_restore() {
     echo "${PWD}/private folder already exist, delete it if you want to restore files from backup"
     return
   fi
+  echo "Restoring file backup..."
   HOME="/home/$(logname)" duplicity \
     --no-encryption \
     --s3-endpoint-url https://storage.yandexcloud.net \
@@ -174,8 +175,10 @@ backup_restore() {
     --archive-dir /root/.cache/duplicity \
     --force \
     "${duplicity_backup_location}" "${PWD}"
-  ./scripts/fix-rights.sh
   echo "Server has latest backup of files and DB restored!"
+  echo "Linking logrotate configuration to /etc/logrotate.d/..."
+  ln -sf /web/config/logrotate/* /etc/logrotate.d/
+  ./scripts/fix-rights.sh
 }
 
 restore_mysql() {
