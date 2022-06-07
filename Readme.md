@@ -4,6 +4,12 @@ This repository contains infrastructure code behind Bitrix-based [site](https://
 
 It's a Bitrix website completely enclosed within docker-compose to be as portable and maintainable as possible, and a set of scripts around its maintenance like dev site redeploy or production site backup.
 
+## Is it fast?
+
+You bet! Here is a performance on Yandex.Cloud server with Intel Cascade Lake 8 vCPUs, 16Gb of RAM and 120Gb SSD 4000 read\write IOPS and 60Mb/s bandwidth.
+
+<img width="1100" alt="image" src="https://user-images.githubusercontent.com/712534/172490266-88710b9f-3776-4c5b-9852-590181d1d204.png">
+
 ## How to make use of it
 
 You couldn't use it as-is without alterations. However, I tried to make everything as generic as possible to make adoption for another project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
