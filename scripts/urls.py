@@ -89,14 +89,14 @@ def main(run_type: str, site: str, urls_file: str, update_redirects: bool):
     for line in open(urls_file, 'r').readlines():
         relative_url = url_checker.relative(line.strip(), False)  # keep original URL unquoted
         resp = url_checker.retrieve_url(relative_url)
-        if not resp:
+        if resp is None:
             continue
         if run_type == "redirects":
             url_checker.check_redirect(resp, relative_url)
         if run_type == "chain_redirects":
             url_checker.chain_redirects(resp, relative_url)
         if run_type == "bad_status_codes":
-            url_checker.bad_status_codes(resp, site)
+            url_checker.bad_status_codes(resp, relative_url)
 
 
 if __name__ == '__main__':
