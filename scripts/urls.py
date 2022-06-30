@@ -11,7 +11,7 @@ _default_site = 'https://favor-group.ru'
 
 class RunTypes(Enum):
     redirects = 'redirects'
-    not_found = 'simplify_redirects'
+    chain_redirects = 'chain_redirects'
     bad_status_codes = 'bad_status_codes'
 
     def __str__(self):
@@ -32,11 +32,13 @@ class UrlChecker:
             with open(_redirects_map_path, 'w') as redirects_file:
                 redirects_file.write(self.redirects_map)
 
-    def relative(self, text: str) -> str:
+    def relative(self, text: str, utf8: bool = True) -> str:
         """ Returns provided URL without the site prefix, e.g. relative URL.
-        Also unquotes the URL.
+        Also unquotes the URL if the flag is not overwritten.
+        Spaces are not unquoted as they would mess up the redirects map.
         """
-        return unquote(text[len(self.site):]) if text.rfind(self.site) == 0 else unquote(text)
+        relative_url = text[len(self.site):] if text.rfind(self.site) == 0 else text
+        return unquote(relative_url).replace(' ', '%20') if utf8 else relative_url
 
     def update_redirect(self, text: str, substitute: str):
         """ Replaces provided text with substitute in the redirects map, in case writes are enabled.
@@ -63,7 +65,7 @@ class UrlChecker:
             print(f"{relative_url} -> {self.relative(resp.url)}")
         self.bad_status_codes(resp, relative_url)
 
-    def simplify_redirects(self, resp: requests.Response, relative_url: str):
+    def chain_redirects(self, resp: requests.Response, relative_url: str):
         """Prints original redirect or the URL, and its final destination in case there is a chain of redirects.
         That turns out to be useful to simplify redirects as well as for SEO, as original redirect might be to
         non-indexed search page while the final destination might be SEO-friendly page,
@@ -85,14 +87,14 @@ class UrlChecker:
 def main(run_type: str, site: str, urls_file: str, update_redirects: bool):
     url_checker = UrlChecker(site, update_redirects)
     for line in open(urls_file, 'r').readlines():
-        relative_url = url_checker.relative(line.strip())
+        relative_url = url_checker.relative(line.strip(), False)
         resp = url_checker.retrieve_url(relative_url)
         if not resp:
             continue
         if run_type == "redirects":
             url_checker.check_redirect(resp, relative_url)
-        if run_type == "simplify_redirects":
-            url_checker.simplify_redirects(resp, relative_url)
+        if run_type == "chain_redirects":
+            url_checker.chain_redirects(resp, relative_url)
         if run_type == "bad_status_codes":
             url_checker.bad_status_codes(resp, site)
 
