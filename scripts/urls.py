@@ -87,7 +87,7 @@ class UrlChecker:
 def main(run_type: str, site: str, urls_file: str, update_redirects: bool):
     url_checker = UrlChecker(site, update_redirects)
     for line in open(urls_file, 'r').readlines():
-        relative_url = url_checker.relative(line.strip(), False)
+        relative_url = url_checker.relative(line.strip(), False)  # keep original URL unquoted
         resp = url_checker.retrieve_url(relative_url)
         if not resp:
             continue
