@@ -3,6 +3,10 @@ from typing import Optional
 import requests
 from argparse import ArgumentParser
 from enum import Enum
+from urllib.parse import unquote
+
+_redirects_map_path = '../config/nginx/conf.d/redirects-map.conf'
+_default_site = 'https://favor-group.ru'
 
 
 class RunTypes(Enum):
@@ -15,13 +19,30 @@ class RunTypes(Enum):
 
 
 class UrlChecker:
-    def __init__(self, site: str):
+    def __init__(self, site: str = _default_site, update_redirects: bool = False):
         self.site = site
+        self.write = update_redirects
+        # https://stackoverflow.com/a/17141572/961092
+        if self.write:
+            with open(_redirects_map_path, 'r') as redirects_file:
+                self.redirects_map = redirects_file.read()
+
+    def __del__(self):
+        if self.write:
+            with open(_redirects_map_path, 'w') as redirects_file:
+                redirects_file.write(self.redirects_map)
 
     def relative(self, text: str) -> str:
         """ Returns provided URL without the site prefix, e.g. relative URL.
+        Also unquotes the URL.
         """
-        return text[len(self.site):] if text.rfind(self.site) == 0 else text
+        return unquote(text[len(self.site):]) if text.rfind(self.site) == 0 else unquote(text)
+
+    def update_redirect(self, text: str, substitute: str):
+        """ Replaces provided text with substitute in the redirects map, in case writes are enabled.
+        """
+        if self.write:
+            self.redirects_map = self.redirects_map.replace(text, substitute)
 
     def retrieve_url(self, relative_url: str) -> Optional[requests.Response]:
         """Returns response for the provided URL,
@@ -38,7 +59,8 @@ class UrlChecker:
         or URL and it's redirect final destination or the status code in case it's not 301 or 302.
         """
         if relative_url != self.relative(resp.url):
-            print(f"redirect: {relative_url} -> {self.relative(resp.url)}")
+            self.update_redirect(relative_url, self.relative(resp.url))
+            print(f"{relative_url} -> {self.relative(resp.url)}")
         self.bad_status_codes(resp, relative_url)
 
     def simplify_redirects(self, resp: requests.Response, relative_url: str):
@@ -47,8 +69,8 @@ class UrlChecker:
         non-indexed search page while the final destination might be SEO-friendly page,
         but the search engine would never know."""
         if len(resp.history) > 1:
-            print(f"{self.relative(resp.history[1].url)}"
-                  f" -> {self.relative(resp.url)}")
+            self.update_redirect(relative_url, self.relative(resp.url))
+            print(f"{self.relative(resp.history[1].url)} -> {self.relative(resp.url)}")
         self.bad_status_codes(resp, relative_url)
 
     @staticmethod
@@ -59,8 +81,9 @@ class UrlChecker:
             print(f"code {resp.status_code}: {relative_url}")
 
 
-def main(run_type: str, site: str, urls_file: str):
-    url_checker = UrlChecker(site)
+
+def main(run_type: str, site: str, urls_file: str, update_redirects: bool):
+    url_checker = UrlChecker(site, update_redirects)
     for line in open(urls_file, 'r').readlines():
         relative_url = url_checker.relative(line.strip())
         resp = url_checker.retrieve_url(relative_url)
@@ -78,12 +101,18 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--site',
                         dest="site",
-                        default="https://favor-group.ru",
+                        default=_default_site,
+                        type=str,
                         help='Site URL without trailing slash')
     parser.add_argument('--file',
                         dest="urls_file",
                         default="urls.txt",
+                        type=str,
                         help='File with URLs list divided by newlines')
+    parser.add_argument('--update_redirects',
+                        dest="update_redirects",
+                        action='store_true',
+                        help='Replace the old redirects with the new ones in redirects-map.conf')
     parser.add_argument(
         'run_type',
         type=RunTypes,
@@ -93,4 +122,4 @@ if __name__ == '__main__':
              " or only pages which are not redirects with wrong status codes."
     )
     opts = parser.parse_args()
-    main(str(opts.run_type), opts.site, opts.urls_file)
+    main(str(opts.run_type), opts.site, opts.urls_file, opts.update_redirects)
