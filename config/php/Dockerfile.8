@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>
       org.opencontainers.image.source="https://github.com/paskal/bitrix.infra.git" \
       org.opencontainers.image.title="php"
 
--get update \
+RUN apt-get update \
     && apt-get -y --allow-downgrades --no-install-recommends install \
     php8.0-memcached \
     php8.0-memcache \
