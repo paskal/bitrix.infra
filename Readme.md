@@ -1,4 +1,4 @@
-# Bitrix infrastructure as a code
+# Bitrix infrastructure as a code [![Build Status](https://github.com/paskal/bitrix.infra/workflows/build/badge.svg)](https://github.com/paskal/bitrix.infra/actions/workflows/ci-build.yml) [![PHP Build Status](https://github.com/paskal/bitrix.infra/workflows/build-php/badge.svg)](https://github.com/paskal/bitrix.infra/actions/workflows/ci-build-php.yml)
 
 This repository contains infrastructure code behind Bitrix-based [site](https://favor-group.ru) of my father's metal decking business operating in multiple cities.
 
@@ -120,20 +120,18 @@ return array(
 
 ### Core
 
-- [Nginx](https://www.nginx.com/) with [brotli](https://github.com/google/ngx_brotli)
-  proxying requests to php-fpm and serving static assets directly
-- [php-fpm](https://www.php.net/manual/en/install.fpm.php) for bitrix with msmtp for mail sending
-- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server)
-  because of it's monitoring capabilities
-- [memcached](https://memcached.org/) for bitrix cache, plus additional only for user sessions
+- [Nginx](https://www.nginx.com/) [![Image Size](https://img.shields.io/docker/image-size/paskal/nginx)](https://hub.docker.com/r/paskal/nginx) with [brotli](https://github.com/google/ngx_brotli) proxying requests to php-fpm and serving static assets directly
+- [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
+- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server)](https://hub.docker.com/r/percona/percona-server) because of it's monitoring capabilities
+- [memcached](https://memcached.org/) [![Image Size](https://img.shields.io/docker/image-size/_/memcached)](https://hub.docker.com/r/_/memcached) for bitrix cache, plus additional only for user sessions
 
 ### Optional
 
 - PHP cron container with same settings as PHP serving web requests
-- [adminer](https://www.adminer.org/) as phpmyadmin alternative for work with MySQL
-- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) for ftp access
-- [DNSroboCert](https://github.com/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation
-- [zabbix-agent](https://www.zabbix.com/zabbix_agent) for monitoring
+- [adminer](https://www.adminer.org/) [![Image Size](https://img.shields.io/docker/image-size/_/adminer)](https://hub.docker.com/r/_/adminer) as phpmyadmin alternative for work with MySQL
+- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) [![Image Size](https://img.shields.io/docker/image-size/stilliard/pure-ftpd)](https://hub.docker.com/r/stilliard/pure-ftpd) for ftp access
+- [DNSroboCert](https://github.com/adferrand/dnsrobocert) [![Image Size](https://img.shields.io/docker/image-size/adferrand/dnsrobocert)](https://hub.docker.com/r/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation
+- [zabbix-agent2](https://www.zabbix.com/zabbix_agent) [![Image Size](https://img.shields.io/docker/image-size/paskal/zabbix-agent2)](https://hub.docker.com/r/paskal/zabbix-agent2) for monitoring
 
 ## File structure
 

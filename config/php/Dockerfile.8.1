@@ -1,5 +1,11 @@
 FROM phpdockerio/php:8.1-fpm
-# https://github.com/bitrixdock/bitrixdock/blob/master/php74/Dockerfile
+# https://github.com/bitrixdock/bitrixdock/blob/master/php80/Dockerfile
+
+LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>" \
+      org.opencontainers.image.description="PHP 8.1 with everything needed for Bitrix" \
+      org.opencontainers.image.documentation="https://github.com/paskal/bitrix.infra" \
+      org.opencontainers.image.source="https://github.com/paskal/bitrix.infra.git" \
+      org.opencontainers.image.title="php"
 
 RUN apt-get update \
     && apt-get -y --allow-downgrades --no-install-recommends install \

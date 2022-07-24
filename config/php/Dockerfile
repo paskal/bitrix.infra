@@ -1,6 +1,12 @@
 FROM phpdockerio/php:7.4-fpm
 # https://github.com/bitrixdock/bitrixdock/blob/master/php74/Dockerfile
 
+LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>" \
+      org.opencontainers.image.description="PHP 7.4 with everything needed for Bitrix" \
+      org.opencontainers.image.documentation="https://github.com/paskal/bitrix.infra" \
+      org.opencontainers.image.source="https://github.com/paskal/bitrix.infra.git" \
+      org.opencontainers.image.title="php"
+
 RUN apt-get update \
     && apt-get -y --allow-downgrades --no-install-recommends install \
     php7.4-memcached \

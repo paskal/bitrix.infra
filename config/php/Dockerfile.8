@@ -1,7 +1,13 @@
 FROM phpdockerio/php:8.0-fpm
 # https://github.com/bitrixdock/bitrixdock/blob/master/php80/Dockerfile
 
-RUN apt-get update \
+LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>" \
+      org.opencontainers.image.description="PHP 8.0 with everything needed for Bitrix" \
+      org.opencontainers.image.documentation="https://github.com/paskal/bitrix.infra" \
+      org.opencontainers.image.source="https://github.com/paskal/bitrix.infra.git" \
+      org.opencontainers.image.title="php"
+
+-get update \
     && apt-get -y --allow-downgrades --no-install-recommends install \
     php8.0-memcached \
     php8.0-memcache \
