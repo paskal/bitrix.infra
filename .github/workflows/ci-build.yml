@@ -46,7 +46,6 @@ jobs:
           GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           USERNAME: ${{ github.actor }}
-          GITHUB_SHA: ${{ github.sha}}
         run: |
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
           echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
@@ -61,7 +60,6 @@ jobs:
           GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
           USERNAME: ${{ github.actor }}
-          GITHUB_SHA: ${{ github.sha}}
         run: |
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
           echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
