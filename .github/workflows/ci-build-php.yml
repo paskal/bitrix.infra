@@ -1,4 +1,4 @@
-name: build
+name: build-php
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-images:
-    name: Build Docker images for nginx and Zabbix
+    name: Build Docker images for PHP
     runs-on: ubuntu-latest
 
     steps:
@@ -25,22 +25,15 @@ jobs:
       - name: available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
 
-      - name: build nginx image without pushing (only outside master)
-        working-directory: config/nginx
+      - name: build PHP 7 image without pushing (only outside master)
+        working-directory: config/php
         if: ${{ github.ref != 'refs/heads/master' }}
         run: |
           docker buildx build \
               --platform linux/amd64 .
 
-      - name: build Zabbix agent image without pushing (only outside master)
-        working-directory: config/zabbix
-        if: ${{ github.ref != 'refs/heads/master' }}
-        run: |
-          docker buildx build \
-              --platform linux/amd64 .
-
-      - name: build nginx image for ghcr.io and DockerHub
-        working-directory: config/nginx
+      - name: build PHP 7 image for ghcr.io and DockerHub
+        working-directory: config/php
         if: ${{ github.ref == 'refs/heads/master' }}
         env:
           GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,10 +45,11 @@ jobs:
           echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
           docker buildx build --push \
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
-              -t ghcr.io/${USERNAME}/nginx:latest -t ${USERNAME}/nginx:latest .
+              -t ghcr.io/${USERNAME}/bitrix-php:7 -t ${USERNAME}/bitrix-php:7 \
+              -t ghcr.io/${USERNAME}/bitrix-php:latest -t ${USERNAME}/bitrix-php:latest .
 
-      - name: build Zabbix agent image for ghcr.io and DockerHub
-        working-directory: config/zabbix
+      - name: build PHP 8 image for ghcr.io and DockerHub
+        working-directory: config/php
         if: ${{ github.ref == 'refs/heads/master' }}
         env:
           GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,7 +61,24 @@ jobs:
           echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
           docker buildx build --push \
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
-              -t ghcr.io/${USERNAME}/zabbix-agent2:latest -t ${USERNAME}/zabbix-agent2:latest .
+              -f Dockerfile.8 \
+              -t ghcr.io/${USERNAME}/bitrix-php:8 -t ${USERNAME}/bitrix-php:8 .
+
+      - name: build PHP 8.1 image for ghcr.io and DockerHub
+        working-directory: config/php
+        if: ${{ github.ref == 'refs/heads/master' }}
+        env:
+          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+          USERNAME: ${{ github.actor }}
+          GITHUB_SHA: ${{ github.sha}}
+        run: |
+          echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
+          echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
+          docker buildx build --push \
+              --platform linux/amd64,linux/arm/v7,linux/arm64 \
+              -f Dockerfile.8.1 \
+              -t ghcr.io/${USERNAME}/bitrix-php:8.1 -t ${USERNAME}/bitrix-php:8.1 .
 
 #      - name: remote deployment to favor-group.ru from master
 #        if: ${{ github.ref == 'refs/heads/master' }}
