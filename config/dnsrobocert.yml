@@ -8,6 +8,7 @@ profiles:
     provider_options:
       auth_token: ${AUTH_KEY}
       dns_zone_id: ${DNS_ZONE_ID}
+      cloud_id: ${CLOUD_ID}
 certificates:
   - profile: ${PROVIDER}
     domains:
