@@ -12,7 +12,7 @@ You bet! Here is a performance on Yandex.Cloud server with Intel Cascade Lake 8 
 
 ## How to make use of it
 
-You couldn't use it as-is without alterations. However, I tried to make everything as generic as possible to make adoption for another project easy. To use it, read trough [docker-compose.yml](docker-compose.yml)
+You couldn't use it as-is without alterations. However, I tried to make everything as generic as possible to make adoption for another project easy. To use it, read through [docker-compose.yml](docker-compose.yml)
 and then read the rest of this Readme.
 
 After you make adjustments to configuration and docker-compose.yml, run it as follows:
@@ -248,7 +248,7 @@ echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
 <details>
 <summary>Manual certificate renewal</summary>
 
-DNS verification of a wildcard certificate is set up automatically trough [CloudFlare](https://cloudflare.com/) DNS.
+DNS verification of a wildcard certificate is set up automatically through [CloudFlare](https://cloudflare.com/) DNS.
 
 To renew the certificate manually, run the following command and follow the interactive prompt:
 
