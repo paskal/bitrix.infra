@@ -1,0 +1,17 @@
+name: pull
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-images:
+    name: Pull code from master to favor-group.ru
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: pull newest code to favor-group.ru from master
+        env:
+          UPDATER_KEY: ${{ secrets.UPDATER_KEY }}
+        run: curl https://hooks.favor-group.ru/update/pull-code/${UPDATER_KEY}
