@@ -76,9 +76,3 @@ jobs:
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
               -f Dockerfile.8.1 \
               -t ghcr.io/${USERNAME}/bitrix-php:8.1 -t ${USERNAME}/bitrix-php:8.1 .
-
-#      - name: remote deployment to favor-group.ru from master
-#        if: ${{ github.ref == 'refs/heads/master' }}
-#        env:
-#          UPDATER_KEY: ${{ secrets.UPDATER_KEY }}
-#        run: curl -s https://hooks.favor-group.ru/update/zabbix/${UPDATER_KEY}
