@@ -41,11 +41,11 @@ jobs:
           USERNAME: ${{ github.actor }}
         run: |
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
+          echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
-              -t ghcr.io/${USERNAME}/bitrix-php:7 -t ${USERNAME}/bitrix-php:7 \
-              -t ghcr.io/${USERNAME}/bitrix-php:latest -t ${USERNAME}/bitrix-php:latest .
+              -t ghcr.io/paskal/bitrix-php:7 -t paskal/bitrix-php:7 \
+              -t ghcr.io/paskal/bitrix-php:latest -t paskal/bitrix-php:latest .
 
       - name: build PHP 8 image for ghcr.io and DockerHub
         working-directory: config/php
@@ -56,11 +56,11 @@ jobs:
           USERNAME: ${{ github.actor }}
         run: |
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
+          echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
               -f Dockerfile.8 \
-              -t ghcr.io/${USERNAME}/bitrix-php:8 -t ${USERNAME}/bitrix-php:8 .
+              -t ghcr.io/paskal/bitrix-php:8 -t paskal/bitrix-php:8 .
 
       - name: build PHP 8.1 image for ghcr.io and DockerHub
         working-directory: config/php
@@ -71,8 +71,8 @@ jobs:
           USERNAME: ${{ github.actor }}
         run: |
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
+          echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
               -f Dockerfile.8.1 \
-              -t ghcr.io/${USERNAME}/bitrix-php:8.1 -t ${USERNAME}/bitrix-php:8.1 .
+              -t ghcr.io/paskal/bitrix-php:8.1 -t paskal/bitrix-php:8.1 .

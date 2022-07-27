@@ -48,10 +48,10 @@ jobs:
           USERNAME: ${{ github.actor }}
         run: |
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
+          echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
-              -t ghcr.io/${USERNAME}/nginx:latest -t ${USERNAME}/nginx:latest .
+              -t ghcr.io/paskal/nginx:latest -t paskal/nginx:latest .
 
       - name: build Zabbix agent image for ghcr.io and DockerHub
         working-directory: config/zabbix
@@ -62,10 +62,10 @@ jobs:
           USERNAME: ${{ github.actor }}
         run: |
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          echo ${DOCKER_HUB_TOKEN} | docker login -u ${USERNAME} --password-stdin
+          echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
               --platform linux/amd64,linux/arm/v7,linux/arm64 \
-              -t ghcr.io/${USERNAME}/zabbix-agent2:latest -t ${USERNAME}/zabbix-agent2:latest .
+              -t ghcr.io/paskal/zabbix-agent2:latest -t paskal/zabbix-agent2:latest .
 
       - name: remote update of zabbix agent after rebuild
         if: ${{ github.ref == 'refs/heads/master' }}
