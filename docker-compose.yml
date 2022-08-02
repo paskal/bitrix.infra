@@ -180,7 +180,7 @@ services:
             # Data persistence
             - ./private/mysql-data:/var/lib/mysql
             # MySQL socket to prevent transferring data through TCP
-            # do chown $(whoami):1001 ./private/mysqld
+            # do chown 1001:1001 ./private/mysqld
             - ./private/mysqld:/var/mysql-socket
             # Logs
             - ./logs/mysql:/var/log/mysql
