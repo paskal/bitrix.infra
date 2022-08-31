@@ -21,7 +21,7 @@ INFRA_DIR=/web
 5  1,15  *  *  * root cd $INFRA_DIR && ./scripts/mysql-dump.sh >/dev/null 2>&1
 
 # three times a day renew Yandex Cloud token for DNS renewal via dnsrobocert. lifetime of token is 12 hours.
-5  1,9,17  *  *  * root cd $INFRA_DIR && ./scripts/update_dns_token.sh >/dev/null 2>&1
+5  1,9,17  *  *  * admin cd $INFRA_DIR && ./scripts/update_dns_token.sh >/dev/null 2>&1
 
 # every 10 minutes check block for blog articles for non-main domains
 # using robots.txt, so that these domains won't fight for place under
