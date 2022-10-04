@@ -49,6 +49,8 @@ services:
         ports:
             - "80:80"
             - "443:443"
+        expose:
+            - "8084"
         volumes:
             - ./web/prod:/web/prod
             - ./web/dev:/web/dev
