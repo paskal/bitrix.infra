@@ -14,6 +14,9 @@ INFRA_DIR=/web
 # once a day fix access rights in case they are screwed
 0  1  *  *  * root cd $INFRA_DIR && ./scripts/fix-rights.sh >/dev/null 2>&1
 
+# once a day optimise images
+0  23  *  *  * root cd $INFRA_DIR && ./scripts/optimise-images.sh >/dev/null 2>&1
+
 # once a day make backup of production files
 25  1  *  *  * root cd $INFRA_DIR && ./scripts/file_backup.sh >/dev/null 2>&1
 
