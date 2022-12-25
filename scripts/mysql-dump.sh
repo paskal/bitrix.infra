@@ -46,7 +46,8 @@ chown 1000:1000 "$backup_directory/$backup_file"
 rm -f -- "${mysql_config_file}"
 
 echo "Syncing backups to s3://$backup_s3_directory"
-# sync with S3 (Yandex in that case)
-HOME=/home/admin /usr/local/bin/aws --endpoint-url=https://storage.yandexcloud.net s3 sync "${backup_directory_path}" "s3://${backup_s3_directory}/mysql_$(hostname)/"
+# sync with S3 (Yandex in that case),
+# also ignore duplicity cache in the backup volume
+HOME=/home/admin /usr/local/bin/aws --endpoint-url=https://storage.yandexcloud.net s3 sync "${backup_directory_path}" "s3://${backup_s3_directory}/mysql_$(hostname)/" --exclude .duplicity-cache
 
 echo "Backup is complete"

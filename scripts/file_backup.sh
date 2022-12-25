@@ -3,6 +3,7 @@
 set -e -u
 
 src="/web"
+cache_dir="${src}/backup/.duplicity-cache"
 dest="boto3+s3://favor-group-backup/duplicity_web_$(hostname)"
 
 # HOME is required to read .aws/credentials from it
@@ -13,7 +14,7 @@ HOME="/home/admin" duplicity \
   --s3-use-ia \
   --s3-endpoint-url https://storage.yandexcloud.net \
   --log-file /web/logs/duplicity.log \
-  --archive-dir /root/.cache/duplicity \
+  --archive-dir "${cache_dir}" \
   --exclude '**/.git' \
   --exclude '**/backup/' \
   --exclude '**/logs/' \
