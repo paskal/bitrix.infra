@@ -1,26 +1,26 @@
-FROM phpdockerio/php:8.1-fpm
+FROM phpdockerio/php:8.2-fpm
 # https://github.com/bitrixdock/bitrixdock/blob/master/php80/Dockerfile
 
 LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>" \
-      org.opencontainers.image.description="PHP 8.1 with everything needed for Bitrix" \
+      org.opencontainers.image.description="PHP 8.2 with everything needed for Bitrix" \
       org.opencontainers.image.documentation="https://github.com/paskal/bitrix.infra" \
       org.opencontainers.image.source="https://github.com/paskal/bitrix.infra.git" \
       org.opencontainers.image.title="php"
 
 RUN apt-get update \
     && apt-get -y --allow-downgrades --no-install-recommends install \
-    php8.1-memcached \
-    php8.1-memcache \
-    php8.1-mbstring \
-    php8.1-mysql \
-    php8.1-intl \
-    php8.1-interbase \
-    php8.1-soap \
-    php8.1-gd \
-    php8.1-imagick \
-    php8.1-opcache \
-    php8.1-zip \
-    php-pear php8.1-dev libmcrypt-dev gcc make autoconf libc-dev pkg-config \
+    php8.2-memcached \
+    php8.2-memcache \
+    php8.2-mbstring \
+    php8.2-mysql \
+    php8.2-intl \
+    php8.2-interbase \
+    php8.2-soap \
+    php8.2-gd \
+    php8.2-imagick \
+    php8.2-opcache \
+    php8.2-zip \
+    php-pear php8.2-dev libmcrypt-dev gcc make autoconf libc-dev pkg-config \
     msmtp \
     msmtp-mta \
     sudo \

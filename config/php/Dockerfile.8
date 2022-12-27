@@ -25,7 +25,7 @@ RUN apt-get update \
     msmtp-mta \
     sudo \
     cron \
-    && pecl install mcrypt-1.0.4 \
+    && pecl install mcrypt-1.0.5 \
     && apt-get clean; rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 # msmtp to allow email sending
