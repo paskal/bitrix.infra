@@ -82,9 +82,9 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'update_devsrv';" ${DEV_DB}
 # disable external access to the site
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'site_stopped';" ${DEV_DB}
-# give admin access to user #6
-${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "insert into b_user_access (user_id, provider_id, access_code) values ('6', 'group', 'G1');" ${DEV_DB}
-${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "insert into b_user_group (user_id, group_id, date_active_from, date_active_to) values ('6', '1', NULL, NULL);" ${DEV_DB}
+# give admin access to users #6 and #92
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "insert into b_user_access (user_id, provider_id, access_code) values ('6', 'group', 'G1'), ('92', 'group', 'G1');" ${DEV_DB}
+${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e "insert into b_user_group (user_id, group_id, date_active_from, date_active_to) values ('6', '1', NULL, NULL), ('92', '1', NULL, NULL);" ${DEV_DB}
 
 echo "Copying files"
 # install -d is the same as mkdir -p, but it allows setting owner user and group for created folder
