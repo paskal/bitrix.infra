@@ -26,6 +26,10 @@ INFRA_DIR=/web
 # three times a day renew Yandex Cloud token for DNS renewal via dnsrobocert. lifetime of token is 12 hours.
 5  1,9,17  *  *  * admin cd $INFRA_DIR && ./scripts/update_dns_token.sh >/dev/null 2>&1
 
+# minify js and css files
+*  *  *  *  * root docker run -v /web/web/dev/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.js {}"; docker run -v /web/web/dev/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.css {}"
+*  *  *  *  * root docker run -v /web/web/prod/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.js {}"; docker run -v /web/web/prod/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.css {}"
+
 # every 10 minutes check block for blog articles for non-main domains
 # using robots.txt, so that these domains won't fight for place under
 # the sun with main one. better to keep blog texts belong to single domain.
