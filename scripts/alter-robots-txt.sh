@@ -23,4 +23,3 @@ for f in $robots_files; do
 done
 
 echo "robots.txt files other than Moscow, have /info/blog/ disallow entry now"
-

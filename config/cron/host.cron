@@ -33,4 +33,4 @@ INFRA_DIR=/web
 # every 10 minutes check block for blog articles for non-main domains
 # using robots.txt, so that these domains won't fight for place under
 # the sun with main one. better to keep blog texts belong to single domain.
-*/10  *  *  *  * root cd $INFRA_DIR && ./scripts/disallow_blog_in_regions.sh >/dev/null 2>&1
+*/10  *  *  *  * root cd $INFRA_DIR && ./scripts/alter-robots-txt.sh >/dev/null 2>&1
