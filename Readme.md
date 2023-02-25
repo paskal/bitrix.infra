@@ -186,7 +186,7 @@ Site files in directories `web/prod` and `web/dev`.
     - `private/environment/dnsrobocert.env` should contain Yandex Cloud DNS API key for [adferrand/dnsrobocert](https://hub.docker.com/r/adferrand/dnsrobocert):
 
       ```
-      # Run `yc components update` once to get the key, and `update_dns_token.sh` script will renew it automatically afterwards
+      # Run `yc components update` once to get the key, and `update-dns-token.sh` script will renew it automatically afterwards
       AUTH_KEY=insert_key_there
       DNS_ZONE_ID=insert_zone_id_there
       ```
@@ -224,7 +224,7 @@ sudo apt-get -y install git >/dev/null
 git clone https://github.com/paskal/bitrix.infra.git /web
 cd /web
 # backup restoration, it's safe to run it multiple times
-sudo ./scripts/disaster_recovery.sh
+sudo ./scripts/disaster-recovery.sh
 ```
 
 </details>

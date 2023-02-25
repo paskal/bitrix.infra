@@ -18,17 +18,16 @@ INFRA_DIR=/web
 0  23  *  *  6 root cd $INFRA_DIR && ./scripts/optimise-images.sh >/dev/null 2>&1
 
 # once a day make backup of production files
-25  1  *  *  * root cd $INFRA_DIR && ./scripts/file_backup.sh >/dev/null 2>&1
+25  1  *  *  * root cd $INFRA_DIR && ./scripts/file-backup.sh >/dev/null 2>&1
 
 # twice a day make MySQL dump of production data
 5  1,15  *  *  * root cd $INFRA_DIR && ./scripts/mysql-dump.sh >/dev/null 2>&1
 
 # three times a day renew Yandex Cloud token for DNS renewal via dnsrobocert. lifetime of token is 12 hours.
-5  1,9,17  *  *  * admin cd $INFRA_DIR && ./scripts/update_dns_token.sh >/dev/null 2>&1
+5  1,9,17  *  *  * admin cd $INFRA_DIR && ./scripts/update-dns-token.sh >/dev/null 2>&1
 
 # minify js and css files
-*  *  *  *  * root docker run -v /web/web/dev/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.js {}"; docker run -v /web/web/dev/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.css {}"
-*  *  *  *  * root docker run -v /web/web/prod/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.js {}"; docker run -v /web/web/prod/local/templates/light:/www tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.css {}"
+*  *  *  *  * root docker run -v /web/web/dev/local/templates/light:/www/dev -v /web/web/prod/local/templates/light:/www/prod tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.js {}"; docker run -v /web/web/dev/local/templates/light:/www/dev -v /web/web/prod/local/templates/light:/www/prod tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | xargs -I{} minify --preserve -o {}.min.css {}"
 
 # every 10 minutes check block for blog articles for non-main domains
 # using robots.txt, so that these domains won't fight for place under
