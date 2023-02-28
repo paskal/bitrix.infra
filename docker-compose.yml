@@ -113,8 +113,8 @@ services:
   php-8:
     build:
       context: ./config/php
-      dockerfile: Dockerfile.8.2
-    image: paskal/bitrix-php:8.2
+      dockerfile: Dockerfile.8
+    image: paskal/bitrix-php:8
     hostname: php-8
     container_name: php-8
     depends_on:
@@ -127,8 +127,8 @@ services:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
       - ./private/msmtprc:/etc/msmtprc
-      - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
-      - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.0/fpm/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.0/cli/conf.d/90-php.ini
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
       # Logs
@@ -301,7 +301,7 @@ services:
       - ./config/updater.yaml:/etc/updater.yml
       - ./private/updater_ssh_key:/home/app/.ssh/id_rsa
 
-# FTP access
+  # FTP access
 
 #  ftp:
 #    image: stilliard/pure-ftpd
@@ -312,10 +312,11 @@ services:
 #      - "21:21"
 #      - "30000-30009:30000-30009"
 #    volumes:
-#      - ./web:/home/web
+#      - ./web/dev:/home/web
 #    environment:
 #      PUBLICHOST: favor-group.ru
 #      FTP_USER_HOME: /home/web
+#      FTP_PASSIVE_PORTS: 30000:30009
 #
 #    logging:
 #      driver: json-file
