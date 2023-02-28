@@ -95,6 +95,8 @@ services:
             - ./private/mysqld:/var/run/mysqld
             # Logs
             - ./logs/php:/var/log/php
+            # for monitoring purposes
+            - ./logs/nginx:/var/log/nginx
 
         logging:
             driver: json-file
@@ -127,6 +129,8 @@ services:
             - ./private/mysqld:/var/run/mysqld
             # Logs
             - ./logs/php:/var/log/php
+            # for monitoring purposes
+            - ./logs/nginx:/var/log/nginx
 
         logging:
             driver: json-file

@@ -1,8 +1,6 @@
-/web/logs/nginx/access.log
-/web/logs/nginx/error.log
-/web/logs/nginx/dev.favor-group.ru.access.log
-/web/logs/nginx/dev.favor-group.ru.error.log
-/web/logs/nginx/favor-group.ru.error.log
+#[!p][!r][!o][!d] means "does not start with prod"
+/web/logs/nginx/[!p][!r][!o][!d]*.log
+/web/logs/nginx/prod.error.log
 {
 	dateext
 	dateformat .%Y-%m-%d
@@ -21,7 +19,7 @@
 }
 
 
-/web/logs/nginx/favor-group.ru.access.log
+/web/logs/nginx/prod.access.log
 {
 	dateext
 	dateformat .%Y-%m-%d
