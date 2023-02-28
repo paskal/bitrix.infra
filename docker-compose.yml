@@ -23,6 +23,7 @@ services:
 
         # AUTH_KEY, DNS_ZONE_ID
         env_file: private/environment/dnsrobocert.env
+        # used in config/dnsrobocert.yml
         environment:
             - PROVIDER=yandexcloud
             - EMAIL=tech@favor-group.ru
