@@ -13,10 +13,10 @@ profiles:
 certificates:
   - profile: ${PROVIDER}
     domains:
-    - "*.${DOMAIN}"
-    - "${DOMAIN}"
-    - "*.cdn-${DOMAIN}"
-    - "cdn-${DOMAIN}"
+      - "*.${DOMAIN}"
+      - "${DOMAIN}"
+      - "*.cdn-${DOMAIN}"
+      - "cdn-${DOMAIN}"
     autorestart:
-    - containers:
-      - nginx
+      - containers:
+          - nginx

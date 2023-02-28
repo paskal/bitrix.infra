@@ -118,4 +118,3 @@ rm -f prod-dump.sql
 rm -f ./private/mysql-data/deleteme_*
 
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
-

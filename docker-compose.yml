@@ -9,316 +9,318 @@ networks:
       com.docker.network.driver.mtu: 1450
 
 services:
-    certbot:
-        image: adferrand/dnsrobocert
-        hostname: certbot
-        container_name: certbot
-        volumes:
-            - ./private/letsencrypt:/etc/letsencrypt
-            # needed for nginx container autorestart, https://dnsrobocert.readthedocs.io/en/latest/configuration_reference.html#autorestart
-            - /var/run/docker.sock:/var/run/docker.sock
-            # should be in the following format:
-            # https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
-            - ./config/dnsrobocert.yml:/etc/dnsrobocert/config.yml
+  certbot:
+    image: adferrand/dnsrobocert
+    hostname: certbot
+    container_name: certbot
+    volumes:
+      - ./private/letsencrypt:/etc/letsencrypt
+      # needed for nginx container autorestart, https://dnsrobocert.readthedocs.io/en/latest/configuration_reference.html#autorestart
+      - /var/run/docker.sock:/var/run/docker.sock
+      # should be in the following format:
+      # https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
+      - ./config/dnsrobocert.yml:/etc/dnsrobocert/config.yml
 
-        # For yandexcloud:
-        # AUTH_KEY must be provided, short-lived and set by scripts/update-dns-token.sh
-        # DNS_ZONE_ID from https://console.cloud.yandex.com/link/dns or
-        # CLOUD_ID, FOLDER_ID from https://console.cloud.yandex.com/cloud can be provided
-        env_file: private/environment/dnsrobocert.env
-        # used in config/dnsrobocert.yml
-        environment:
-            - PROVIDER=yandexcloud
-            - EMAIL=tech@favor-group.ru
-            - DOMAIN=favor-group.ru
+    # For yandexcloud:
+    # AUTH_KEY must be provided, short-lived and set by scripts/update-dns-token.sh
+    # DNS_ZONE_ID from https://console.cloud.yandex.com/link/dns or
+    # CLOUD_ID, FOLDER_ID from https://console.cloud.yandex.com/cloud can be provided
+    env_file: private/environment/dnsrobocert.env
+    # used in config/dnsrobocert.yml
+    environment:
+      - PROVIDER=yandexcloud
+      - EMAIL=tech@favor-group.ru
+      - DOMAIN=favor-group.ru
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
-        restart: unless-stopped
+    restart: unless-stopped
 
-    nginx:
-        build: ./config/nginx
-        hostname: nginx
-        container_name: nginx
-        image: paskal/nginx:latest
-        depends_on:
-            - adminer
-            - php
-            - php-8
-            - updater
-        ports:
-            - "80:80"
-            - "443:443"
-        expose:
-            - "8084"
-        volumes:
-            - ./web/prod:/web/prod
-            - ./web/dev:/web/dev
-            - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-            - ./config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro
-            - ./config/nginx/bitrix-8.conf:/etc/nginx/bitrix-8.conf:ro
-            - ./config/nginx/fastcgi.conf:/etc/nginx/fastcgi.conf:ro
-            - ./config/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
-            - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
-            - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
-            # Logs
-            - ./logs/nginx:/var/log/nginx
-        environment:
-            - TZ=Europe/Moscow
+  nginx:
+    build: ./config/nginx
+    hostname: nginx
+    container_name: nginx
+    image: paskal/nginx:latest
+    depends_on:
+      - adminer
+      - php
+      - php-8
+      - updater
+    ports:
+      - "80:80"
+      - "443:443"
+    expose:
+      - "8084"
+    volumes:
+      - ./web/prod:/web/prod
+      - ./web/dev:/web/dev
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro
+      - ./config/nginx/bitrix-8.conf:/etc/nginx/bitrix-8.conf:ro
+      - ./config/nginx/fastcgi.conf:/etc/nginx/fastcgi.conf:ro
+      - ./config/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
+      # Logs
+      - ./logs/nginx:/var/log/nginx
+    environment:
+      - TZ=Europe/Moscow
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
-        restart: unless-stopped
+    restart: unless-stopped
 
-    php:
-        build: ./config/php
-        image: paskal/bitrix-php:latest
-        hostname: php
-        container_name: php
-        depends_on:
-            - mysql
-            - memcached
-            - memcached-sessions
-        expose:
-            - "9000"
-        volumes:
-            - ./web/prod:/web/prod
-            - ./web/dev:/web/dev
-            - ./private/msmtprc:/etc/msmtprc
-            - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
-            - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
-            # MySQL socket to prevent transferring data through TCP
-            - ./private/mysqld:/var/run/mysqld
-            # Logs
-            - ./logs/php:/var/log/php
-            # for monitoring purposes
-            - ./logs/nginx:/var/log/nginx
+  php:
+    build: ./config/php
+    image: paskal/bitrix-php:latest
+    hostname: php
+    container_name: php
+    depends_on:
+      - mysql
+      - memcached
+      - memcached-sessions
+    expose:
+      - "9000"
+    volumes:
+      - ./web/prod:/web/prod
+      - ./web/dev:/web/dev
+      - ./private/msmtprc:/etc/msmtprc
+      - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+      # MySQL socket to prevent transferring data through TCP
+      - ./private/mysqld:/var/run/mysqld
+      # Logs
+      - ./logs/php:/var/log/php
+      # for monitoring purposes
+      - ./logs/nginx:/var/log/nginx
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
-        restart: unless-stopped
+    restart: unless-stopped
 
-    php-8:
-        build:
-          context: ./config/php
-          dockerfile: Dockerfile.8.2
-        image: paskal/bitrix-php:8.2
-        hostname: php-8
-        container_name: php-8
-        depends_on:
-            - mysql
-            - memcached
-            - memcached-sessions
-        expose:
-            - "9000"
-        volumes:
-            - ./web/prod:/web/prod
-            - ./web/dev:/web/dev
-            - ./private/msmtprc:/etc/msmtprc
-            - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
-            - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
-            # MySQL socket to prevent transferring data through TCP
-            - ./private/mysqld:/var/run/mysqld
-            # Logs
-            - ./logs/php:/var/log/php
-            # for monitoring purposes
-            - ./logs/nginx:/var/log/nginx
+  php-8:
+    build:
+      context: ./config/php
+      dockerfile: Dockerfile.8.2
+    image: paskal/bitrix-php:8.2
+    hostname: php-8
+    container_name: php-8
+    depends_on:
+      - mysql
+      - memcached
+      - memcached-sessions
+    expose:
+      - "9000"
+    volumes:
+      - ./web/prod:/web/prod
+      - ./web/dev:/web/dev
+      - ./private/msmtprc:/etc/msmtprc
+      - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
+      # MySQL socket to prevent transferring data through TCP
+      - ./private/mysqld:/var/run/mysqld
+      # Logs
+      - ./logs/php:/var/log/php
+      # for monitoring purposes
+      - ./logs/nginx:/var/log/nginx
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
-        restart: unless-stopped
+    restart: unless-stopped
 
-    php-cron:
-        command: cron -f
-        image: paskal/bitrix-php:latest
-        hostname: php-cron
-        container_name: php-cron
-        depends_on:
-            - mysql
-            - memcached
-            - memcached-sessions
-        volumes:
-            - ./web/prod:/web/prod
-            - ./web/dev:/web/dev
-            - ./private/msmtprc:/etc/msmtprc
-            - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
-            - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
-            # MySQL socket to prevent transferring data through TCP
-            - ./private/mysqld:/var/run/mysqld
-            # Cronjobs
-            - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
-            # Logs
-            - ./logs/php:/var/log/php
+  php-cron:
+    command: cron -f
+    image: paskal/bitrix-php:latest
+    hostname: php-cron
+    container_name: php-cron
+    depends_on:
+      - mysql
+      - memcached
+      - memcached-sessions
+    volumes:
+      - ./web/prod:/web/prod
+      - ./web/dev:/web/dev
+      - ./private/msmtprc:/etc/msmtprc
+      - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+      # MySQL socket to prevent transferring data through TCP
+      - ./private/mysqld:/var/run/mysqld
+      # Cronjobs
+      - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
+      # Logs
+      - ./logs/php:/var/log/php
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
-        restart: unless-stopped
+    restart: unless-stopped
 
-    mysql:
-        image: percona/percona-server:8.0
-        hostname: mysql
-        container_name: mysql
-        # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
-        env_file: private/environment/mysql.env
-        expose:
-            - "3306"
-        ports:
-            - "127.0.0.1:3306:3306"
-        volumes:
-            # Configuration
-            - ./config/mysql/my.cnf:/etc/my.cnf.d/my.cnf
-            # Data persistence
-            - ./private/mysql-data:/var/lib/mysql
-            # MySQL socket to prevent transferring data through TCP
-            # do chown 1001:1001 ./private/mysqld
-            - ./private/mysqld:/var/mysql-socket
-            # Logs
-            - ./logs/mysql:/var/log/mysql
-        environment:
-            MYSQL_DATABASE: favor_group_ru
-            TZ: Europe/Moscow
-        cap_add:
-            - SYS_NICE  # CAP_SYS_NICE
+  mysql:
+    image: percona/percona-server:8.0
+    hostname: mysql
+    container_name: mysql
+    # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
+    env_file: private/environment/mysql.env
+    expose:
+      - "3306"
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      # Configuration
+      - ./config/mysql/my.cnf:/etc/my.cnf.d/my.cnf
+      # Data persistence
+      - ./private/mysql-data:/var/lib/mysql
+      # MySQL socket to prevent transferring data through TCP
+      # do chown 1001:1001 ./private/mysqld
+      - ./private/mysqld:/var/mysql-socket
+      # Logs
+      - ./logs/mysql:/var/log/mysql
+    environment:
+      MYSQL_DATABASE: favor_group_ru
+      TZ: Europe/Moscow
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
-        restart: unless-stopped
+    restart: unless-stopped
 
-    memcached:
-        image: memcached:1-alpine
-        hostname: memcached
-        container_name: memcached
-        restart: unless-stopped
-        expose:
-            - "11211"
+  memcached:
+    image: memcached:1-alpine
+    hostname: memcached
+    container_name: memcached
+    restart: unless-stopped
+    expose:
+      - "11211"
 
-    memcached-sessions:
-        image: memcached:1-alpine
-        hostname: memcached-sessions
-        container_name: memcached-sessions
-        restart: unless-stopped
-        expose:
-            - "11211"
+  memcached-sessions:
+    image: memcached:1-alpine
+    hostname: memcached-sessions
+    container_name: memcached-sessions
+    restart: unless-stopped
+    expose:
+      - "11211"
 
-    adminer:
-        image: adminer
-        hostname: adminer
-        container_name: adminer
-        depends_on:
-            - mysql
-        expose:
-            - "8080"
-        environment:
-            ADMINER_DEFAULT_SERVER: mysql
+  adminer:
+    image: adminer
+    hostname: adminer
+    container_name: adminer
+    depends_on:
+      - mysql
+    expose:
+      - "8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
 
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
-        restart: unless-stopped
+    restart: unless-stopped
 
-#    ftp:
-#        image: stilliard/pure-ftpd
-#        container_name: ftp
-#        # FTP_USER_NAME, FTP_USER_PASS
-#        env_file: private/environment/ftp.env
-#        ports:
-#            - "21:21"
-#            - "30000-30009:30000-30009"
-#        volumes:
-#            - ./web:/home/web
-#        environment:
-#            PUBLICHOST: favor-group.ru
-#            FTP_USER_HOME: /home/web
+  # Monitoring
+
+  ## Zabbix Agent 2
+  zabbix-agent:
+    build: ./config/zabbix
+    image: paskal/zabbix-agent2:latest
+    container_name: zabbix-agent
+    privileged: true
+    # MYSQL_USER, MYSQL_PASSWORD
+    # ZBX_HOSTNAME, ZBX_SERVER_HOST
+    env_file:
+      - private/environment/mysql.env
+      - private/environment/zabbix.env
+    depends_on:
+      - mysql
+      - nginx
+      - memcached
+    volumes:
+      # for monitoring purposes
+      - ./logs/nginx:/var/log/nginx
+      # for monitoring purposes
+      - ./web/prod/upload:/web/prod/upload
+      # this is needed in order to monitor docker
+      # to make it work you need to create user "zabbix" with id 1997 on the host system,
+      # and make sure it has enough permissions to read /var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock
+      # MySQL socket to prevent transferring data through TCP
+      - ./private/mysqld:/var/run/mysqld
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped
+
+  # webhooks server
+  updater:
+    image: ghcr.io/umputun/updater:master
+    container_name: updater
+    hostname: updater
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # KEY variable
+    env_file: private/environment/updater.env
+    environment:
+      - LISTEN=0.0.0.0:8080
+      - CONF=/etc/updater.yml
+    ports:
+      - "8080"
+    volumes:
+      - ./config/updater.yaml:/etc/updater.yml
+      - ./private/updater_ssh_key:/home/app/.ssh/id_rsa
+
+# FTP access
+
+#  ftp:
+#    image: stilliard/pure-ftpd
+#    container_name: ftp
+#    # FTP_USER_NAME, FTP_USER_PASS
+#    env_file: private/environment/ftp.env
+#    ports:
+#      - "21:21"
+#      - "30000-30009:30000-30009"
+#    volumes:
+#      - ./web:/home/web
+#    environment:
+#      PUBLICHOST: favor-group.ru
+#      FTP_USER_HOME: /home/web
 #
-#        logging:
-#            driver: json-file
-#            options:
-#                max-size: "10m"
-#                max-file: "5"
+#    logging:
+#      driver: json-file
+#      options:
+#        max-size: "10m"
+#        max-file: "5"
 #
-#        restart: unless-stopped
-
-    # Monitoring
-
-    ## Zabbix Agent 2
-    zabbix-agent:
-        build: ./config/zabbix
-        image: paskal/zabbix-agent2:latest
-        container_name: zabbix-agent
-        privileged: true
-        # MYSQL_USER, MYSQL_PASSWORD
-        # ZBX_HOSTNAME, ZBX_SERVER_HOST
-        env_file:
-            - private/environment/mysql.env
-            - private/environment/zabbix.env
-        depends_on:
-            - mysql
-            - nginx
-            - memcached
-        volumes:
-            # for monitoring purposes
-            - ./logs/nginx:/var/log/nginx
-            # for monitoring purposes
-            - ./web/prod/upload:/web/prod/upload
-            # this is needed in order to monitor docker
-            # to make it work you need to create user "zabbix" with id 1997 on the host system,
-            # and make sure it has enough permissions to read /var/run/docker.sock
-            - /var/run/docker.sock:/var/run/docker.sock
-            # MySQL socket to prevent transferring data through TCP
-            - ./private/mysqld:/var/run/mysqld
-
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
-        restart: unless-stopped
-
-    # webhooks server
-    updater:
-        image: ghcr.io/umputun/updater:master
-        container_name: updater
-        hostname: updater
-        restart: always
-        logging:
-            driver: json-file
-            options:
-                max-size: "10m"
-                max-file: "5"
-        # KEY variable
-        env_file: private/environment/updater.env
-        environment:
-            - LISTEN=0.0.0.0:8080
-            - CONF=/etc/updater.yml
-        ports:
-            - "8080"
-        volumes:
-            - ./config/updater.yaml:/etc/updater.yml
-            - ./private/updater_ssh_key:/home/app/.ssh/id_rsa
+#    restart: unless-stopped
