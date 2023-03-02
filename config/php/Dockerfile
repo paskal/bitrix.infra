@@ -21,6 +21,7 @@ RUN apt-get update \
     php7.4-opcache \
     php7.4-zip \
     php-pear php7.4-dev libmcrypt-dev gcc make autoconf libc-dev pkg-config \
+    webp \
     msmtp \
     msmtp-mta \
     sudo \
