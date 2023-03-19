@@ -29,6 +29,9 @@ INFRA_DIR=/web
 # minify js and css files. rev-cut-rev magic is to remove the file extension.
 *  *  *  *  * root docker run -v /web/web/dev/local/templates/light:/www/dev -v /web/web/prod/local/templates/light:/www/prod tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -I{} minify --preserve -o {}.min.js {}.js"; docker run -v /web/web/dev/local/templates/light:/www/dev -v /web/web/prod/local/templates/light:/www/prod tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -I{} minify --preserve -o {}.min.css {}.css"
 
+# cleanup docker runs after 60*24=1440 runs of docker a day in the minimify command
+10 3 * * * root docker system prune -f
+
 # every 10 minutes check block for blog articles for non-main domains
 # using robots.txt, so that these domains won't fight for place under
 # the sun with main one. better to keep blog texts belong to single domain.
