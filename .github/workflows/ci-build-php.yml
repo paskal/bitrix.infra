@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-images:
-    name: Build Docker images for PHP
+    name: Build PHP Docker images
     runs-on: ubuntu-latest
 
     steps:
@@ -24,43 +24,6 @@ jobs:
 
       - name: available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
-
-      - name: build PHP 7 image without pushing (only outside master)
-        working-directory: config/php
-        if: ${{ github.ref != 'refs/heads/master' }}
-        run: |
-          docker buildx build \
-              --platform linux/amd64 .
-
-      - name: build PHP 7 image for ghcr.io and DockerHub
-        working-directory: config/php
-        if: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-          USERNAME: ${{ github.actor }}
-        run: |
-          echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
-          docker buildx build --push \
-              --platform linux/amd64,linux/arm/v7,linux/arm64 \
-              -t ghcr.io/paskal/bitrix-php:7 -t paskal/bitrix-php:7 \
-              -t ghcr.io/paskal/bitrix-php:latest -t paskal/bitrix-php:latest .
-
-      - name: build PHP 8 image for ghcr.io and DockerHub
-        working-directory: config/php
-        if: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-          USERNAME: ${{ github.actor }}
-        run: |
-          echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
-          docker buildx build --push \
-              --platform linux/amd64,linux/arm/v7,linux/arm64 \
-              -f Dockerfile.8 \
-              -t ghcr.io/paskal/bitrix-php:8 -t paskal/bitrix-php:8 .
 
       - name: build PHP 8.1 image for ghcr.io and DockerHub
         working-directory: config/php

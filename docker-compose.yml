@@ -48,7 +48,6 @@ services:
     depends_on:
       - adminer
       - php
-      - php-8
       - updater
     ports:
       - "80:80"
@@ -60,9 +59,9 @@ services:
       - ./web/dev:/web/dev
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro
-      - ./config/nginx/bitrix-8.conf:/etc/nginx/bitrix-8.conf:ro
       - ./config/nginx/fastcgi.conf:/etc/nginx/fastcgi.conf:ro
       - ./config/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
+      - ./config/nginx/static-cdn.conf:/etc/nginx/static-cdn.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
       # Logs
@@ -79,8 +78,10 @@ services:
     restart: unless-stopped
 
   php:
-    build: ./config/php
-    image: paskal/bitrix-php:latest
+    build:
+      context: ./config/php
+      dockerfile: Dockerfile.8.2
+    image: paskal/bitrix-php:8.2
     hostname: php
     container_name: php
     depends_on:
@@ -93,42 +94,8 @@ services:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
       - ./private/msmtprc:/etc/msmtprc
-      - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
-      - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
-      # MySQL socket to prevent transferring data through TCP
-      - ./private/mysqld:/var/run/mysqld
-      # Logs
-      - ./logs/php:/var/log/php
-      # for monitoring purposes
-      - ./logs/nginx:/var/log/nginx
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-
-    restart: unless-stopped
-
-  php-8:
-    build:
-      context: ./config/php
-      dockerfile: Dockerfile.8
-    image: paskal/bitrix-php:8
-    hostname: php-8
-    container_name: php-8
-    depends_on:
-      - mysql
-      - memcached
-      - memcached-sessions
-    expose:
-      - "9000"
-    volumes:
-      - ./web/prod:/web/prod
-      - ./web/dev:/web/dev
-      - ./private/msmtprc:/etc/msmtprc
-      - ./config/php/90-php.ini:/etc/php/8.0/fpm/conf.d/90-php.ini
-      - ./config/php/90-php.ini:/etc/php/8.0/cli/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
       # Logs
@@ -146,7 +113,7 @@ services:
 
   php-cron:
     command: cron -f
-    image: paskal/bitrix-php:latest
+    image: paskal/bitrix-php:8.2
     hostname: php-cron
     container_name: php-cron
     depends_on:
@@ -157,14 +124,12 @@ services:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
       - ./private/msmtprc:/etc/msmtprc
-      - ./config/php/90-php.ini:/etc/php/7.4/fpm/conf.d/90-php.ini
-      - ./config/php/90-php.ini:/etc/php/7.4/cli/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
       # Cronjobs
       - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
-      # Logs
-      - ./logs/php:/var/log/php
 
     logging:
       driver: json-file
