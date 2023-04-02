@@ -94,8 +94,6 @@ services:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
       - ./private/msmtprc:/etc/msmtprc
-      - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
-      - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
       # Logs
@@ -124,8 +122,6 @@ services:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
       - ./private/msmtprc:/etc/msmtprc
-      - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
-      - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
       # Cronjobs
