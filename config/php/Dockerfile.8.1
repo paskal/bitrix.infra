@@ -1,5 +1,5 @@
 FROM phpdockerio/php:8.1-fpm
-# https://github.com/bitrixdock/bitrixdock/blob/master/php80/Dockerfile
+# https://github.com/bitrixdock/bitrixdock/blob/master/php81/Dockerfile
 
 LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>" \
       org.opencontainers.image.description="PHP 8.1 with everything needed for Bitrix" \
@@ -8,13 +8,14 @@ LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>
       org.opencontainers.image.title="php"
 
 RUN apt-get update \
-    && apt-get -y --allow-downgrades --no-install-recommends install \
+    && apt-get -y --no-install-recommends install \
     php8.1-memcached \
     php8.1-memcache \
     php8.1-mbstring \
     php8.1-mysql \
     php8.1-intl \
     php8.1-interbase \
+    php8.1-redis \
     php8.1-soap \
     php8.1-gd \
     php8.1-imagick \
