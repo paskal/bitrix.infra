@@ -198,6 +198,13 @@ Site files in directories `web/prod` and `web/dev`.
     ZBX_SERVER_HOST=zabbix.example.com
     ```
 
+    MySQL setup if you want to use Zabbix for monitoring of the database:
+    ```sql
+    drop user if exists 'zbx_monitor'@'localhost';
+    create user if not exists `zbx_monitor`@`localhost` identified by 'generate_random_password_here';
+    grant process, replication client, show databases, show view on *.* to `zbx_monitor`@`localhost`;
+    ```
+
 - `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
 
 - `private/mysql-data` directory will be filled with database data automatically after the start of mysql container
