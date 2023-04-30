@@ -85,7 +85,6 @@ services:
     hostname: php
     container_name: php
     depends_on:
-      - mysql
       - memcached
       - memcached-sessions
     expose:
@@ -115,7 +114,6 @@ services:
     hostname: php-cron
     container_name: php-cron
     depends_on:
-      - mysql
       - memcached
       - memcached-sessions
     volumes:
@@ -141,10 +139,6 @@ services:
     container_name: mysql
     # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
     env_file: private/environment/mysql.env
-    expose:
-      - "3306"
-    ports:
-      - "127.0.0.1:3306:3306"
     volumes:
       # Configuration
       - ./config/mysql/my.cnf:/etc/my.cnf.d/my.cnf
@@ -189,12 +183,13 @@ services:
     image: adminer
     hostname: adminer
     container_name: adminer
-    depends_on:
-      - mysql
     expose:
       - "8080"
     environment:
-      ADMINER_DEFAULT_SERVER: mysql
+      ADMINER_DEFAULT_SERVER: localhost
+    volumes:
+      # MySQL socket to prevent transferring data through TCP
+      - ./private/mysqld:/var/run/mysqld
 
     logging:
       driver: json-file
@@ -218,7 +213,6 @@ services:
       - private/environment/mysql.env
       - private/environment/zabbix.env
     depends_on:
-      - mysql
       - nginx
       - memcached
     volumes:
