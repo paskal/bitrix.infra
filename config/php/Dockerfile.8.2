@@ -21,6 +21,7 @@ RUN apt-get update \
     php8.2-imagick \
     php8.2-opcache \
     php8.2-zip \
+    php8.2-xdebug \
     php-pear php8.2-dev libmcrypt-dev gcc make autoconf libc-dev pkg-config \
     webp \
     msmtp \
@@ -38,6 +39,8 @@ RUN apt-get update \
 # without this, php container won't work if you forget to mount 90-php.ini
 COPY ./90-php.ini /etc/php/8.2/fpm/conf.d/90-php.ini
 COPY ./90-php.ini /etc/php/8.2/cli/conf.d/90-php.ini
+# disable xdebug by default as it affects performance badly
+COPY ./xdebug.ini /etc/php/8.2/mods-available/xdebug.ini
 
 RUN usermod -u 1000 www-data
 RUN groupmod -g 1000 www-data
