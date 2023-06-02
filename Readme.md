@@ -47,7 +47,7 @@ $DBPassword = "<DBPASSWORD>";
 define('BX_TEMPORARY_FILES_DIRECTORY', '/tmp');
 
 define("BX_CACHE_TYPE", "memcache");
-define("BX_CACHE_SID", "prod"); // or "dev" in case of dev config
+define("BX_CACHE_SID", $_SERVER["DOCUMENT_ROOT"]."#01");
 define("BX_MEMCACHE_HOST", "memcached");
 define("BX_MEMCACHE_PORT", "11211");
 define('BX_SECURITY_SESSION_MEMCACHE_HOST', 'memcached-sessions');
@@ -107,7 +107,7 @@ return array(
         'host' => 'memcached',
         'port' => '11211',
       ),
-      'sid' => "prod" // or "dev" in case of dev config
+      'sid' => $_SERVER["DOCUMENT_ROOT"]."#01"
     ),
   ),
 );

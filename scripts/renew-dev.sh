@@ -104,9 +104,7 @@ echo "Changing DB and memcached connection settings"
 sed -i "s/.*\$DBName.*/\$DBName = '${DEV_DB}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBLogin.*/\$DBLogin = '${DEV_USER}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBPassword.*/\$DBPassword = '${DEV_PASSWORD}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
-sed -i "s/.*BX_CACHE_SID.*/define('BX_CACHE_SID', '${DEV_SUBDOMAIN}');/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*BX_TEMPORARY_FILES_DIRECTORY.*/define('BX_TEMPORARY_FILES_DIRECTORY', '\/tmp\/${DEV_DOMAIN}');/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
-sed -i "s/.*'sid'.*/'sid' => '${DEV_SUBDOMAIN}'/" ${DEV_LOCATION}/bitrix/.settings_extra.php
 sed -i "s/.*'database' =>.*/'database' => '${DEV_DB}',/" ${DEV_LOCATION}/bitrix/.settings.php
 sed -i "s/.*'login' =>.*/'login' => '${DEV_USER}',/" ${DEV_LOCATION}/bitrix/.settings.php
 sed -i "s/.*'password' =>.*/'password' => '${DEV_PASSWORD}',/" ${DEV_LOCATION}/bitrix/.settings.php
