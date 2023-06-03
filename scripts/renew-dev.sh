@@ -99,12 +99,11 @@ install -d -o 1000 -g 1000 ${DEV_LOCATION}
 # / in the end of src location avoid creating additional directory level at destination
 rsync --archive --no-inc-recursive --delete --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --exclude '*.tmp*' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
 
-echo "Changing DB and memcached connection settings"
-# change settings in files to reflect dev site domain and user
+echo "Changing DB connection settings"
+# change settings in files to reflect dev site DB user
 sed -i "s/.*\$DBName.*/\$DBName = '${DEV_DB}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBLogin.*/\$DBLogin = '${DEV_USER}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*\$DBPassword.*/\$DBPassword = '${DEV_PASSWORD}';/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
-sed -i "s/.*BX_TEMPORARY_FILES_DIRECTORY.*/define('BX_TEMPORARY_FILES_DIRECTORY', '\/tmp\/${DEV_DOMAIN}');/" ${DEV_LOCATION}/bitrix/php_interface/dbconn.php
 sed -i "s/.*'database' =>.*/'database' => '${DEV_DB}',/" ${DEV_LOCATION}/bitrix/.settings.php
 sed -i "s/.*'login' =>.*/'login' => '${DEV_USER}',/" ${DEV_LOCATION}/bitrix/.settings.php
 sed -i "s/.*'password' =>.*/'password' => '${DEV_PASSWORD}',/" ${DEV_LOCATION}/bitrix/.settings.php
@@ -118,3 +117,4 @@ rm -f prod-dump.sql
 rm -f ./private/mysql-data/deleteme_*
 
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
+

@@ -46,12 +46,8 @@ $DBLogin = "<DBUSER>";
 $DBPassword = "<DBPASSWORD>";
 define('BX_TEMPORARY_FILES_DIRECTORY', '/tmp');
 
-define("BX_CACHE_TYPE", "memcache");
-define("BX_CACHE_SID", $_SERVER["DOCUMENT_ROOT"]."#01");
-define("BX_MEMCACHE_HOST", "memcached");
-define("BX_MEMCACHE_PORT", "11211");
-define('BX_SECURITY_SESSION_MEMCACHE_HOST', 'memcached-sessions');
-define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
+define("BX_CACHE_TYPE", "apc");
+define('BX_CACHE_SID', $_SERVER["DOCUMENT_ROOT"]."#01");
 ```
 
 </details>
@@ -62,14 +58,16 @@ define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
   'session' => array (
   'value' =>
   array (
-    'mode' => 'default',
+    'mode' => 'separated',
+    'lifetime' => 14400,
     'handlers' =>
     array (
+      'kernel'  => 'encrypted_cookies',
       'general' =>
       array (
-        'type' => 'memcache',
-        'host' => 'memcached-sessions',
-        'port' => '11211',
+        'type' => 'redis',
+        'host' => 'redis',
+        'port' => '6379',
       ),
     ),
   ),
@@ -102,10 +100,13 @@ define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
 return array(
   'cache' => array(
     'value' => array(
-      'type' => 'memcache',
-      'memcache' => array(
-        'host' => 'memcached',
-        'port' => '11211',
+      'type' => array(
+        'class_name' => '\\Bitrix\\Main\\Data\\CacheEngineRedis',
+        'extension' => 'redis'
+      ),
+      'redis' => array(
+        'host' => 'redis',
+        'port' => '6379',
       ),
       'sid' => $_SERVER["DOCUMENT_ROOT"]."#01"
     ),
@@ -122,8 +123,8 @@ return array(
 
 - [Nginx](https://www.nginx.com/) [![Image Size](https://img.shields.io/docker/image-size/paskal/nginx)](https://hub.docker.com/r/paskal/nginx) with [brotli](https://github.com/google/ngx_brotli) proxying requests to php-fpm and serving static assets directly
 - [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php) 8.2 [![Image Size 8.2](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.2)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
-- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server)](https://hub.docker.com/r/percona/percona-server) because of it's monitoring capabilities
-- [memcached](https://memcached.org/) [![Image Size](https://img.shields.io/docker/image-size/_/memcached)](https://hub.docker.com/r/_/memcached) for bitrix cache, plus additional only for user sessions
+- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server/8.0)](https://hub.docker.com/r/percona/percona-server) because of it's monitoring capabilities
+- [Redis](https://redis.io) [![Image Size](https://img.shields.io/docker/image-size/_/redis/alpine)](https://hub.docker.com/r/_/redis) for bitrix cache, plus additional only for user sessions
 
 ### Optional
 
@@ -236,19 +237,36 @@ sudo ./scripts/disaster-recovery.sh
 
 </details>
 
-<details>
-<summary>Cleaning (mem)cache</summary>
 
-There are two memcached instances in use, one for site cache and another for sessions. Here are the commands to clean them completely:
+<details>
+<summary>Recovery of files</summary>
+
+Presume you have a machine with problems, and you want to roll back the changes:
 
 ```shell
-# to flush site cache
-echo "flush_all" | docker exec -i memcached /usr/bin/nc 127.0.0.1 11211
-# to flush all user sessions
-echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
+# restore to directory /web/prod2
+# -t 2D means restore from the backup made 2 days
+# last argument /web/web/prod2 is the directory to restore to, we're not restoring to the original dir
+# so that you can rename it first and then rename this directory to prod
+sudo HOME="/home/$(logname)" duplicity -t 2D \
+    --no-encryption \
+    --s3-endpoint-url https://storage.yandexcloud.net \
+    --log-file /web/logs/duplicity.log \
+    --archive-dir /root/.cache/duplicity \
+    --file-to-restore web/prod  "boto3+s3://favor-group-backup/duplicity_web_favor-group" /web/web/prod2
+```
+</details>
+
+<details>
+<summary>Cleaning redis cache</summary>
+
+Redis is used for site cache and user sessions. To clean it, run the following commands:
+
+```shell
+docker exec -uroot -it redis redis-cli FLUSHALL
 ```
 
-[Here](https://github.com/memcached/memcached/wiki/Commands) is the complete list of commands you can send to it.
+[Here](https://redis.io/commands/) is the complete list of commands you can send to it.
 
 </details>
 
