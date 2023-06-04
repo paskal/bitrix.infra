@@ -51,7 +51,8 @@ services:
       - updater
     ports:
       - "80:80"
-      - "443:443"
+      - "443:443/tcp"
+      - "443:443/udp"
     expose:
       - "8084"
     volumes:
