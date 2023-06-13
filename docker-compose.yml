@@ -98,6 +98,9 @@ services:
       - ./private/mysqld:/var/run/mysqld
       # Logs
       - ./logs/php:/var/log/php
+      # configuration
+      - ./config/php/90-php.ini:/etc/php/8.2/fpm/conf.d/90-php.ini
+      - ./config/php/xdebug.ini:/etc/php/8.2/mods-available/xdebug.ini
       # for monitoring purposes
       - ./logs/nginx:/var/log/nginx
 
@@ -123,6 +126,8 @@ services:
       - ./private/msmtprc:/etc/msmtprc
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
+      # configuration
+      - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
       # Cronjobs
       - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
 
