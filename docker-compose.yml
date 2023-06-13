@@ -86,7 +86,8 @@ services:
     hostname: php
     container_name: php
     depends_on:
-      - redis
+      - memcached
+      - memcached-sessions
     expose:
       - "9000"
     volumes:
@@ -114,7 +115,8 @@ services:
     hostname: php-cron
     container_name: php-cron
     depends_on:
-      - redis
+      - memcached
+      - memcached-sessions
     volumes:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
@@ -162,13 +164,21 @@ services:
 
     restart: unless-stopped
 
-  redis:
-    image: redis:alpine
-    hostname: redis
-    container_name: redis
+  memcached:
+    image: memcached:1-alpine
+    hostname: memcached
+    container_name: memcached
     restart: unless-stopped
     expose:
-      - "6379"
+      - "11211"
+
+  memcached-sessions:
+    image: memcached:1-alpine
+    hostname: memcached-sessions
+    container_name: memcached-sessions
+    restart: unless-stopped
+    expose:
+      - "11211"
 
   adminer:
     image: adminer
@@ -205,7 +215,7 @@ services:
       - private/environment/zabbix.env
     depends_on:
       - nginx
-      - redis
+      - memcached
     volumes:
       # for monitoring purposes
       - ./logs/nginx:/var/log/nginx

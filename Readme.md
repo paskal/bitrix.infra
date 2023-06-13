@@ -31,6 +31,8 @@ It might be easier to switch everything to User and Group 1000 for consistency l
 
 ### Relevant parts of Bitrix config
 
+Documentation: sessions [1](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24868) [2](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24870) (ru [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.3435.4816.14028.14026), [2](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=32&LESSON_ID=9421)), [cache](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&CHAPTER_ID=05962&LESSON_PATH=5936.5959.5962) ([ru](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=43&LESSON_ID=2795))
+
 <details><summary>bitrix/php_interface/dbconn.php</summary>
 
 ```php
@@ -46,8 +48,12 @@ $DBLogin = "<DBUSER>";
 $DBPassword = "<DBPASSWORD>";
 define('BX_TEMPORARY_FILES_DIRECTORY', '/tmp');
 
-define("BX_CACHE_TYPE", "apc");
-define('BX_CACHE_SID', $_SERVER["DOCUMENT_ROOT"]."#01");
+define("BX_CACHE_TYPE", "memcache");
+define("BX_CACHE_SID", $_SERVER["DOCUMENT_ROOT"]."#01");
+define("BX_MEMCACHE_HOST", "memcached");
+define("BX_MEMCACHE_PORT", "11211");
+define('BX_SECURITY_SESSION_MEMCACHE_HOST', 'memcached');
+define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
 ```
 
 </details>
@@ -65,9 +71,9 @@ define('BX_CACHE_SID', $_SERVER["DOCUMENT_ROOT"]."#01");
       'kernel'  => 'encrypted_cookies',
       'general' =>
       array (
-        'type' => 'redis',
-        'host' => 'redis',
-        'port' => '6379',
+        'type' => 'memcache',
+        'host' => 'memcached',
+        'port' => '11211',
       ),
     ),
   ),
@@ -100,13 +106,10 @@ define('BX_CACHE_SID', $_SERVER["DOCUMENT_ROOT"]."#01");
 return array(
   'cache' => array(
     'value' => array(
-      'type' => array(
-        'class_name' => '\\Bitrix\\Main\\Data\\CacheEngineRedis',
-        'extension' => 'redis'
-      ),
-      'redis' => array(
-        'host' => 'redis',
-        'port' => '6379',
+      'type' => 'memcache',
+      'memcache' => array(
+        'host' => 'memcached',
+        'port' => '11211',
       ),
       'sid' => $_SERVER["DOCUMENT_ROOT"]."#01"
     ),
@@ -124,7 +127,7 @@ return array(
 - [Nginx](https://www.nginx.com/) [![Image Size](https://img.shields.io/docker/image-size/paskal/nginx)](https://hub.docker.com/r/paskal/nginx) with [brotli](https://github.com/google/ngx_brotli) proxying requests to php-fpm and serving static assets directly
 - [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php) 8.2 [![Image Size 8.2](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.2)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
 - [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server/8.0)](https://hub.docker.com/r/percona/percona-server) because of it's monitoring capabilities
-- [Redis](https://redis.io) [![Image Size](https://img.shields.io/docker/image-size/_/redis/alpine)](https://hub.docker.com/r/_/redis) for bitrix cache, plus additional only for user sessions
+- [memcached](https://memcached.org/) [![Image Size](https://img.shields.io/docker/image-size/_/memcached/1-alpine)](https://hub.docker.com/r/_/memcached) for bitrix cache and user sessions
 
 ### Optional
 
@@ -258,15 +261,18 @@ sudo HOME="/home/$(logname)" duplicity -t 2D \
 </details>
 
 <details>
-<summary>Cleaning redis cache</summary>
+<summary>Cleaning (mem)cache</summary>
 
-Redis is used for site cache and user sessions. To clean it, run the following commands:
+There are two memcached instances in use, one for site cache and another for sessions. Here are the commands to clean them completely:
 
 ```shell
-docker exec -uroot -it redis redis-cli FLUSHALL
+# to flush site cache
+echo "flush_all" | docker exec -i memcached /usr/bin/nc 127.0.0.1 11211
+# to flush all user sessions
+echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
 ```
 
-[Here](https://redis.io/commands/) is the complete list of commands you can send to it.
+[Here](https://github.com/memcached/memcached/wiki/Commands) is the complete list of commands you can send to it.
 
 </details>
 
