@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-from typing import Optional
-import requests
 from argparse import ArgumentParser
 from enum import Enum
+from typing import Optional
 from urllib.parse import urljoin
+
+import requests
 
 _redirects_map_path = '../config/nginx/conf.d/redirects-map.conf'
 _default_site = 'https://favor-group.ru'
@@ -45,6 +46,9 @@ class UrlChecker:
             resp = requests.get(url)
         except requests.exceptions.TooManyRedirects:
             print(f"too many redirects on {url}")
+            return
+        except Exception as ex:
+            print(f"can't retrieve {url}: {ex}")
             return
         return resp
 
@@ -122,3 +126,4 @@ if __name__ == '__main__':
     )
     opts = parser.parse_args()
     main(str(opts.run_type), opts.site, opts.urls_file, opts.update_redirects)
+
