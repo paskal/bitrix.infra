@@ -103,6 +103,9 @@ services:
       - ./config/php/xdebug.ini:/etc/php/8.2/mods-available/xdebug.ini
       # for monitoring purposes
       - ./logs/nginx:/var/log/nginx
+      # switch timezone from UTC to Moscow
+      - ./config/php/moscow-timezone:/etc/timezone:ro
+      - ./config/php/moscow-localtime:/etc/localtime:ro
 
     logging:
       driver: json-file
@@ -130,6 +133,9 @@ services:
       - ./config/php/90-php.ini:/etc/php/8.2/cli/conf.d/90-php.ini
       # Cronjobs
       - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
+      # switch timezone from UTC to Moscow
+      - ./config/php/moscow-timezone:/etc/timezone:ro
+      - ./config/php/moscow-localtime:/etc/localtime:ro
 
     logging:
       driver: json-file
