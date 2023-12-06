@@ -27,7 +27,8 @@ INFRA_DIR=/web
 5  1,9,17  *  *  * admin cd $INFRA_DIR && ./scripts/update-dns-token.sh >/dev/null 2>&1
 
 # minify js and css files. rev-cut-rev magic is to remove the file extension.
-10  *  *  *  * root docker run -v /web/web/dev/local:/www/dev -v /web/web/prod/local:/www/prod tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -I{} minify --preserve all -o {}.min.js {}.js"; docker run -v /web/web/dev/local:/www/dev -v /web/web/prod/local:/www/prod tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -I{} minify --preserve all -o {}.min.css {}.css"
+# < /dev/null is needed to prevent minify from getting any STDIN which prevents it from working with files
+10  *  *  *  * root docker run -v /web/web/dev/local:/www/dev -v /web/web/prod/local:/www/prod tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -n1 -I{} minify -o {}.min.js {}.js"; docker run -v /web/web/dev/local:/www/dev -v /web/web/prod/local:/www/prod tdewolff/minify sh -c "find /www -name '*.css' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -n1 -I{} minify -o {}.min.css {}.css"
 
 # cleanup docker runs after 60*24=1440 runs of docker a day in the minimify command
 10 3 * * * root docker system prune -f
