@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 from enum import Enum
 from typing import Optional
 from urllib.parse import urljoin
+from lxml.html import fromstring
 
 import requests
 
@@ -14,6 +15,7 @@ class RunTypes(Enum):
     redirects = 'redirects'
     chain_redirects = 'chain_redirects'
     bad_status_codes = 'bad_status_codes'
+    titles = 'titles'
 
     def __str__(self):
         return self.value
@@ -54,7 +56,7 @@ class UrlChecker:
 
     def check_redirect(self, resp: requests.Response, url: str):
         """Prints URL and status code of the provided response if it has non-200 status code,
-        or URL and it's redirect final destination or the status code in case it's not 301 or 302.
+        or URL, and it's redirect final destination or the status code in case it's not 301 or 302.
         """
         if url != resp.url:
             self.update_redirect(url, resp.url)
@@ -92,6 +94,10 @@ def main(run_type: str, site: str, urls_file: str, update_redirects: bool):
         resp = url_checker.retrieve_url(absolute_url)
         if resp is None:
             continue
+        if run_type == "titles":
+            title = fromstring(resp.content).findtext('.//title')
+            url = resp.url.removeprefix("https://favor-group.ru")
+            print(f"{url};{title}")
         if run_type == "redirects":
             url_checker.check_redirect(resp, absolute_url)
         if run_type == "chain_redirects":
