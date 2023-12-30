@@ -1,5 +1,6 @@
 #[!p][!r][!o][!d] means "does not start with prod"
-/web/logs/nginx/[!p][!r][!o][!d]*.log
+# and [!0-9] means "don't match already rotated files"
+/web/logs/nginx/[!p][!r][!o][!d]*[!0-9].log
 /web/logs/nginx/prod.error.log
 {
 	dateext
