@@ -1,4 +1,5 @@
 /web/logs/mysql/error.log
+/web/logs/mysql/slow.log
 {
 	dateext
 	dateformat .%Y-%m-%d
