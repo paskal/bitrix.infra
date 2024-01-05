@@ -11,15 +11,10 @@ RUN echo http://dl-2.alpinelinux.org/alpine/edge/community/ >> /etc/apk/reposito
 
 # shadow for usermod
 # brotli for compression
-# set-misc for nonce random string generation
-RUN apk add --no-cache nginx-mod-http-brotli nginx-mod-http-set-misc shadow
+RUN apk add --no-cache nginx-mod-http-brotli shadow
 
 RUN usermod -u 1000 nginx
 RUN groupmod -g 1000 nginx
-
-# prepare to switching to non-root - update file permissions of directory containing
-# nginx.lock and nginx.pid file
-RUN chown -R --verbose nginx:nginx /var/run/nginx/ /var/cache/nginx/
 
 # run nginx with configuration reload once in every 6 hours
 CMD /bin/sh -c 'while :; do /bin/sleep 6h & wait ${!}; /usr/sbin/nginx -s reload; done & /usr/sbin/nginx -g "daemon off;"'
