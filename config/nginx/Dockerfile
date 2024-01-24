@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>
       org.opencontainers.image.title="nginx"
 
 # for shadow package
-RUN echo http://dl-2.alpinelinux.org/alpine/edge/community/ >> /etc/apk/repositories
+RUN echo https://dl-2.alpinelinux.org/alpine/edge/community/ >> /etc/apk/repositories
 
 # shadow for usermod
 # brotli for compression
