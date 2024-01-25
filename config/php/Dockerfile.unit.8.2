@@ -50,4 +50,3 @@ COPY nginx-unit.json /docker-entrypoint.d/.unit.conf.json
 EXPOSE 8090 8091 8092 8093
 
 CMD ["unitd", "--no-daemon", "--control", "unix:/var/run/control.unit.sock"]
-

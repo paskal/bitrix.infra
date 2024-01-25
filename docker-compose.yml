@@ -84,7 +84,7 @@ services:
       dockerfile: Dockerfile.unit
     hostname: nginx-unit
     container_name: nginx-unit
-    image: paskal/nginx-unit:8.2-bitrix
+    image: paskal/nginx-unit-bitrix:8.2
     restart: always
     depends_on:
       - memcached
