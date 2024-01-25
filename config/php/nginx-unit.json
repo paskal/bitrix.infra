@@ -1,0 +1,102 @@
+{
+  "listeners": {
+    "0.0.0.0:8090": {
+      "application": "bitrix_urlrewrite_prod"
+    },
+    "0.0.0.0:8091": {
+      "application": "bitrix_direct_prod"
+    },
+    "0.0.0.0:8092": {
+      "application": "bitrix_urlrewrite_dev"
+    },
+    "0.0.0.0:8093": {
+      "application": "bitrix_direct_dev"
+    }
+  },
+  "applications": {
+    "bitrix_urlrewrite_prod": {
+      "type": "php",
+      "processes": {
+        "max": 20,
+        "spare": 5
+      },
+      "root": "/web/prod/",
+      "script": "bitrix/urlrewrite.php",
+      "user": "www-data",
+      "group": "www-data",
+      "options": {
+        "file": "/etc/php.ini",
+        "admin": {
+          "memory_limit": "1536M",
+          "variables_order": "EGPCS",
+          "expose_php": "0"
+        },
+        "user": {
+          "display_errors": "0"
+        }
+      }
+    },
+    "bitrix_direct_prod": {
+      "type": "php",
+      "processes": 20,
+      "root": "/web/prod/",
+      "index": "index.php",
+      "user": "www-data",
+      "group": "www-data",
+      "options": {
+        "file": "/etc/php.ini",
+        "admin": {
+          "memory_limit": "1536M",
+          "variables_order": "EGPCS",
+          "expose_php": "0"
+        },
+        "user": {
+          "display_errors": "0"
+        }
+      }
+    },
+    "bitrix_urlrewrite_dev": {
+      "type": "php",
+      "processes": {
+        "max": 20,
+        "spare": 5
+      },
+      "root": "/web/dev/",
+      "script": "bitrix/urlrewrite.php",
+      "user": "www-data",
+      "group": "www-data",
+      "options": {
+        "file": "/etc/php.ini",
+        "admin": {
+          "memory_limit": "1536M",
+          "variables_order": "EGPCS",
+          "expose_php": "0"
+        },
+        "user": {
+          "display_errors": "1"
+        }
+      }
+    },
+    "bitrix_direct_dev": {
+      "type": "php",
+      "processes": 20,
+      "root": "/web/dev/",
+      "index": "index.php",
+      "user": "www-data",
+      "group": "www-data",
+      "options": {
+        "file": "/etc/php.ini",
+        "admin": {
+          "memory_limit": "1536M",
+          "variables_order": "EGPCS",
+          "expose_php": "0"
+        },
+        "user": {
+          "display_errors": "1"
+        }
+      }
+    }
+  },
+  "access_log": "/var/log/php/unit-access.log"
+}
+
