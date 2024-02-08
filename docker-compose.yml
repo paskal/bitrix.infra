@@ -64,6 +64,7 @@ services:
       - ./config/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
       - ./config/nginx/static-cdn.conf:/etc/nginx/static-cdn.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./private/nginx:/etc/nginx/private.conf.d:ro
       - ./private/letsencrypt:/etc/nginx/letsencrypt:ro
       # Logs
       - ./logs/nginx:/var/log/nginx
