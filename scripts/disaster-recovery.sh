@@ -138,14 +138,26 @@ EOF
 }
 
 memcached_user_setup() {
-  if ! getent group memcached >/dev/null; then
+  if ! getent group | cut -d: -f3 | grep -qx '11211'; then
     echo "creating memcached group"
     groupadd -g 11211 memcached
   fi
 
-  if ! id -u memcached >/dev/null 2>&1; then
+  if ! getent passwd | cut -d: -f3 | grep -qx '11211'; then
     echo "creating memcached user"
     useradd -u 11211 -g memcached memcached
+  fi
+}
+
+mysql_user_setup() {
+  if ! getent group | cut -d: -f3 | grep -qx '1001'; then
+    echo "creating mysql group"
+    groupadd -g 1001 mysql
+  fi
+
+  if ! getent passwd | cut -d: -f3 | grep -qx '1001'; then
+    echo "creating mysql user"
+    useradd -u 1001 -g mysql mysql
   fi
 }
 
@@ -277,6 +289,7 @@ zabbix_setup
 set_up_duplicity
 setup_aws
 memcached_user_setup
+mysql_user_setup
 
 # Backup restoration
 backup_restore
