@@ -13,7 +13,6 @@
 	sharedscripts
 	postrotate
 		/usr/bin/docker exec php /bin/sh -c '[ ! -f /var/run/php-fpm.pid ] || kill -USR1 $(cat /var/run/php-fpm.pid) > /dev/null 2>/dev/null'
-		/usr/bin/docker exec php-8 /bin/sh -c '[ ! -f /var/run/php-fpm.pid ] || kill -USR1 $(cat /var/run/php-fpm.pid) > /dev/null 2>/dev/null'
 	endscript
 }
 
