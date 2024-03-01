@@ -137,6 +137,18 @@ EOF
   echo "done the zabbix set up"
 }
 
+memcached_user_setup() {
+  if ! getent group memcached >/dev/null; then
+    echo "creating memcached group"
+    groupadd -g 11211 memcached
+  fi
+
+  if ! id -u memcached >/dev/null 2>&1; then
+    echo "creating memcached user"
+    useradd -u 11211 -g memcached memcached
+  fi
+}
+
 set_up_duplicity() {
   command -v duplicity >/dev/null && return
   echo "installing duplicity for backups..."
@@ -264,6 +276,7 @@ install_docker_compose_if_not_installed
 zabbix_setup
 set_up_duplicity
 setup_aws
+memcached_user_setup
 
 # Backup restoration
 backup_restore
