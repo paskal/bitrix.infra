@@ -20,3 +20,6 @@
 
 # private folder
 /private
+
+# default directory in linux mount
+/lost+found/
