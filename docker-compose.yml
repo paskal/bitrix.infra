@@ -296,6 +296,7 @@ services:
     environment:
       - LISTEN=0.0.0.0:8080
       - CONF=/etc/updater.yml
+      - APP_UID=1000
     ports:
       - "8080"
     volumes:
