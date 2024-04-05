@@ -214,6 +214,7 @@ services:
     hostname: memcached
     container_name: memcached
     restart: unless-stopped
+    command: ["-m", "128"]
     expose:
       - "11211"
 
@@ -222,6 +223,7 @@ services:
     hostname: memcached-sessions
     container_name: memcached-sessions
     restart: unless-stopped
+    command: ["-m", "128"]
     expose:
       - "11211"
 
