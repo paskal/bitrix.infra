@@ -23,3 +23,6 @@
 
 # default directory in linux mount
 /lost+found/
+
+# backups
+.synosnap_data/
