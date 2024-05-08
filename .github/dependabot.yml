@@ -13,16 +13,3 @@ updates:
       "GitHub Actions updates":
         patterns:
           - "*"
-  - package-ecosystem: "pip"
-    directory: "/scripts"
-    schedule:
-      interval: "monthly"
-    allow:
-      - dependency-name: "*"
-        dependency-type: "all"
-    groups:
-      "Python dependencies updates":
-        dependency-type: "production"
-      "Python dependencies updates for tests":
-        dependency-type: "development"
-
