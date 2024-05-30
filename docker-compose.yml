@@ -44,7 +44,7 @@ services:
     build: ./config/nginx
     hostname: nginx
     container_name: nginx
-    image: paskal/nginx:latest
+    image: ghcr.io/paskal/nginx:latest
     depends_on:
       - adminer
       - php
@@ -85,7 +85,7 @@ services:
       dockerfile: Dockerfile.unit
     hostname: nginx-unit
     container_name: nginx-unit
-    image: paskal/nginx-unit-bitrix:8.2
+    image: ghcr.io/paskal/nginx-unit-bitrix:8.2
     restart: always
     depends_on:
       - memcached
@@ -116,7 +116,7 @@ services:
     build:
       context: ./config/php
       dockerfile: Dockerfile.8.2
-    image: paskal/bitrix-php:8.2
+    image: ghcr.io/paskal/bitrix-php:8.2
     hostname: php
     container_name: php
     depends_on:
@@ -151,7 +151,7 @@ services:
 
   php-cron:
     command: cron -f
-    image: paskal/bitrix-php:8.2
+    image: ghcr.io/paskal/bitrix-php:8.2
     hostname: php-cron
     container_name: php-cron
     depends_on:
@@ -252,7 +252,7 @@ services:
   ## Zabbix Agent 2
   zabbix-agent:
     build: ./config/zabbix
-    image: paskal/zabbix-agent2:latest
+    image: ghcr.io/paskal/zabbix-agent2:latest
     container_name: zabbix-agent
     privileged: true
     # MYSQL_USER, MYSQL_PASSWORD
