@@ -260,6 +260,8 @@ services:
     env_file:
       - private/environment/mysql.env
       - private/environment/zabbix.env
+      # for monitoring purposes, as AUTH_TOKEN is supposed to be set by scripts/update-dns-token.sh
+      - private/environment/dnsrobocert.env
     depends_on:
       - nginx
       - memcached
