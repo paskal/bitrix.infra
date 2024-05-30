@@ -16,6 +16,7 @@ HOME="/home/admin" duplicity \
   --log-file /web/logs/duplicity.log \
   --archive-dir "${cache_dir}" \
   --exclude '**/.git' \
+  --exclude '**/.synosnap_data' \
   --exclude '**/backup/' \
   --exclude '**/logs/' \
   --exclude '**/private/mysqld/' \
