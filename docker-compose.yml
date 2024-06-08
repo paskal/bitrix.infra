@@ -61,6 +61,7 @@ services:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro
       - ./config/nginx/fastcgi.conf:/etc/nginx/fastcgi.conf:ro
+      - ./config/nginx/bots.conf:/etc/nginx/bots.conf:ro
       - ./config/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
       - ./config/nginx/static-cdn.conf:/etc/nginx/static-cdn.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
