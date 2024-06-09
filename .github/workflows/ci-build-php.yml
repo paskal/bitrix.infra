@@ -36,7 +36,7 @@ jobs:
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
           echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
-              --platform linux/amd64,linux/arm/v7,linux/arm64 \
+              --platform linux/amd64,linux/arm64 \
               -f Dockerfile.8.1 \
               -t ghcr.io/paskal/bitrix-php:8.1 -t paskal/bitrix-php:8.1 .
 
@@ -51,7 +51,7 @@ jobs:
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
           echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
-              --platform linux/amd64,linux/arm/v7,linux/arm64 \
+              --platform linux/amd64,linux/arm64 \
               -f Dockerfile.8.2 \
               -t ghcr.io/paskal/bitrix-php:8.2 -t paskal/bitrix-php:8.2 .
 
@@ -66,7 +66,7 @@ jobs:
           echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
           echo ${DOCKER_HUB_TOKEN} | docker login -u paskal --password-stdin
           docker buildx build --push \
-              --platform linux/amd64,linux/arm/v7,linux/arm64 \
+              --platform linux/amd64,linux/arm64 \
               -f Dockerfile.8.3 \
               -t ghcr.io/paskal/bitrix-php:8.3 -t paskal/bitrix-php:8.3 .
 
