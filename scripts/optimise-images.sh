@@ -4,6 +4,12 @@ set -e -u
 # Directories to search for images
 IMAGE_DIRS="web/prod/images web/prod/upload"
 
+# Base find command to locate files in the directories
+FIND_CMD="find $IMAGE_DIRS -type f"
+
+# Find command specifically for locating image files
+FIND_IMAGES_CMD="$FIND_CMD \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -not -iname '*.tmp.webp'"
+
 # This script optimises png, jpeg, and webp images on the site and marks them as optimised, so that they are not processed again.
 # It uses optipng and advancecomp for PNGs, jpegoptim for JPEGs, and cwebp for WebP images.
 # The script is designed to be run as a cron job.
@@ -55,7 +61,7 @@ optimise_webp() {
 
 # Clean up orphaned .optimised and leftover .tmp.webp files
 cleanup_optimised_and_tmp_files() {
-    find $IMAGE_DIRS -type f \( -iname "*.optimised" -o -iname "*.tmp.webp" \) | while read -r file; do
+    $FIND_CMD \( -iname "*.optimised" -o -iname "*.tmp.webp" \) | while read -r file; do
         original_file="${file%.optimised}"
         if [ ! -f "$original_file" ]; then
             rm -f "$file"
@@ -65,8 +71,8 @@ cleanup_optimised_and_tmp_files() {
 
 # Function to calculate and display progress stats
 display_stats() {
-    total=$(find $IMAGE_DIRS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -not -iname "*.tmp.webp" | wc -l)
-    optimised=$(find $IMAGE_DIRS -type f -iname "*.optimised" | wc -l)
+    total=$(eval "$FIND_IMAGES_CMD" | wc -l)
+    optimised=$($FIND_CMD -iname "*.optimised" | wc -l)
     percent=$(awk "BEGIN {printf \"%.2f\", ($optimised/$total)*100}")
     echo "Total images: $total, Optimised images: $optimised, Percentage optimised: $percent%"
 }
@@ -74,7 +80,8 @@ display_stats() {
 # Function to determine file type and optimize accordingly
 optimise_file() {
     local file="$1"
-    local file_type=$(file --mime-type -b "$file")
+    local file_type
+    file_type=$(file --mime-type -b "$file")
 
     case "$file_type" in
         image/png)
@@ -99,10 +106,10 @@ display_stats
 echo "Optimising images..."
 
 # Count the total number of files
-total_files=$(find $IMAGE_DIRS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -not -iname "*.tmp.webp" | wc -l)
+total_files=$(eval "$FIND_IMAGES_CMD" | wc -l)
 
 # Process the files and update progress bar
-find $IMAGE_DIRS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -not -iname "*.tmp.webp" | pv -l -s $total_files | while read -r file; do
+eval "$FIND_IMAGES_CMD" | pv -l -s "$total_files" | while read -r file; do
     if [ ! -f "${file}.optimised" ] || [ "$file" -nt "${file}.optimised" ]; then
         optimise_file "$file"
     fi
