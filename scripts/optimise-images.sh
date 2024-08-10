@@ -40,7 +40,7 @@ optimise_jpeg() {
 optimise_webp() {
     local file="$1"
     local tmpfile="${file}.tmp.webp"
-    if nice -n 10 ionice -c2 -n7 cwebp -q 80 "$file" -o "$tmpfile"; then
+    if nice -n 10 ionice -c2 -n7 cwebp -q 100 "$file" -o "$tmpfile"; then
         mv "$tmpfile" "$file"
         touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
         chmod 600 "$file.optimised"  # Restrict permissions to owner only
