@@ -22,8 +22,8 @@ sudo apt-get -y install optipng advancecomp jpegoptim webp pv >/dev/null
 # Function to optimise PNGs
 optimise_png() {
     local file="$1"
-    if nice -n 10 ionice -c2 -n7 optipng -fix -o7 -preserve "$file" >/dev/null; then
-        if nice -n 10 ionice -c2 -n7 advpng -z4 "$file" >/dev/null; then
+    if nice -n 10 ionice -c2 -n7 optipng -quiet -fix -o7 -preserve "$file"; then
+        if nice -n 10 ionice -c2 -n7 advpng --quiet -z4 "$file"; then
             touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
             chmod 600 "$file.optimised"  # Restrict permissions to owner only
         else
@@ -37,7 +37,7 @@ optimise_png() {
 # Function to optimise JPEGs
 optimise_jpeg() {
     local file="$1"
-    if nice -n 10 ionice -c2 -n7 jpegoptim --strip-none "$file" >/dev/null; then
+    if nice -n 10 ionice -c2 -n7 jpegoptim --quiet --strip-none "$file"; then
         touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
         chmod 600 "$file.optimised"  # Restrict permissions to owner only
     else
