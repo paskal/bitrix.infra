@@ -1,38 +1,41 @@
 #!/usr/bin/env sh
 set -e -u
 
+# Directories to search for images
+IMAGE_DIRS="web/prod/images web/prod/upload"
+
 # This script optimises png, jpeg, and webp images on the site and marks them as optimised, so that they are not processed again.
 # It uses optipng and advancecomp for PNGs, jpegoptim for JPEGs, and cwebp for WebP images.
 # The script is designed to be run as a cron job.
 # It only processes files that have been modified since the last optimisation.
-# It also cleans up orphaned .optimised files.
+# It also cleans up orphaned .optimised and leftover .tmp.webp files and shows a progress bar.
 
 # Install missing packages
-sudo apt -y install optipng advancecomp jpegoptim webp
+sudo apt-get -y install optipng advancecomp jpegoptim webp pv >/dev/null
 
 # Function to optimise PNGs
 optimise_png() {
     local file="$1"
-    if nice -n 10 ionice -c2 -n7 optipng -fix -o7 -preserve "$file"; then
-        if nice -n 10 ionice -c2 -n7 advpng -z4 "$file"; then
+    if nice -n 10 ionice -c2 -n7 optipng -fix -o7 -preserve "$file" >/dev/null; then
+        if nice -n 10 ionice -c2 -n7 advpng -z4 "$file" >/dev/null; then
             touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
             chmod 600 "$file.optimised"  # Restrict permissions to owner only
         else
-            echo "Error: Failed to process $file with advpng. Skipping."
+            echo "Error: Failed to process $file with advpng. Skipping." >&2
         fi
     else
-        echo "Error: Failed to process $file with optipng. Skipping."
+        echo "Error: Failed to process $file with optipng. Skipping." >&2
     fi
 }
 
 # Function to optimise JPEGs
 optimise_jpeg() {
     local file="$1"
-    if nice -n 10 ionice -c2 -n7 jpegoptim --strip-none "$file"; then
+    if nice -n 10 ionice -c2 -n7 jpegoptim --strip-none "$file" >/dev/null; then
         touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
         chmod 600 "$file.optimised"  # Restrict permissions to owner only
     else
-        echo "Error: Failed to process $file with jpegoptim. Skipping."
+        echo "Error: Failed to process $file with jpegoptim. Skipping." >&2
     fi
 }
 
@@ -40,48 +43,76 @@ optimise_jpeg() {
 optimise_webp() {
     local file="$1"
     local tmpfile="${file}.tmp.webp"
-    if nice -n 10 ionice -c2 -n7 cwebp -q 100 "$file" -o "$tmpfile"; then
+    if nice -n 10 ionice -c2 -n7 cwebp -q 100 -quiet "$file" -o "$tmpfile"; then
         mv "$tmpfile" "$file"
         touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
         chmod 600 "$file.optimised"  # Restrict permissions to owner only
     else
-        echo "Error: Failed to process $file with cwebp. Skipping."
+        echo "Error: Failed to process $file with cwebp. Skipping." >&2
         rm -f "$tmpfile"  # Clean up temporary file if optimization fails
     fi
 }
 
-# Clean up orphaned .optimised files
-cleanup_optimised_flags() {
-    find web/prod/images web/prod/upload -type f -iname "*.optimised" | while read -r flag; do
-        original_file="${flag%.optimised}"
+# Clean up orphaned .optimised and leftover .tmp.webp files
+cleanup_optimised_and_tmp_files() {
+    find $IMAGE_DIRS -type f \( -iname "*.optimised" -o -iname "*.tmp.webp" \) | while read -r file; do
+        original_file="${file%.optimised}"
         if [ ! -f "$original_file" ]; then
-            rm -f "$flag"
+            rm -f "$file"
         fi
     done
 }
 
-# Single find command to locate PNG, JPEG, and WebP files, case insensitive
+# Function to calculate and display progress stats
+display_stats() {
+    total=$(find $IMAGE_DIRS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -not -iname "*.tmp.webp" | wc -l)
+    optimised=$(find $IMAGE_DIRS -type f -iname "*.optimised" | wc -l)
+    percent=$(awk "BEGIN {printf \"%.2f\", ($optimised/$total)*100}")
+    echo "Total images: $total, Optimised images: $optimised, Percentage optimised: $percent%"
+}
+
+# Function to determine file type and optimize accordingly
+optimise_file() {
+    local file="$1"
+    local file_type=$(file --mime-type -b "$file")
+
+    case "$file_type" in
+        image/png)
+            optimise_png "$file"
+            ;;
+        image/jpeg)
+            optimise_jpeg "$file"
+            ;;
+        image/webp)
+            optimise_webp "$file"
+            ;;
+        *)
+            echo "Warning: Unsupported file type '$file_type' for file '$file'. Skipping." >&2
+            ;;
+    esac
+}
+
+# Start processing images with progress bar
+echo "Calculating initial statistics..."
+display_stats
+
 echo "Optimising images..."
-find web/prod/images web/prod/upload -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) | while read -r file; do
+
+# Count the total number of files
+total_files=$(find $IMAGE_DIRS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -not -iname "*.tmp.webp" | wc -l)
+
+# Process the files and update progress bar
+find $IMAGE_DIRS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -not -iname "*.tmp.webp" | pv -l -s $total_files | while read -r file; do
     if [ ! -f "${file}.optimised" ] || [ "$file" -nt "${file}.optimised" ]; then
-        # Convert file extension to lowercase
-        extension=$(echo "${file##*.}" | tr '[:upper:]' '[:lower:]')
-        case "$extension" in
-            png)
-                optimise_png "$file"
-                ;;
-            jpg|jpeg)
-                optimise_jpeg "$file"
-                ;;
-            webp)
-                optimise_webp "$file"
-                ;;
-        esac
+        optimise_file "$file"
     fi
 done
 
-# Cleanup orphaned .optimised files
-echo "Cleaning up orphaned .optimised files..."
-cleanup_optimised_flags
+echo "Calculating final statistics..."
+display_stats
+
+# Cleanup orphaned .optimised and leftover .tmp.webp files
+echo "Cleaning up orphaned .optimised and leftover .tmp.webp files..."
+cleanup_optimised_and_tmp_files
 
 echo "Images optimisation and cleanup complete"
