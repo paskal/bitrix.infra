@@ -7,17 +7,17 @@ IMAGE_DIRS="web/prod/images web/prod/upload"
 # Base find command to locate files in the directories
 FIND_CMD="find $IMAGE_DIRS -type f"
 
-# Find command specifically for locating image files
-FIND_IMAGES_CMD="$FIND_CMD \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -not -iname '*.tmp.webp'"
+# Find command specifically for locating image files, now including GIF files
+FIND_IMAGES_CMD="$FIND_CMD \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.gif' \) -not -iname '*.tmp.webp'"
 
-# This script optimises png, jpeg, and webp images on the site and marks them as optimised, so that they are not processed again.
-# It uses optipng and advancecomp for PNGs, jpegoptim for JPEGs, and cwebp for WebP images.
+# This script optimises png, jpeg, webp, and gif images on the site and marks them as optimised, so that they are not processed again.
+# It uses optipng and advancecomp for PNGs, jpegoptim for JPEGs, cwebp for WebP images, and gifsicle for GIFs.
 # The script is designed to be run as a cron job.
 # It only processes files that have been modified since the last optimisation.
 # It also cleans up orphaned .optimised and leftover .tmp.webp files and shows a progress bar.
 
 # Install missing packages
-sudo apt-get -y install optipng advancecomp jpegoptim webp pv >/dev/null
+sudo apt-get -y install optipng advancecomp jpegoptim webp gifsicle pv >/dev/null
 
 # Function to optimise PNGs
 optimise_png() {
@@ -59,6 +59,17 @@ optimise_webp() {
     fi
 }
 
+# Function to optimise GIFs
+optimise_gif() {
+    local file="$1"
+    if nice -n 10 ionice -c2 -n7 gifsicle --optimize=3 --batch "$file"; then
+        touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
+        chmod 600 "$file.optimised"  # Restrict permissions to owner only
+    else
+        echo "Error: Failed to process $file with gifsicle. Skipping." >&2
+    fi
+}
+
 # Clean up orphaned .optimised and leftover .tmp.webp files
 cleanup_optimised_and_tmp_files() {
     $FIND_CMD \( -iname "*.optimised" -o -iname "*.tmp.webp" \) | while read -r file; do
@@ -93,6 +104,9 @@ optimise_file() {
         image/webp)
             optimise_webp "$file"
             ;;
+        image/gif)
+            optimise_gif "$file"
+            ;;
         *)
             echo "Warning: Unsupported file type '$file_type' for file '$file'. Skipping." >&2
             ;;
@@ -123,3 +137,4 @@ echo "Cleaning up orphaned .optimised and leftover .tmp.webp files..."
 cleanup_optimised_and_tmp_files
 
 echo "Images optimisation and cleanup complete"
+
