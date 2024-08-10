@@ -13,18 +13,27 @@ sudo apt -y install optipng advancecomp jpegoptim
 # Function to optimise PNGs
 optimise_png() {
     local file="$1"
-    nice -n 10 ionice -c2 -n7 optipng -fix -o7 -preserve "$file"
-    nice -n 10 ionice -c2 -n7 advpng -z4 "$file"
-    touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
-    chmod 600 "$file.optimised"  # Restrict permissions to owner only
+    if nice -n 10 ionice -c2 -n7 optipng -fix -o7 -preserve "$file"; then
+        if nice -n 10 ionice -c2 -n7 advpng -z4 "$file"; then
+            touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
+            chmod 600 "$file.optimised"  # Restrict permissions to owner only
+        else
+            echo "Error: Failed to process $file with advpng. Skipping."
+        fi
+    else
+        echo "Error: Failed to process $file with optipng. Skipping."
+    fi
 }
 
 # Function to optimise JPEGs
 optimise_jpeg() {
     local file="$1"
-    nice -n 10 ionice -c2 -n7 jpegoptim --strip-none "$file"
-    touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
-    chmod 600 "$file.optimised"  # Restrict permissions to owner only
+    if nice -n 10 ionice -c2 -n7 jpegoptim --strip-none "$file"; then
+        touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
+        chmod 600 "$file.optimised"  # Restrict permissions to owner only
+    else
+        echo "Error: Failed to process $file with jpegoptim. Skipping."
+    fi
 }
 
 # Clean up orphaned .optimised files
