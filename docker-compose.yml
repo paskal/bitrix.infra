@@ -80,39 +80,6 @@ services:
 
     restart: unless-stopped
 
-  nginx-unit:
-    build:
-      context: ./config/php
-      dockerfile: Dockerfile.unit
-    hostname: nginx-unit
-    container_name: nginx-unit
-    image: ghcr.io/paskal/nginx-unit-bitrix:8.2
-    restart: always
-    depends_on:
-      - memcached
-      - memcached-sessions
-    volumes:
-      - ./web/prod:/web/prod
-      - ./web/dev:/web/dev
-      - ./private/msmtprc:/etc/msmtprc
-      # MySQL socket to prevent transferring data through TCP
-      - ./private/mysqld:/var/run/mysqld
-      # Logs
-      - ./logs/php:/var/log/php
-      # configuration
-      - ./config/php/90-php.ini:/etc/php/php.ini
-      - ./config/php/nginx-unit.json:/docker-entrypoint.d/.unit.conf.json
-      # for monitoring purposes
-      - ./logs/nginx:/var/log/nginx
-      # switch timezone from UTC to Moscow
-      - ./config/php/moscow-timezone:/etc/timezone:ro
-      - ./config/php/moscow-localtime:/etc/localtime:ro
-    expose:
-      - "8090" # bitrix_urlrewrite_prod
-      - "8091" # bitrix_direct_prod
-      - "8092" # bitrix_urlrewrite_dev
-      - "8093" # bitrix_direct_dev
-
   php:
     build:
       context: ./config/php
