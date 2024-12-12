@@ -3,6 +3,10 @@
 # logs
 *.log
 
+# intellij idea
+.idea
+.cache
+
 # sql dumps
 *.sql
 
