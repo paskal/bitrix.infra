@@ -27,4 +27,6 @@ HOME="/home/admin" duplicity \
   --exclude '**/web/prod/upload/acrit.core/.tmp' \
   --exclude '**/web/prod/bitrix/managed_cache' \
   --exclude '**/web/prod/bitrix/cache' \
+  --exclude '**/.cache' \
+  --exclude '**/.idea' \
   "${src}" "${dest}"
