@@ -41,7 +41,7 @@ setup_aws() {
   if [ ! -f "/home/$(logname)/.aws/credentials" ]; then
     echo "!! AWS credentials file is absent, won't be able to restore backups without it !!\n"
     echo "Please go by the link and create new static key for the existing service account:"
-    echo "https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn?section=service-accounts\n"
+    echo "https://console.yandex.cloud/folders/b1gm2f812hg4h5s5jsgn/iam/service-accounts\n"
     echo "\
 You'll get ID and secret key, write them to /home/$(logname)/.aws/credentials in the following format:\n\n\
 [default]\n\
