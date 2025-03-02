@@ -39,7 +39,7 @@ jobs:
           docker buildx build \
               --platform linux/amd64 .
 
-      - name: build nginx image for ghcr.io and DockerHub
+      - name: build nginx image for ghcr.io
         working-directory: config/nginx
         if: ${{ github.ref == 'refs/heads/master' }}
         env:
@@ -51,7 +51,7 @@ jobs:
               --platform linux/amd64,linux/arm64 \
               -t ghcr.io/paskal/nginx:latest .
 
-      - name: build Zabbix agent image for ghcr.io and DockerHub
+      - name: build Zabbix agent image for ghcr.io
         working-directory: config/zabbix
         if: ${{ github.ref == 'refs/heads/master' }}
         env:
