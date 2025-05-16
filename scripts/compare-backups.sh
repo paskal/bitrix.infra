@@ -10,7 +10,7 @@ BACKUP_DIR="./backup/restore"
 DEST="boto3+s3://favor-group-backup/duplicity_web_$(hostname)"
 S3_ENDPOINT="https://storage.yandexcloud.net"
 HOME_DIR="/home/admin"  # Duplicity needs HOME to read AWS credentials
-LOGFILE="/web/logs/duplicity.log"
+LOGFILE="/web/logs/compare-backups.log"
 CACHE_DIR="/web/backup/.duplicity-cache"  # Match location in file-backup.sh
 DIFF_FILE="${BACKUP_DIR}/backup_diff.txt"
 
