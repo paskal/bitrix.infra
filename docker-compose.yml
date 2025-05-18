@@ -204,6 +204,7 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: localhost
     volumes:
+      - ./config/adminer/mysql-socket.ini:/usr/local/etc/php/conf.d/mysql-socket.ini
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
 
