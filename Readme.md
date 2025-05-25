@@ -43,6 +43,8 @@ Follow these steps to get your Bitrix environment up and running:
     ```
     This project primarily uses pre-built Docker images from a container registry (like GitHub Container Registry - GHCR). Therefore, running `docker-compose build` or adding the `--build` flag is generally not necessary for standard usage. Docker Compose will automatically pull the specified images if they are not present locally. You would typically only need to use `--build` if you have made custom modifications to the Dockerfiles and need to rebuild the images locally.
 
+    To manage optional services, refer to the "[Managing Optional Services with Profiles](#managing-optional-services-with-profiles)" section.
+
 ## How to make use of it
 
 You couldn't use it as-is without alterations. However, I tried to make everything as generic as possible to make adoption for another project easy. To use it, read through [docker-compose.yml](docker-compose.yml)
@@ -250,6 +252,41 @@ Site files in directories `web/prod` and `web/dev`.
 - `private/mysqld` directory will contain MySQL unix socket for connections without network
 
 - `private/msmtprc` is a file with [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp)
+
+## Managing Optional Services with Profiles
+
+This project uses Docker Compose profiles to manage optional services. This allows you to run only the services you need, saving resources. The core services (`nginx`, `php`, `mysql`, `memcached`, `memcached-sessions`) will always start.
+
+Here are the available profiles and the services they enable:
+
+*   **`certs`**: Enables the `certbot` service (using DNSroboCert technology via the `adferrand/dnsrobocert` image) for managing SSL certificates.
+*   **`cron`**: Enables `php-cron` for running scheduled tasks.
+*   **`monitoring`**: Enables `zabbix-agent` for Zabbix monitoring.
+*   **`dbadmin`**: Enables `adminer` for database administration.
+*   **`hooks`**: Enables `updater` for handling webhooks.
+*   **`ftp`**: Enables `ftp` for FTP access.
+
+**Examples:**
+
+*   To run only the core services:
+    ```bash
+    docker-compose up -d
+    ```
+
+*   To run core services plus `php-cron` and `adminer`:
+    ```bash
+    docker-compose --profile cron --profile dbadmin up -d
+    ```
+    Alternatively, you can list multiple profiles in a single `--profile` flag:
+    ```bash
+    docker-compose --profile cron --profile dbadmin up -d
+    ```
+
+*   To run all services, including all defined profiles:
+    ```bash
+    docker-compose --profile "*" up -d
+    ```
+    As mentioned in "Getting Started," this project uses pre-built images. If you've made custom changes to Dockerfiles or need to ensure you have the absolute latest build not yet reflected in the pre-built images, you can add the `--build` flag (e.g., `docker-compose --profile "*" up --build -d`).
 
 ## Advanced Usage
 

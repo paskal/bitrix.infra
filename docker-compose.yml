@@ -1,5 +1,3 @@
-version: '2'
-
 # Yandex.Cloud external IP with DDoS Protection enabled has a requirement of MTU of 1450
 # according to https://github.com/moby/moby/issues/22297#issuecomment-242934050 that's the only way to set it inside docker-compose
 networks:
@@ -13,6 +11,8 @@ services:
     image: adferrand/dnsrobocert
     hostname: certbot
     container_name: certbot
+    profiles:
+      - certs
     volumes:
       - ./private/letsencrypt:/etc/letsencrypt
       # needed for nginx container autorestart, https://dnsrobocert.readthedocs.io/en/latest/configuration_reference.html#autorestart
@@ -122,6 +122,8 @@ services:
     image: ghcr.io/paskal/bitrix-php:8.2
     hostname: php-cron
     container_name: php-cron
+    profiles:
+      - cron
     depends_on:
       - memcached
       - memcached-sessions
@@ -199,6 +201,8 @@ services:
     image: adminer
     hostname: adminer
     container_name: adminer
+    profiles:
+      - dbadmin
     expose:
       - "8080"
     environment:
@@ -223,6 +227,8 @@ services:
     build: ./config/zabbix
     image: ghcr.io/paskal/zabbix-agent2:latest
     container_name: zabbix-agent
+    profiles:
+      - monitoring
     privileged: true
     # MYSQL_USER, MYSQL_PASSWORD
     # ZBX_HOSTNAME, ZBX_SERVER_HOST
@@ -258,6 +264,8 @@ services:
     image: ghcr.io/umputun/updater:master
     container_name: updater
     hostname: updater
+    profiles:
+      - hooks
     restart: always
     logging:
       driver: json-file
@@ -278,25 +286,26 @@ services:
 
   # FTP access
 
-#  ftp:
-#    image: stilliard/pure-ftpd
-#    container_name: ftp
-#    # FTP_USER_NAME, FTP_USER_PASS
-#    env_file: private/environment/ftp.env
-#    ports:
-#      - "21:21"
-#      - "30000-30009:30000-30009"
-#    volumes:
-#      - ./web/dev:/home/web
-#    environment:
-#      PUBLICHOST: favor-group.ru
-#      FTP_USER_HOME: /home/web
-#      FTP_PASSIVE_PORTS: 30000:30009
-#
-#    logging:
-#      driver: json-file
-#      options:
-#        max-size: "10m"
-#        max-file: "5"
-#
-#    restart: unless-stopped
+  ftp:
+    image: stilliard/pure-ftpd
+    container_name: ftp
+    # FTP_USER_NAME, FTP_USER_PASS
+    env_file: private/environment/ftp.env
+    ports:
+      - "21:21"
+      - "30000-30009:30000-30009"
+    volumes:
+      - ./web/dev:/home/web
+    environment:
+      PUBLICHOST: favor-group.ru
+      FTP_USER_HOME: /home/web
+      FTP_PASSIVE_PORTS: 30000:30009
+    profiles:
+      - ftp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    restart: unless-stopped
