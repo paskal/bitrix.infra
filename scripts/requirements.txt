@@ -1,7 +1,7 @@
-pip==24.*
+pip==25.*
 wheel==0.*
-certifi==2024.*
-idna~=3.*
+certifi==2025.*
+idna==3.*
 urllib3==2.*
-setuptools==70.*
+setuptools==80.*
 requests==2.*
