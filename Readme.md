@@ -162,7 +162,34 @@ return array(
 
 ### /scripts
 
-Bunch of scripts, see their source code for purpose and comments.
+Maintenance and utility scripts for the infrastructure.
+
+#### Site Management
+
+- `renew-dev.sh` - Recreates dev site from production or from an existing backup. Can be run with `--date` flag to restore from a specific backup date instead of creating a fresh dump from production.
+- `disaster-recovery.sh` - Automates disaster recovery process by setting up a fresh Ubuntu server with Docker, restoring files from S3 backup, and recovering MySQL database.
+
+#### Backup and Restore
+
+- `file-backup.sh` - Performs incremental file backups to S3 using duplicity. Excludes cache, logs, and development directories. Full backup every 60 days.
+- `mysql-dump.sh` - Creates compressed MySQL dump and uploads to S3. Excludes user sessions table to reduce backup size.
+- `compare-backups.sh` - Interactive tool to compare two backups from S3, showing differences between selected dates.
+
+#### Maintenance and Optimization
+
+- `fix-rights.sh` - Sets proper file ownership for containers (UID/GID 1000 for PHP/Nginx, 1001 for MySQL). Must be run after file operations.
+- `optimise-images.sh` - Optimizes PNG, JPEG, WebP, and GIF images using various tools. Marks processed files to avoid reprocessing.
+- `find-image-type-mismatch.sh` - Detects images where file extension doesn't match actual MIME type.
+- `alter-robots-txt.sh` - Updates robots.txt files for regional subdomains, blocking specific sections based on region.
+
+#### Monitoring and Analysis
+
+- `check-404.sh` - Analyzes nginx logs to find 404 errors from search engine bots for redirect troubleshooting.
+- `urls.py` - Python utility for checking URLs, finding redirects, broken links, and extracting page titles. Supports updating redirect maps.
+
+#### System Configuration
+
+- `update-dns-token.sh` - Updates Yandex Cloud DNS authentication token for automatic certificate renewal.
 
 ### /web
 
