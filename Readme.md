@@ -10,28 +10,56 @@ You bet! Here is a performance on Yandex.Cloud server with Intel Cascade Lake 8 
 
 <img width="1100" alt="image" src="https://user-images.githubusercontent.com/712534/172490266-88710b9f-3776-4c5b-9852-590181d1d204.png">
 
+## Getting Started
+
+Follow these steps to get your Bitrix environment up and running:
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/paskal/bitrix.infra.git
+    cd bitrix.infra
+    ```
+
+2.  **Create Environment Files:**
+    Navigate to the `private/environment/` directory. You will need to create several environment files based on the templates or examples provided. These include:
+    *   `mysql.env`
+    *   `ftp.env`
+    *   `dnsrobocert.env` (Note: this file is for the `certbot` service, which uses DNSroboCert technology)
+    *   `zabbix.env`
+    *   `updater.env`
+    Detailed information about the required variables for each file can be found in the "[File structure > /private > private/environment](#privateenvironment)" section of this Readme.
+
+3.  **Set File Permissions:**
+    Before starting the containers for the first time, it's crucial to set the correct file and directory permissions. Run the provided script:
+    ```bash
+    sudo ./scripts/fix-rights.sh
+    ```
+    This script ensures that services like MySQL, PHP, and Nginx have the necessary access rights. See the "[File system permissions](#file-system-permissions)" section for more details.
+
+4.  **Start the Services:**
+    Use Docker Compose to start the services. For a basic setup with only core services, run:
+    ```bash
+    docker-compose up -d
+    ```
+    This project primarily uses pre-built Docker images from a container registry (like GitHub Container Registry - GHCR). Therefore, running `docker-compose build` or adding the `--build` flag is generally not necessary for standard usage. Docker Compose will automatically pull the specified images if they are not present locally. You would typically only need to use `--build` if you have made custom modifications to the Dockerfiles and need to rebuild the images locally.
+
 ## How to make use of it
 
 You couldn't use it as-is without alterations. However, I tried to make everything as generic as possible to make adoption for another project easy. To use it, read through [docker-compose.yml](docker-compose.yml)
-and then read the rest of this Readme.
-
-After you make adjustments to configuration and docker-compose.yml, run it as follows:
-
-```bash
-docker-compose up --build -d
-```
+and then read the rest of this Readme. For information about maintenance and utility scripts, see [scripts/README.md](scripts/README.md).
 
 [bitrixdock](https://github.com/bitrixdock/bitrixdock) (Russian) project was an inspiration for this one and had way better setup instructions. Please start with it if you don't know what to do with many files in that repo.
 
 ### File system permissions
 
-All files touched by MySQL use UID/GID 1001, and PHP and Nginx use UID/GID 1000. Running `scripts/fix-rights.sh` script would set the permissions appropriately for all containers to run correctly.
+All files touched by MySQL use UID/GID 1001, and PHP and Nginx use UID/GID 1000.
+**It is crucial to run the `sudo ./scripts/fix-rights.sh` script after cloning the repository and creating your environment files, and before running `docker-compose up` for the first time.** This script sets the permissions appropriately for all containers to run correctly.
 
 It might be easier to switch everything to User and Group 1000 for consistency later.
 
 ### Relevant parts of Bitrix config
 
-Documentation: sessions [1](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24868) [2](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24870) (ru [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.3435.4816.14028.14026), [2](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=32&LESSON_ID=9421)), [cache](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&CHAPTER_ID=05962&LESSON_PATH=5936.5959.5962) ([ru](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=43&LESSON_ID=2795))
+Documentation: sessions [1](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24868) [2](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24870) (ru [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.3435.4816.14028.14026), [2](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=32&LESSON_ID=9421)), [cache](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&CHAPTER_ID=05962&LESSON_PATH=5936.5959.5962) ([ru](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=43&LESSON_ID=2795))
 
 <details><summary>bitrix/php_interface/dbconn.php</summary>
 
@@ -131,11 +159,12 @@ return array(
 
 ### Optional
 
-- PHP cron container with same settings as PHP serving web requests
-- [adminer](https://www.adminer.org/) [![Image Size](https://img.shields.io/docker/image-size/_/adminer)](https://hub.docker.com/r/_/adminer) as phpmyadmin alternative for work with MySQL
-- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) [![Image Size](https://img.shields.io/docker/image-size/stilliard/pure-ftpd)](https://hub.docker.com/r/stilliard/pure-ftpd) for ftp access
-- [DNSroboCert](https://github.com/adferrand/dnsrobocert) [![Image Size](https://img.shields.io/docker/image-size/adferrand/dnsrobocert)](https://hub.docker.com/r/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation
-- [zabbix-agent2](https://www.zabbix.com/zabbix_agent) [![Image Size](https://img.shields.io/docker/image-size/paskal/zabbix-agent2)](https://hub.docker.com/r/paskal/zabbix-agent2) for monitoring
+- PHP cron container (`php-cron`) with same settings as PHP serving web requests
+- [adminer](https://www.adminer.org/) (`adminer`) [![Image Size](https://img.shields.io/docker/image-size/_/adminer)](https://hub.docker.com/r/_/adminer) as phpmyadmin alternative for work with MySQL
+- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) (`ftp`) [![Image Size](https://img.shields.io/docker/image-size/stilliard/pure-ftpd)](https://hub.docker.com/r/stilliard/pure-ftpd) for ftp access
+- [DNSroboCert](https://github.com/adferrand/dnsrobocert) (`certbot`) [![Image Size](https://img.shields.io/docker/image-size/adferrand/dnsrobocert)](https://hub.docker.com/r/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation using the `adferrand/dnsrobocert` image.
+- [zabbix-agent2](https://www.zabbix.com/zabbix_agent) (`zabbix-agent`) [![Image Size](https://img.shields.io/docker/image-size/paskal/zabbix-agent2)](https://hub.docker.com/r/paskal/zabbix-agent2) for monitoring
+- Webhooks server (`updater`) for automated tasks.
 
 ## File structure
 
@@ -154,7 +183,7 @@ return array(
     - HTTP to HTTPS redirects
     - stub status page listening on localhost for Zabbix monitoring
 
-- `php-fpm` directory contains the build Dockerfile and php configuration, applied on top of package-provided one
+- `php` directory contains the build Dockerfiles (e.g., `Dockerfile.8.1`, `Dockerfile.8.2`, `Dockerfile.8.3`) and php configuration, applied on top of package-provided one.
 
 ### /logs
 
@@ -162,39 +191,13 @@ return array(
 
 ### /scripts
 
-Maintenance and utility scripts for the infrastructure.
-
-#### Site Management
-
-- `renew-dev.sh` - Recreates dev site from production or from an existing backup. Can be run with `--date` flag to restore from a specific backup date instead of creating a fresh dump from production.
-- `disaster-recovery.sh` - Automates disaster recovery process by setting up a fresh Ubuntu server with Docker, restoring files from S3 backup, and recovering MySQL database.
-
-#### Backup and Restore
-
-- `file-backup.sh` - Performs incremental file backups to S3 using duplicity. Excludes cache, logs, and development directories. Full backup every 60 days.
-- `mysql-dump.sh` - Creates compressed MySQL dump and uploads to S3. Excludes user sessions table to reduce backup size.
-- `compare-backups.sh` - Interactive tool to compare two backups from S3, showing differences between selected dates.
-
-#### Maintenance and Optimization
-
-- `fix-rights.sh` - Sets proper file ownership for containers (UID/GID 1000 for PHP/Nginx, 1001 for MySQL). Must be run after file operations.
-- `optimise-images.sh` - Optimizes PNG, JPEG, WebP, and GIF images using various tools. Marks processed files to avoid reprocessing.
-- `find-image-type-mismatch.sh` - Detects images where file extension doesn't match actual MIME type.
-- `alter-robots-txt.sh` - Updates robots.txt files for regional subdomains, blocking specific sections based on region.
-
-#### Monitoring and Analysis
-
-- `check-404.sh` - Analyzes nginx logs to find 404 errors from search engine bots for redirect troubleshooting.
-- `urls.py` - Python utility for checking URLs, finding redirects, broken links, and extracting page titles. Supports updating redirect maps.
-
-#### System Configuration
-
-- `update-dns-token.sh` - Updates Yandex Cloud DNS authentication token for automatic certificate renewal.
+Maintenance and utility scripts for the infrastructure. See [scripts/README.md](scripts/README.md) for detailed documentation of each script.
 
 ### /web
 
 Site files in directories `web/prod` and `web/dev`.
 
+<span id="privateenvironment"></span>
 ### /private
 
 - `private/environment` is a directory with environment files for docker-compose
@@ -214,12 +217,16 @@ Site files in directories `web/prod` and `web/dev`.
       FTP_USER_PASS=ftp_password
       ```
 
-    - `private/environment/dnsrobocert.env` should contain Yandex Cloud DNS API key for [adferrand/dnsrobocert](https://hub.docker.com/r/adferrand/dnsrobocert):
+    - `private/environment/dnsrobocert.env` should contain Yandex Cloud DNS API key for the `certbot` service (which uses the [adferrand/dnsrobocert](https://hub.docker.com/r/adferrand/dnsrobocert) image):
 
       ```
       # Run `yc components update` once to get the key, and `update-dns-token.sh` script will renew it automatically afterwards
       AUTH_KEY=insert_key_there
       DNS_ZONE_ID=insert_zone_id_there
+      ```
+    - `private/environment/updater.env` should contain a secret key for the updater service:
+      ```bash
+      KEY=your_secret_key_here
       ```
 
   - `private/environment/zabbix.env` should contain the [following variables](https://hub.docker.com/r/zabbix/zabbix-agent2):
@@ -236,13 +243,52 @@ Site files in directories `web/prod` and `web/dev`.
     grant process, replication client, show databases, show view on *.* to `zbx_monitor`@`localhost`;
     ```
 
-- `private/letsencrypt` directory will be filled with certificates after certbot run (see instruction below)
+- `private/letsencrypt` directory will be filled with certificates after the `certbot` service (using DNSroboCert technology) runs.
 
 - `private/mysql-data` directory will be filled with database data automatically after the start of mysql container
 
 - `private/mysqld` directory will contain MySQL unix socket for connections without network
 
 - `private/msmtprc` is a file with [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp)
+
+## Advanced Usage
+
+### Switching PHP Versions
+
+This project is configured to support multiple PHP versions. Dockerfiles for different versions (e.g., 8.1, 8.2, 8.3) are available in the `config/php/` directory.
+
+To switch the PHP version used by the `php` and `php-cron` services:
+
+1.  **Edit `docker-compose.yml`:**
+    *   Locate the `php` service definition.
+    *   Modify the `build.context` and `build.dockerfile` to point to the desired Dockerfile. For example, to switch to PHP 8.3:
+        ```yaml
+        php:
+          build:
+            context: ./config/php
+            dockerfile: Dockerfile.8.3 # Changed from Dockerfile.8.2
+          image: ghcr.io/paskal/bitrix-php:8.3 # Update image tag
+          # ... rest of the service definition
+        ```
+    *   Repeat the same changes for the `php-cron` service definition, ensuring the `image` tag is also updated.
+
+2.  **Rebuild the PHP images:**
+    This is a scenario where you *would* need to build the images:
+    ```bash
+    docker-compose build php php-cron
+    # Or, if you are starting the services at the same time:
+    # docker-compose up -d --build php php-cron 
+    # (or simply 'docker-compose up -d --build' if you want to ensure all buildable services are updated)
+    ```
+    After building, you can start the services as usual:
+    ```bash
+    docker-compose up -d
+    ```
+
+
+For a more dynamic approach to switching PHP versions, you could consider:
+*   Using an environment variable (e.g., `PHP_VERSION`) in your `docker-compose.yml` to specify the Dockerfile path and image tag. You would then set this variable in your shell or a `.env` file.
+*   Utilizing Docker Compose override files to specify different PHP configurations.
 
 ## Routine operations
 
@@ -306,11 +352,12 @@ echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
 <details>
 <summary>Manual certificate renewal</summary>
 
-DNS verification of a wildcard certificate is set up automatically through [CloudFlare](https://cloudflare.com/) DNS.
+DNS verification of a wildcard certificate is set up automatically through Yandex Cloud DNS via the `certbot` service (which uses DNSroboCert technology via the `adferrand/dnsrobocert` image).
 
-To renew the certificate manually, run the following command and follow the interactive prompt:
+To renew the certificate manually, if needed, you can run the following command which uses the `certbot` command available within the `certbot` service's container (which runs `adferrand/dnsrobocert`):
 
 ```shell
+# Note: The service is certbot, and the command inside is also certbot
 docker-compose run --rm --entrypoint "\
   certbot certonly \
     --email email@example.com \
@@ -320,6 +367,7 @@ docker-compose run --rm --entrypoint "\
     --preferred-challenges dns" certbot
 ```
 
-To add required TXT entries, head to DNS entries page of your provider.
+To add required TXT entries, head to DNS entries page of your provider (Yandex Cloud).
+The `certbot` service is configured to handle renewals automatically.
 
 </details>
