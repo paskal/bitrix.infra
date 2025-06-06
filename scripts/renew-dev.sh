@@ -8,6 +8,12 @@ fi
 
 # This script recreates dev site from current prod one with deleting old dev in the process
 
+# Parse command line arguments
+USE_EXISTING_BACKUP=0
+if [ $# -eq 1 ] && [ "$1" = "--date" ]; then
+  USE_EXISTING_BACKUP=1
+fi
+
 # Domain names
 DOMAIN=favor-group.ru
 DEV_SUBDOMAIN=dev
@@ -23,9 +29,48 @@ DEV_PASSWORD=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 32 | head -n 1)
 # File path variables
 PROD_LOCATION="./web/prod"
 DEV_LOCATION="./web/${DEV_SUBDOMAIN}"
+BACKUP_LOCATION="./backup"
 
 # Sanity checks before the run
 [ -d "${PROD_LOCATION}" ] || (echo "${PROD_LOCATION} (prod location) directory is absent" && exit 45)
+
+# If --date is provided, validate backup directory exists and select backup file
+if [ ${USE_EXISTING_BACKUP} -eq 1 ]; then
+  [ -d "${BACKUP_LOCATION}" ] || (echo "${BACKUP_LOCATION} (backup location) directory is absent" && exit 47)
+  
+  # List available backup directories
+  echo "Available backup dates:"
+  ls -1 ${BACKUP_LOCATION}/ | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | sort -r | head -20
+  
+  # Ask user to select a date
+  printf "Enter the backup date (YYYY-MM-DD): "
+  read -r BACKUP_DATE
+  
+  # Check if directory exists
+  if [ ! -d "${BACKUP_LOCATION}/${BACKUP_DATE}" ]; then
+    echo "Error: Backup directory ${BACKUP_LOCATION}/${BACKUP_DATE} does not exist"
+    exit 1
+  fi
+  
+  # List files in selected directory
+  echo "Available backup files for ${BACKUP_DATE}:"
+  ls -1 "${BACKUP_LOCATION}/${BACKUP_DATE}/" | grep "mysqldump.sql.gz$" || (echo "No backup files found" && exit 1)
+  
+  # Ask user to select a file
+  printf "Enter the backup filename: "
+  read -r BACKUP_FILE
+  
+  # Full path to backup
+  BACKUP_PATH="${BACKUP_LOCATION}/${BACKUP_DATE}/${BACKUP_FILE}"
+  
+  # Check if file exists
+  if [ ! -f "${BACKUP_PATH}" ]; then
+    echo "Error: Backup file ${BACKUP_PATH} does not exist"
+    exit 1
+  fi
+  
+  echo "Selected backup: ${BACKUP_PATH}"
+fi
 
 # read MYSQL_ROOT_PASSWORD
 [ -f "./private/environment/mysql.env" ] || (echo "./private/environment/mysql.env file is absent, couldn't read MYSQL_ROOT_PASSWORD variable" && exit 46)
@@ -58,13 +103,19 @@ ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container
 ${mysql_binary_path}/mysql --defaults-extra-file=${mysql_config_inside_container} -e 'flush privileges;'
 
 # create and load database dump
-# --no-tablespaces allows running not from root (not used currently)
-# --single-transaction will start a transaction before running
-# first --no-data run just dumps the schema for all tables,
-# second --ignore-table run ignores data from user sessions as we don't need to transfer it
-echo "Creating mysql dump"
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --no-data ${PROD_DB} >prod-dump.sql
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>prod-dump.sql
+if [ ${USE_EXISTING_BACKUP} -eq 1 ]; then
+  echo "Using existing backup: ${BACKUP_PATH}"
+  # Decompress the backup to prod-dump.sql
+  zcat "${BACKUP_PATH}" > prod-dump.sql
+else
+  # --no-tablespaces allows running not from root (not used currently)
+  # --single-transaction will start a transaction before running
+  # first --no-data run just dumps the schema for all tables,
+  # second --ignore-table run ignores data from user sessions as we don't need to transfer it
+  echo "Creating mysql dump"
+  ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --no-data ${PROD_DB} >prod-dump.sql
+  ${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>prod-dump.sql
+fi
 # shellcheck disable=SC2028
 echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" >${mysql_config_file}
 echo "Restoring mysql dump for dev"
