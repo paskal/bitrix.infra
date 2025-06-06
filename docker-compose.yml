@@ -122,8 +122,6 @@ services:
     image: ghcr.io/paskal/bitrix-php:8.2
     hostname: php-cron
     container_name: php-cron
-    profiles:
-      - cron
     depends_on:
       - memcached
       - memcached-sessions

@@ -255,12 +255,13 @@ Site files in directories `web/prod` and `web/dev`.
 
 ## Managing Optional Services with Profiles
 
-This project uses Docker Compose profiles to manage optional services. This allows you to run only the services you need, saving resources. The core services (`nginx`, `php`, `mysql`, `memcached`, `memcached-sessions`) will always start.
+This project uses Docker Compose profiles to manage optional services. This allows you to run only the services you need, saving resources. The core services (`nginx`, `php`, `php-cron`, `mysql`, `memcached`, `memcached-sessions`) will always start.
+
+**⚠️ Breaking Change Notice**: If you were previously running services like `adminer`, `zabbix-agent`, `updater`, or `ftp`, they will no longer start automatically with `docker-compose up -d`. You must now explicitly enable them using profiles (see examples below) or set the `COMPOSE_PROFILES` environment variable.
 
 Here are the available profiles and the services they enable:
 
 *   **`certs`**: Enables the `certbot` service (using DNSroboCert technology via the `adferrand/dnsrobocert` image) for managing SSL certificates.
-*   **`cron`**: Enables `php-cron` for running scheduled tasks.
 *   **`monitoring`**: Enables `zabbix-agent` for Zabbix monitoring.
 *   **`dbadmin`**: Enables `adminer` for database administration.
 *   **`hooks`**: Enables `updater` for handling webhooks.
@@ -273,13 +274,19 @@ Here are the available profiles and the services they enable:
     docker-compose up -d
     ```
 
-*   To run core services plus `php-cron` and `adminer`:
+*   To run core services plus `adminer` and `ftp`:
     ```bash
-    docker-compose --profile cron --profile dbadmin up -d
+    docker-compose --profile dbadmin --profile ftp up -d
     ```
-    Alternatively, you can list multiple profiles in a single `--profile` flag:
+
+*   Alternatively, you can set profiles using the `COMPOSE_PROFILES` environment variable:
     ```bash
-    docker-compose --profile cron --profile dbadmin up -d
+    COMPOSE_PROFILES=dbadmin,ftp docker-compose up -d
+    ```
+    Or export it for the session:
+    ```bash
+    export COMPOSE_PROFILES=dbadmin,ftp
+    docker-compose up -d
     ```
 
 *   To run all services, including all defined profiles:
