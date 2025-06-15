@@ -44,6 +44,12 @@ COPY ./xdebug.ini /etc/php/8.3/mods-available/xdebug.ini
 RUN usermod -u 1000 www-data
 RUN groupmod -g 1000 www-data
 
+# Security: prevent www-data from using cron and harden file permissions
+RUN echo "www-data" >> /etc/cron.deny && \
+    chmod 644 /etc/cron.deny && \
+    chmod -R 755 /etc/php/ && \
+    chown -R root:root /etc/php/
+
 HEALTHCHECK --interval=30s --timeout=10s --retries=10 --start-period=10s \
   CMD php --ini || exit 1
 

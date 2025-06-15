@@ -92,6 +92,11 @@ services:
       - memcached-sessions
     expose:
       - "9000"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
@@ -125,6 +130,11 @@ services:
     depends_on:
       - memcached
       - memcached-sessions
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
