@@ -11,4 +11,7 @@ USER 0
 # ERROR 1045 (28000): Plugin caching_sha2_password could not be loaded: Error loading shared library /usr/lib/mariadb/plugin/caching_sha2_password.so: No such file or directory
 RUN apk add --no-cache mysql-client mariadb-connector-c
 
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD zabbix_agent2 -t agent.ping || exit 1
+
 USER 1997
