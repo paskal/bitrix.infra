@@ -12,54 +12,34 @@ jobs:
     name: Build PHP Docker images
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        php-version: ['8.1', '8.2', '8.3']
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up QEMU
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: set up Docker Buildx
-        id: buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: build PHP 8.1 image for ghcr.io
-        working-directory: config/php
-        if: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          USERNAME: ${{ github.actor }}
-        run: |
-          echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          docker buildx build --push \
-              --platform linux/amd64,linux/arm64 \
-              -f Dockerfile.8.1 \
-              -t ghcr.io/paskal/bitrix-php:8.1 .
-
-      - name: build PHP 8.2 image for ghcr.io
-        working-directory: config/php
-        if: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          USERNAME: ${{ github.actor }}
-        run: |
-          echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          docker buildx build --push \
-              --platform linux/amd64,linux/arm64 \
-              -f Dockerfile.8.2 \
-              -t ghcr.io/paskal/bitrix-php:8.2 .
-
-      - name: build PHP 8.3 image for ghcr.io
-        working-directory: config/php
-        if: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          USERNAME: ${{ github.actor }}
-        run: |
-          echo ${GITHUB_PACKAGE_TOKEN} | docker login ghcr.io -u ${USERNAME} --password-stdin
-          docker buildx build --push \
-              --platform linux/amd64,linux/arm64 \
-              -f Dockerfile.8.3 \
-              -t ghcr.io/paskal/bitrix-php:8.3 .
+      - name: Build and push PHP ${{ matrix.php-version }} image
+        uses: docker/build-push-action@v5
+        with:
+          context: config/php
+          file: config/php/Dockerfile.${{ matrix.php-version }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/paskal/bitrix-php:${{ matrix.php-version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
