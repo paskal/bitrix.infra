@@ -185,6 +185,11 @@ services:
     command: ["-m", "128"]
     expose:
       - "11211"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo stats | nc localhost 11211"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   memcached-sessions:
     image: memcached:1-alpine
@@ -194,6 +199,11 @@ services:
     command: ["-m", "128"]
     expose:
       - "11211"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo stats | nc localhost 11211"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   adminer:
     image: adminer
@@ -209,6 +219,11 @@ services:
       - ./config/adminer/mysql-socket.ini:/usr/local/etc/php/conf.d/mysql-socket.ini
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
     logging:
       driver: json-file
