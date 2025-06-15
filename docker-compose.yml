@@ -94,7 +94,6 @@ services:
       - "9000"
     security_opt:
       - no-new-privileges:true
-    read_only: true
     tmpfs:
       - /tmp
     volumes:
@@ -132,7 +131,6 @@ services:
       - memcached-sessions
     security_opt:
       - no-new-privileges:true
-    read_only: true
     tmpfs:
       - /tmp
     volumes:
