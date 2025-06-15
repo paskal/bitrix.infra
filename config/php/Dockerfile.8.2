@@ -4,11 +4,13 @@ FROM phpdockerio/php:8.2-fpm
 LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>" \
       org.opencontainers.image.description="PHP-fpm 8.2 with everything needed for Bitrix" \
       org.opencontainers.image.documentation="https://github.com/paskal/bitrix.infra" \
-      org.opencontainers.image.source="https://github.com/paskal/bitrix.infra.git" \
-      org.opencontainers.image.title="php"
+      org.opencontainers.image.source="https://github.com/paskal/bitrix.infra" \
+      org.opencontainers.image.title="bitrix-php-8.2" \
+      org.opencontainers.image.vendor="Dmitry Verkhoturov"
 
-RUN apt-get update \
-    && apt-get -y --no-install-recommends install \
+RUN apt-get update
+
+RUN apt-get -y --no-install-recommends install \
     php8.2-gd \
     php8.2-imagick \
     php8.2-interbase \
@@ -22,18 +24,21 @@ RUN apt-get update \
     php8.2-redis \
     php8.2-soap \
     php8.2-xdebug \
-    php8.2-zip \
+    php8.2-zip
+
+RUN apt-get -y --no-install-recommends install \
     webp \
     msmtp \
     msmtp-mta \
     sudo \
-    cron \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
+    cron
 
 # msmtp to allow email sending
 # msmtp-mta to allow sendmail usage with msmtp
 # sudo to allow create logfile with www-data user
 # cron to run cronjobs in a separate container
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 # without this, php in the container won't work if you forget to mount 90-php.ini
 COPY ./90-php.ini /etc/php/8.2/fpm/conf.d/90-php.ini
@@ -41,10 +46,9 @@ COPY ./90-php.ini /etc/php/8.2/cli/conf.d/90-php.ini
 # disable xdebug by default as it affects performance badly
 COPY ./xdebug.ini /etc/php/8.2/mods-available/xdebug.ini
 
-RUN usermod -u 1000 www-data
-RUN groupmod -g 1000 www-data
+RUN usermod -u 1000 www-data && \
+    groupmod -g 1000 www-data
 
-# Security: prevent www-data from using cron and harden file permissions
 RUN echo "www-data" >> /etc/cron.deny && \
     chmod 644 /etc/cron.deny && \
     chmod -R 755 /etc/php/ && \
