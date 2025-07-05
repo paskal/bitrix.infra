@@ -12,7 +12,7 @@ RUN echo https://dl-2.alpinelinux.org/alpine/edge/community/ >> /etc/apk/reposit
 
 # shadow for usermod
 # brotli for compression
-RUN apk add --no-cache nginx-mod-http-brotli shadow
+RUN apk add --no-cache nginx-mod-http-brotli nginx-mod-http-lua shadow
 
 RUN usermod -u 1000 nginx
 RUN groupmod -g 1000 nginx
