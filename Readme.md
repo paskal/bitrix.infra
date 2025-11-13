@@ -66,24 +66,25 @@ Documentation: sessions [1](https://training.bitrix24.com/support/training/cours
 <details><summary>bitrix/php_interface/dbconn.php</summary>
 
 ```php
+// Enable cron-based agent execution
 define('BX_CRONTAB_SUPPORT', true);
 
-define("BX_USE_MYSQLI", true);
-define("DBPersistent", true);
-define("DELAY_DB_CONNECT", true);
+// Database connection (legacy, also configured in .settings.php)
 $DBType = "mysql";
 $DBHost = "localhost";
 $DBName = "<DBNAME>";
 $DBLogin = "<DBUSER>";
 $DBPassword = "<DBPASSWORD>";
+
+// Temporary files directory
 define('BX_TEMPORARY_FILES_DIRECTORY', '/tmp');
 
-define("BX_CACHE_TYPE", "memcached");
-define("BX_CACHE_SID", $_SERVER["DOCUMENT_ROOT"]."#01");
-define("BX_MEMCACHE_HOST", "memcached");
-define("BX_MEMCACHE_PORT", "11211");
-define('BX_SECURITY_SESSION_MEMCACHE_HOST', 'memcached');
-define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
+// Standard Bitrix configuration
+define("BX_UTF", true);
+define("BX_FILE_PERMISSIONS", 0644);
+define("BX_DIR_PERMISSIONS", 0755);
+@umask(~(BX_FILE_PERMISSIONS|BX_DIR_PERMISSIONS)&0777);
+define("BX_DISABLE_INDEX_PAGE", true);
 ```
 
 </details>
@@ -101,8 +102,8 @@ define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
       'kernel'  => 'encrypted_cookies',
       'general' =>
       array (
-        'type' => 'memcached',
-        'host' => 'memcached',
+        'type' => 'memcache',
+        'host' => 'memcached-sessions',
         'port' => '11211',
       ),
     ),
@@ -120,7 +121,7 @@ define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
         'database' => '<DBNAME>',
         'login' => '<DBUSER>',
         'password' => '<DBPASSWORD>',
-        'options' => 2.0,
+        'options' => 3,
       ),
     ),
     'readonly' => true,
