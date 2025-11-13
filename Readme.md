@@ -78,7 +78,7 @@ $DBLogin = "<DBUSER>";
 $DBPassword = "<DBPASSWORD>";
 define('BX_TEMPORARY_FILES_DIRECTORY', '/tmp');
 
-define("BX_CACHE_TYPE", "memcache");
+define("BX_CACHE_TYPE", "memcached");
 define("BX_CACHE_SID", $_SERVER["DOCUMENT_ROOT"]."#01");
 define("BX_MEMCACHE_HOST", "memcached");
 define("BX_MEMCACHE_PORT", "11211");
@@ -101,7 +101,7 @@ define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
       'kernel'  => 'encrypted_cookies',
       'general' =>
       array (
-        'type' => 'memcache',
+        'type' => 'memcached',
         'host' => 'memcached',
         'port' => '11211',
       ),
@@ -136,11 +136,28 @@ define('BX_SECURITY_SESSION_MEMCACHE_PORT', 11211);
 return array(
   'cache' => array(
     'value' => array(
-      'type' => 'memcache',
-      'memcache' => array(
+      // For PHP 8.0+ use memcached instead of deprecated memcache.
+      // The php-memcached extension is actively maintained, works with libmemcached
+      // and provides better performance on modern PHP versions.
+      'type' => 'memcached',
+      'memcached' => array(
         'host' => 'memcached',
         'port' => '11211',
       ),
+
+      // The igbinary serializer reduces cache size by ~50% compared to
+      // the standard PHP serializer and is faster at deserialization.
+      // Value 2 = Memcached::SERIALIZER_IGBINARY
+      // Requires php-igbinary extension to be installed
+      'serializer' => 2,
+
+      // Lock mode (use_lock) prevents simultaneous cache regeneration
+      // by multiple processes. Under high load, only one process
+      // generates cache, others receive stale data.
+      // Requires Bitrix main module version 24.0.0 or higher.
+      // More info: https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=43&LESSON_ID=3485
+      'use_lock' => true,
+
       'sid' => $_SERVER["DOCUMENT_ROOT"]."#01"
     ),
   ),
