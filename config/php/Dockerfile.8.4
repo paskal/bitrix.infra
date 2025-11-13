@@ -1,0 +1,62 @@
+FROM phpdockerio/php:8.4-fpm
+# https://github.com/bitrixdock/bitrixdock/blob/master/php/php84/Dockerfile
+
+LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>" \
+      org.opencontainers.image.description="PHP-fpm 8.4 with everything needed for Bitrix" \
+      org.opencontainers.image.documentation="https://github.com/paskal/bitrix.infra" \
+      org.opencontainers.image.source="https://github.com/paskal/bitrix.infra" \
+      org.opencontainers.image.title="bitrix-php-8.4" \
+      org.opencontainers.image.vendor="Dmitry Verkhoturov"
+
+RUN apt-get update
+
+RUN apt-get -y --no-install-recommends install \
+    php8.4-gd \
+    php8.4-imagick \
+    php8.4-interbase \
+    php8.4-intl \
+    php8.4-mbstring \
+    php8.4-mcrypt \
+    php8.4-memcache \
+    php8.4-memcached \
+    php8.4-mysql \
+    php8.4-opcache \
+    php8.4-redis \
+    php8.4-soap \
+    php8.4-xdebug \
+    php8.4-zip
+
+RUN apt-get -y --no-install-recommends install \
+    webp \
+    msmtp \
+    msmtp-mta \
+    sudo \
+    cron
+
+# msmtp to allow email sending
+# msmtp-mta to allow sendmail usage with msmtp
+# sudo to allow create logfile with www-data user
+# cron to run cronjobs in a separate container
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
+
+# without this, php in the container won't work if you forget to mount 90-php.ini
+COPY ./90-php.ini /etc/php/8.4/fpm/conf.d/90-php.ini
+COPY ./90-php.ini /etc/php/8.4/cli/conf.d/90-php.ini
+# disable xdebug by default as it affects performance badly
+COPY ./xdebug.ini /etc/php/8.4/mods-available/xdebug.ini
+
+RUN groupmod -g 2000 ubuntu && \
+    usermod -u 2000 -g 2000 ubuntu && \
+    usermod -u 1000 www-data && \
+    groupmod -g 1000 www-data
+
+RUN echo "www-data" >> /etc/cron.deny && \
+    chmod 644 /etc/cron.deny && \
+    chmod -R 755 /etc/php/ && \
+    chown -R root:root /etc/php/
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=10 --start-period=10s \
+  CMD php --ini || exit 1
+
+EXPOSE 9000

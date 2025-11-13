@@ -173,7 +173,7 @@ return array(
 ### Core
 
 - [Nginx](https://www.nginx.com/) [![Image Size](https://img.shields.io/docker/image-size/paskal/nginx)](https://hub.docker.com/r/paskal/nginx) with [brotli](https://github.com/google/ngx_brotli) proxying requests to php-fpm and serving static assets directly
-- [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php) 8.2 [![Image Size 8.2](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.2)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
+- [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php) 8.2 [![Image Size 8.2](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.2)](https://hub.docker.com/r/paskal/bitrix-php) 8.3 [![Image Size 8.3](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.3)](https://hub.docker.com/r/paskal/bitrix-php) 8.4 [![Image Size 8.4](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.4)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
 - [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server/8.0)](https://hub.docker.com/r/percona/percona-server) because of it's monitoring capabilities
 - [memcached](https://memcached.org/) [![Image Size](https://img.shields.io/docker/image-size/_/memcached/1-alpine)](https://hub.docker.com/r/_/memcached) for bitrix cache and user sessions
 
@@ -203,7 +203,7 @@ return array(
     - HTTP to HTTPS redirects
     - stub status page listening on localhost for Zabbix monitoring
 
-- `php` directory contains the build Dockerfiles (e.g., `Dockerfile.8.1`, `Dockerfile.8.2`, `Dockerfile.8.3`) and php configuration, applied on top of package-provided one.
+- `php` directory contains the build Dockerfiles (e.g., `Dockerfile.8.1`, `Dockerfile.8.2`, `Dockerfile.8.3`, `Dockerfile.8.4`) and php configuration, applied on top of package-provided one.
 
 ### /logs
 
@@ -317,7 +317,7 @@ Here are the available profiles and the services they enable:
 
 ### Switching PHP Versions
 
-This project is configured to support multiple PHP versions. Dockerfiles for different versions (e.g., 8.1, 8.2, 8.3) are available in the `config/php/` directory.
+This project is configured to support multiple PHP versions. Dockerfiles for different versions (e.g., 8.1, 8.2, 8.3, 8.4) are available in the `config/php/` directory.
 
 To switch the PHP version used by the `php` and `php-cron` services:
 
