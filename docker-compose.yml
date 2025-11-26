@@ -190,7 +190,7 @@ services:
     hostname: memcached
     container_name: memcached
     restart: unless-stopped
-    command: ["-m", "1024"]
+    command: ["-m", "1024", "-c", "4096"]
     expose:
       - "11211"
     healthcheck:
