@@ -30,3 +30,6 @@
 
 # backups
 .synosnap_data/
+
+# beads are not public
+.beads
