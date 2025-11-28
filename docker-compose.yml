@@ -139,6 +139,8 @@ services:
       - ./private/msmtprc:/etc/msmtprc
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
+      # Logs for email sending: msmtp expects to write logs there
+      - ./logs/php:/var/log/php
       # configuration
       - ./config/php/90-php.ini:/etc/php/8.3/cli/conf.d/90-php.ini
       # Cronjobs
