@@ -83,8 +83,8 @@ services:
   php:
     build:
       context: ./config/php
-      dockerfile: Dockerfile.8.3
-    image: ghcr.io/paskal/bitrix-php:8.3
+      dockerfile: Dockerfile.8.4
+    image: ghcr.io/paskal/bitrix-php:8.4
     hostname: php
     container_name: php
     depends_on:
@@ -105,8 +105,8 @@ services:
       # Logs
       - ./logs/php:/var/log/php
       # configuration
-      - ./config/php/90-php.ini:/etc/php/8.3/fpm/conf.d/90-php.ini
-      - ./config/php/xdebug.ini:/etc/php/8.3/mods-available/xdebug.ini
+      - ./config/php/90-php.ini:/etc/php/8.4/fpm/conf.d/90-php.ini
+      - ./config/php/xdebug.ini:/etc/php/8.4/mods-available/xdebug.ini
       # for monitoring purposes
       - ./logs/nginx:/var/log/nginx
       # switch timezone from UTC to Moscow
@@ -123,7 +123,7 @@ services:
 
   php-cron:
     command: cron -f
-    image: ghcr.io/paskal/bitrix-php:8.3
+    image: ghcr.io/paskal/bitrix-php:8.4
     hostname: php-cron
     container_name: php-cron
     depends_on:
@@ -142,7 +142,7 @@ services:
       # Logs for email sending: msmtp expects to write logs there
       - ./logs/php:/var/log/php
       # configuration
-      - ./config/php/90-php.ini:/etc/php/8.3/cli/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.4/cli/conf.d/90-php.ini
       # Cronjobs
       - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
       # switch timezone from UTC to Moscow

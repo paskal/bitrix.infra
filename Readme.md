@@ -323,13 +323,13 @@ To switch the PHP version used by the `php` and `php-cron` services:
 
 1.  **Edit `docker-compose.yml`:**
     *   Locate the `php` service definition.
-    *   Modify the `build.context` and `build.dockerfile` to point to the desired Dockerfile. For example, to switch to PHP 8.3:
+    *   Modify the `build.context` and `build.dockerfile` to point to the desired Dockerfile. For example, to switch to PHP 8.4:
         ```yaml
         php:
           build:
             context: ./config/php
-            dockerfile: Dockerfile.8.3 # Changed from Dockerfile.8.2
-          image: ghcr.io/paskal/bitrix-php:8.3 # Update image tag
+            dockerfile: Dockerfile.8.4 # Changed from Dockerfile.8.3
+          image: ghcr.io/paskal/bitrix-php:8.4 # Update image tag
           # ... rest of the service definition
         ```
     *   Repeat the same changes for the `php-cron` service definition, ensuring the `image` tag is also updated.
