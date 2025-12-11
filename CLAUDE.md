@@ -24,3 +24,7 @@
 - Logs in `/logs` directory
 - Web files in `/web/prod` and `/web/dev`
 - Environment files in `/private/environment`
+
+## Server
+- Production server: `favor-group` (SSH alias)
+- Repository location on server: `/web`
