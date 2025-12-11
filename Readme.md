@@ -396,6 +396,46 @@ sudo HOME="/home/$(logname)" duplicity -t 2D \
 </details>
 
 <details>
+<summary>Dev site renewal from backup</summary>
+
+The `renew-dev.sh` script can recreate the dev site either from current production or from an existing backup.
+
+**From current production (default):**
+```shell
+sudo ./scripts/renew-dev.sh
+```
+
+**From a specific backup date:**
+```shell
+sudo ./scripts/renew-dev.sh --date
+```
+
+When using `--date`, the script will:
+1. List available backup dates from `/web/backup/`
+2. Prompt you to select a date (format: YYYY-MM-DD)
+3. List available backup files for that date
+4. Prompt you to select a specific backup file
+5. Restore the database from that backup instead of creating a new dump
+
+This is useful for:
+- Testing changes against historical data
+- Reverting problematic database changes by comparing with old backups
+- Debugging issues that appeared after a specific date
+
+**Example workflow for reverting SEO changes:**
+```shell
+# 1. Restore dev from a backup before the problematic change
+sudo ./scripts/renew-dev.sh --date
+# Select 2025-10-31 (or earlier backup)
+
+# 2. Use the LLM revert tool at https://favor-group.ru/local/tools/seo_llm_revert.php
+# Enter 'dev_favor_group_ru' as the backup database
+# Compare and selectively revert changes
+```
+
+</details>
+
+<details>
 <summary>Cleaning (mem)cache</summary>
 
 There are two memcached instances in use, one for site cache and another for sessions. Here are the commands to clean them completely:

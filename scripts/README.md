@@ -65,8 +65,17 @@ Below is a list of scripts and relevant files found in this directory:
 *   **`renew-dev.sh`**
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Recreates dev site from production or from an existing backup.
-    *   **Options:** 
-        *   `--date` - Restore from an existing backup file instead of creating a new dump from production. When used, the script will list available backup dates and prompt for selection.
+    *   **Options:**
+        *   `--date` - Restore from an existing backup file instead of creating a new dump from production. When used, the script will:
+            1. List available backup dates from `/web/backup/` (newest first, up to 20)
+            2. Prompt for date selection (YYYY-MM-DD format)
+            3. List available `.sql.gz` files for that date
+            4. Prompt for file selection
+            5. Restore from the selected backup
+    *   **Use cases:**
+        *   Restore dev from a specific point in time for debugging
+        *   Compare current prod data with historical backup (useful with SEO tools)
+        *   Test migrations against old data
 
 *   **`requirements.txt`**
     *   **Type:** Data file (Python dependencies)
