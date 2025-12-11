@@ -9,6 +9,8 @@ jobs:
   build-images:
     name: Pull code from master to favor-group.ru
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: pull newest code to favor-group.ru from master
