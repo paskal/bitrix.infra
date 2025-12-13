@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php-version: ['8.1', '8.2', '8.3', '8.4']
+        php-version: ['8.3', '8.4']
         arch:
           - platform: linux/amd64
             runner: ubuntu-latest
@@ -92,7 +92,7 @@ jobs:
     # NOTE: keep php-version list in sync with build job matrix
     strategy:
       matrix:
-        php-version: ['8.1', '8.2', '8.3', '8.4']
+        php-version: ['8.3', '8.4']
 
     steps:
       - name: Download digests
@@ -131,3 +131,10 @@ jobs:
           docker buildx imagetools create \
             -t ghcr.io/paskal/bitrix-php:${{ matrix.php-version }} \
             $(printf 'ghcr.io/paskal/bitrix-php@sha256:%s ' *)
+
+      - name: Tag PHP 8.4 as :8
+        if: matrix.php-version == '8.4'
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/paskal/bitrix-php:8 \
+            ghcr.io/paskal/bitrix-php:8.4
