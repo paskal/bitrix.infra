@@ -145,10 +145,11 @@ install -d -o 1000 -g 1000 ${DEV_LOCATION}
 # copy files
 # --archive preserves file permissions and so on
 # --delete deletes files from destination if they are not present in the source
+# --force allows deletion of non-empty directories when their contents were excluded
 # --no-inc-recursive calculates file size for progress bar at the beginning
 # --exclude excludes cache folders from the sync
 # / in the end of src location avoid creating additional directory level at destination
-rsync --archive --no-inc-recursive --delete --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --exclude '*.tmp*' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
+rsync --archive --no-inc-recursive --delete --force --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --exclude '*.tmp*' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' --info=progress2 ${PROD_LOCATION}/ ${DEV_LOCATION}
 
 echo "Changing DB connection settings"
 # change settings in files to reflect dev site DB user
