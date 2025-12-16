@@ -83,27 +83,28 @@ class UrlChecker:
 
 def main(run_type: str, site: str, urls_file: str, update_redirects: bool):
     url_checker = UrlChecker(update_redirects)
-    for line in open(urls_file, 'r').readlines():
-        # skip empty lines and comments
-        if not line.strip() or line.strip().startswith("#"):
-            continue
-        absolute_url = line.strip()
-        # convert relative URLs to absolute
-        if not absolute_url.startswith("https://"):
-            absolute_url = urljoin(site, absolute_url)
-        resp = url_checker.retrieve_url(absolute_url)
-        if resp is None:
-            continue
-        if run_type == "titles":
-            title = fromstring(resp.content).findtext('.//title')
-            url = resp.url.removeprefix("https://favor-group.ru")
-            print(f"{url};{title}")
-        if run_type == "redirects":
-            url_checker.check_redirect(resp, absolute_url)
-        if run_type == "chain_redirects":
-            url_checker.chain_redirects(resp, absolute_url)
-        if run_type == "bad_status_codes":
-            url_checker.bad_status_codes(resp, absolute_url)
+    with open(urls_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            # skip empty lines and comments
+            if not line.strip() or line.strip().startswith("#"):
+                continue
+            absolute_url = line.strip()
+            # convert relative URLs to absolute
+            if not absolute_url.startswith("https://"):
+                absolute_url = urljoin(site, absolute_url)
+            resp = url_checker.retrieve_url(absolute_url)
+            if resp is None:
+                continue
+            if run_type == "titles":
+                title = fromstring(resp.content).findtext('.//title')
+                url = resp.url.removeprefix("https://favor-group.ru")
+                print(f"{url};{title}")
+            if run_type == "redirects":
+                url_checker.check_redirect(resp, absolute_url)
+            if run_type == "chain_redirects":
+                url_checker.chain_redirects(resp, absolute_url)
+            if run_type == "bad_status_codes":
+                url_checker.bad_status_codes(resp, absolute_url)
 
 
 if __name__ == '__main__':

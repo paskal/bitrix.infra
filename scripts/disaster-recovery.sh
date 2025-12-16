@@ -82,11 +82,12 @@ install_docker_if_not_installed() {
 }
 
 install_docker_compose_if_not_installed() {
-  command -v docker-compose >/dev/null && return
-  echo "docker-compose is installing..."
-  curl -sL "https://github.com/docker/compose/releases/download/1.28.6/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-  chmod +x /usr/local/bin/docker-compose
-  echo "docker-compose is installed"
+  if docker compose version >/dev/null 2>&1; then
+    return
+  fi
+  echo "docker-compose-plugin is installing..."
+  apt-get update -qq && apt-get -y install docker-compose-plugin >/dev/null
+  echo "docker-compose-plugin is installed"
 }
 
 # Necessary for Yandex with DDoS Protection enabled https://cloud.yandex.com/en/docs/vpc/concepts/mtu-mss
@@ -261,11 +262,11 @@ restore_mysql() {
 
 start_services() {
   echo "pulling docker images..."
-  docker-compose pull >/dev/null 2>&1 || true
+  docker compose pull >/dev/null 2>&1 || true
   echo "building docker images..."
-  docker-compose build >/dev/null 2>&1 || true
+  docker compose build >/dev/null 2>&1 || true
   echo "starting services..."
-  docker-compose up -d
+  docker compose up -d
   echo "docker setup is complete"
 }
 

@@ -37,8 +37,7 @@ echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_
 
 echo "Backing up MySQL to $backup_directory/$backup_file"
 
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --no-data "${prod_db}" | pigz -c >"$backup_directory/$backup_file"
-${mysql_binary_path}/mysqldump --defaults-extra-file=${mysql_config_inside_container} --routines --single-transaction --flush-logs --no-tablespaces --ignore-table="${prod_db}".b_user_session "${prod_db}" | pigz -c >>"$backup_directory/$backup_file"
+${mysql_binary_path}/mysqldump --defaults-extra-file="${mysql_config_inside_container}" --routines --single-transaction --flush-logs --no-tablespaces --ignore-table="${prod_db}.b_user_session" "${prod_db}" | pigz -c >"$backup_directory/$backup_file"
 chmod 0640 "$backup_directory/$backup_file"
 chown 1000:1000 "$backup_directory/$backup_file"
 
