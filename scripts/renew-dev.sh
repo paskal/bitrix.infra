@@ -142,9 +142,9 @@ if [ -f "${DEV_LOCATION}/bitrix/php_interface/dbconn.php" ]; then
 fi
 if [ -f "${DEV_LOCATION}/bitrix/.settings.php" ]; then
   sed -i \
-    -e "s/^\([[:space:]]*\)'database'[[:space:]]*=>.*/'database' => '${DEV_DB}',/" \
-    -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/'login' => '${DEV_USER}',/" \
-    -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/'password' => '${DEV_PASSWORD}',/" \
+    -e "s/^\([[:space:]]*\)'database'[[:space:]]*=>.*/\1'database' => '${DEV_DB}',/" \
+    -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/\1'login' => '${DEV_USER}',/" \
+    -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/\1'password' => '${DEV_PASSWORD}',/" \
     "${DEV_LOCATION}/bitrix/.settings.php"
 fi
 
@@ -194,12 +194,15 @@ echo "Copying files"
 install -d -o 1000 -g 1000 "${DEV_LOCATION}"
 # copy files
 # --archive preserves file permissions and so on
+# --whole-file skips delta-transfer algorithm, faster for local copy
+# --inplace writes directly to destination file, avoids temp file overhead
 # --delete deletes files from destination if they are not present in the source
 # --force allows deletion of non-empty directories when their contents were excluded
-# --no-inc-recursive calculates file size for progress bar at the beginning
 # --exclude excludes cache folders from the sync
 # / in the end of src location avoid creating additional directory level at destination
-rsync --archive --no-inc-recursive --delete --force --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --exclude '*.tmp*' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' --info=progress2 "${PROD_LOCATION}/" "${DEV_LOCATION}"
+echo "Starting rsync at $(date '+%H:%M:%S'), estimated duration ~3 minutes, expected completion at $(date -d '+3 minutes' '+%H:%M:%S')"
+rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
+echo "Rsync completed at $(date '+%H:%M:%S')"
 
 echo "Changing DB connection settings"
 # change settings in files to reflect dev site DB user
@@ -209,9 +212,9 @@ sed -i \
   -e "s/^\([[:space:]]*\)\$DBPassword[[:space:]]*=.*/\1\$DBPassword = '${DEV_PASSWORD}';/" \
   "${DEV_LOCATION}/bitrix/php_interface/dbconn.php"
 sed -i \
-  -e "s/^\([[:space:]]*\)'database'[[:space:]]*=>.*/'database' => '${DEV_DB}',/" \
-  -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/'login' => '${DEV_USER}',/" \
-  -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/'password' => '${DEV_PASSWORD}',/" \
+  -e "s/^\([[:space:]]*\)'database'[[:space:]]*=>.*/\1'database' => '${DEV_DB}',/" \
+  -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/\1'login' => '${DEV_USER}',/" \
+  -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/\1'password' => '${DEV_PASSWORD}',/" \
   "${DEV_LOCATION}/bitrix/.settings.php"
 
 echo "Cleaning up"
