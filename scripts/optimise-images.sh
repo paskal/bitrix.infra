@@ -25,15 +25,24 @@ sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS optimised (
     size INTEGER NOT NULL
 );"
 
+# Load database into memory for fast lookups (avoids spawning sqlite3 per file)
+declare -A OPTIMISED_CACHE
+load_cache() {
+    echo "Loading optimisation cache..."
+    while IFS='|' read -r path mtime size; do
+        OPTIMISED_CACHE["$path"]="$mtime|$size"
+    done < <(sqlite3 "$DB" "SELECT path, mtime, size FROM optimised;")
+    echo "Loaded ${#OPTIMISED_CACHE[@]} entries into cache"
+}
+
 # Check if file needs optimization (returns 0 if needs optimization, 1 if already done)
 needs_optimise() {
     local file="$1"
-    local mtime size result escaped
+    local mtime size cached
     mtime=$(stat -c %Y "$file")
     size=$(stat -c %s "$file")
-    escaped=$(printf '%s' "$file" | sed "s/'/''/g")
-    result=$(sqlite3 "$DB" "SELECT 1 FROM optimised WHERE path='$escaped' AND mtime=$mtime AND size=$size LIMIT 1;")
-    [[ -z "$result" ]]
+    cached="${OPTIMISED_CACHE[$file]:-}"
+    [[ "$cached" != "$mtime|$size" ]]
 }
 
 # Mark file as optimised
@@ -44,6 +53,7 @@ mark_optimised() {
     size=$(stat -c %s "$file")
     escaped=$(printf '%s' "$file" | sed "s/'/''/g")
     sqlite3 "$DB" "INSERT OR REPLACE INTO optimised (path, mtime, size) VALUES ('$escaped', $mtime, $size);"
+    OPTIMISED_CACHE["$file"]="$mtime|$size"
 }
 
 # Function to optimise PNGs
@@ -160,6 +170,8 @@ optimise_file() {
 }
 
 # Main
+load_cache
+
 echo "Calculating initial statistics..."
 display_stats
 
