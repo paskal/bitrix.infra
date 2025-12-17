@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eu
+set -euo pipefail
 
 # Directories to search for images
 IMAGE_DIRS="web/prod/images web/prod/upload"
@@ -24,25 +24,26 @@ sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS optimised (
     mtime INTEGER NOT NULL,
     size INTEGER NOT NULL
 );"
-sqlite3 "$DB" "CREATE INDEX IF NOT EXISTS idx_path ON optimised(path);"
 
 # Check if file needs optimization (returns 0 if needs optimization, 1 if already done)
 needs_optimise() {
     local file="$1"
-    local mtime size result
+    local mtime size result escaped
     mtime=$(stat -c %Y "$file")
     size=$(stat -c %s "$file")
-    result=$(sqlite3 "$DB" "SELECT 1 FROM optimised WHERE path='$file' AND mtime=$mtime AND size=$size LIMIT 1;")
+    escaped=$(printf '%s' "$file" | sed "s/'/''/g")
+    result=$(sqlite3 "$DB" "SELECT 1 FROM optimised WHERE path='$escaped' AND mtime=$mtime AND size=$size LIMIT 1;")
     [[ -z "$result" ]]
 }
 
 # Mark file as optimised
 mark_optimised() {
     local file="$1"
-    local mtime size
+    local mtime size escaped
     mtime=$(stat -c %Y "$file")
     size=$(stat -c %s "$file")
-    sqlite3 "$DB" "INSERT OR REPLACE INTO optimised (path, mtime, size) VALUES ('$file', $mtime, $size);"
+    escaped=$(printf '%s' "$file" | sed "s/'/''/g")
+    sqlite3 "$DB" "INSERT OR REPLACE INTO optimised (path, mtime, size) VALUES ('$escaped', $mtime, $size);"
 }
 
 # Function to optimise PNGs
@@ -92,20 +93,32 @@ optimise_gif() {
     fi
 }
 
-# Clean up orphaned entries from database
+# Clean up orphaned entries from database (batched for performance)
 cleanup_orphaned() {
     echo "Cleaning up orphaned database entries..."
-    local count_before count_after
+    local count_before count_after paths_to_delete=""
     count_before=$(sqlite3 "$DB" "SELECT COUNT(*) FROM optimised;")
 
-    sqlite3 "$DB" "SELECT path FROM optimised;" | while read -r path; do
+    while read -r path; do
         if [[ ! -f "$path" ]]; then
-            sqlite3 "$DB" "DELETE FROM optimised WHERE path='$path';"
+            local escaped_path
+            escaped_path=$(printf '%s' "$path" | sed "s/'/''/g")
+            paths_to_delete+="DELETE FROM optimised WHERE path='${escaped_path}';"
         fi
-    done
+    done < <(sqlite3 "$DB" "SELECT path FROM optimised;")
+
+    if [[ -n "$paths_to_delete" ]]; then
+        sqlite3 "$DB" "BEGIN TRANSACTION; ${paths_to_delete} COMMIT;"
+    fi
 
     count_after=$(sqlite3 "$DB" "SELECT COUNT(*) FROM optimised;")
     echo "Removed $((count_before - count_after)) orphaned entries"
+}
+
+# Clean up leftover temporary files
+cleanup_temp_files() {
+    # shellcheck disable=SC2086
+    find $IMAGE_DIRS -type f -iname '*.tmp.webp' -delete 2>/dev/null || true
 }
 
 # Function to calculate and display progress stats
@@ -113,7 +126,11 @@ display_stats() {
     local total optimised percent
     total=$(eval "$FIND_IMAGES_CMD" | wc -l)
     optimised=$(sqlite3 "$DB" "SELECT COUNT(*) FROM optimised;")
-    percent=$(awk "BEGIN {printf \"%.2f\", ($optimised/$total)*100}")
+    if [[ "$total" -eq 0 ]]; then
+        percent="0.00"
+    else
+        percent=$(awk "BEGIN {printf \"%.2f\", ($optimised/$total)*100}")
+    fi
     echo "Total images: $total, Optimised images: $optimised, Percentage optimised: $percent%"
 }
 
@@ -149,15 +166,16 @@ display_stats
 echo "Optimising images..."
 total_files=$(eval "$FIND_IMAGES_CMD" | wc -l)
 
-eval "$FIND_IMAGES_CMD" | pv -l -s "$total_files" | while read -r file; do
+while read -r file; do
     if needs_optimise "$file"; then
         optimise_file "$file"
     fi
-done
+done < <(eval "$FIND_IMAGES_CMD" | pv -l -s "$total_files")
 
 echo "Calculating final statistics..."
 display_stats
 
 cleanup_orphaned
+cleanup_temp_files
 
 echo "Images optimisation complete"
