@@ -198,10 +198,10 @@ install -d -o 1000 -g 1000 "${DEV_LOCATION}"
 # --inplace writes directly to destination file, avoids temp file overhead
 # --delete deletes files from destination if they are not present in the source
 # --force allows deletion of non-empty directories when their contents were excluded
-# --exclude excludes cache folders from the sync
+# --exclude excludes backup, temp files, PDFs, and image caches from the sync
 # / in the end of src location avoid creating additional directory level at destination
 echo "Starting rsync at $(date '+%H:%M:%S'), estimated duration ~3 minutes, expected completion at $(date -d '+3 minutes' '+%H:%M:%S')"
-rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/backup' --exclude '**/cache/' --exclude '**/managed_cache/' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
+rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/backup' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
 echo "Rsync completed at $(date '+%H:%M:%S')"
 
 echo "Changing DB connection settings"
