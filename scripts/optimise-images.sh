@@ -1,31 +1,56 @@
-#!/usr/bin/env sh
-set -e -u
+#!/usr/bin/env bash
+set -eu
 
 # Directories to search for images
 IMAGE_DIRS="web/prod/images web/prod/upload"
+DB="private/image-optimisation/optimised.db"
 
 # Base find command to locate files in the directories
 FIND_CMD="find $IMAGE_DIRS -type f"
 
-# Find command specifically for locating image files, now including GIF files
+# Find command specifically for locating image files
 FIND_IMAGES_CMD="$FIND_CMD \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.gif' \) -not -iname '*.tmp.webp'"
 
-# This script optimises png, jpeg, webp, and gif images on the site and marks them as optimised, so that they are not processed again.
+# This script optimises png, jpeg, webp, and gif images on the site using SQLite to track optimised files.
 # It uses optipng and advancecomp for PNGs, jpegoptim for JPEGs, cwebp for WebP images, and gifsicle for GIFs.
-# The script is designed to be run as a cron job.
-# It only processes files that have been modified since the last optimisation.
-# It also cleans up orphaned .optimised and leftover .tmp.webp files and shows a progress bar.
 
 # Install missing packages
-sudo apt-get -y install optipng advancecomp jpegoptim webp gifsicle pv >/dev/null
+sudo apt-get -y install optipng advancecomp jpegoptim webp gifsicle pv sqlite3 >/dev/null
+
+# Initialize SQLite database
+mkdir -p "$(dirname "$DB")"
+sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS optimised (
+    path TEXT PRIMARY KEY,
+    mtime INTEGER NOT NULL,
+    size INTEGER NOT NULL
+);"
+sqlite3 "$DB" "CREATE INDEX IF NOT EXISTS idx_path ON optimised(path);"
+
+# Check if file needs optimization (returns 0 if needs optimization, 1 if already done)
+needs_optimise() {
+    local file="$1"
+    local mtime size result
+    mtime=$(stat -c %Y "$file")
+    size=$(stat -c %s "$file")
+    result=$(sqlite3 "$DB" "SELECT 1 FROM optimised WHERE path='$file' AND mtime=$mtime AND size=$size LIMIT 1;")
+    [[ -z "$result" ]]
+}
+
+# Mark file as optimised
+mark_optimised() {
+    local file="$1"
+    local mtime size
+    mtime=$(stat -c %Y "$file")
+    size=$(stat -c %s "$file")
+    sqlite3 "$DB" "INSERT OR REPLACE INTO optimised (path, mtime, size) VALUES ('$file', $mtime, $size);"
+}
 
 # Function to optimise PNGs
 optimise_png() {
     local file="$1"
     if nice -n 10 ionice -c2 -n7 optipng -quiet -fix -o7 -preserve "$file"; then
         if nice -n 10 ionice -c2 -n7 advpng --quiet -z4 "$file"; then
-            touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
-            chmod 600 "$file.optimised"  # Restrict permissions to owner only
+            mark_optimised "$file"
         else
             echo "Error: Failed to process $file with advpng. Skipping." >&2
         fi
@@ -38,8 +63,7 @@ optimise_png() {
 optimise_jpeg() {
     local file="$1"
     if nice -n 10 ionice -c2 -n7 jpegoptim --quiet --strip-none "$file"; then
-        touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
-        chmod 600 "$file.optimised"  # Restrict permissions to owner only
+        mark_optimised "$file"
     else
         echo "Error: Failed to process $file with jpegoptim. Skipping." >&2
     fi
@@ -51,11 +75,10 @@ optimise_webp() {
     local tmpfile="${file}.tmp.webp"
     if nice -n 10 ionice -c2 -n7 cwebp -q 100 -quiet "$file" -o "$tmpfile"; then
         mv "$tmpfile" "$file"
-        touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
-        chmod 600 "$file.optimised"  # Restrict permissions to owner only
+        mark_optimised "$file"
     else
         echo "Error: Failed to process $file with cwebp. Skipping." >&2
-        rm -f "$tmpfile"  # Clean up temporary file if optimization fails
+        rm -f "$tmpfile"
     fi
 }
 
@@ -63,27 +86,33 @@ optimise_webp() {
 optimise_gif() {
     local file="$1"
     if nice -n 10 ionice -c2 -n7 gifsicle --optimize=3 --batch "$file"; then
-        touch -r "$file" "$file.optimised"  # Set .optimised file's modification time to the original file's time
-        chmod 600 "$file.optimised"  # Restrict permissions to owner only
+        mark_optimised "$file"
     else
         echo "Error: Failed to process $file with gifsicle. Skipping." >&2
     fi
 }
 
-# Clean up orphaned .optimised and leftover .tmp.webp files
-cleanup_optimised_and_tmp_files() {
-    $FIND_CMD \( -iname "*.optimised" -o -iname "*.tmp.webp" \) | while read -r file; do
-        original_file="${file%.optimised}"
-        if [ ! -f "$original_file" ]; then
-            rm -f "$file"
+# Clean up orphaned entries from database
+cleanup_orphaned() {
+    echo "Cleaning up orphaned database entries..."
+    local count_before count_after
+    count_before=$(sqlite3 "$DB" "SELECT COUNT(*) FROM optimised;")
+
+    sqlite3 "$DB" "SELECT path FROM optimised;" | while read -r path; do
+        if [[ ! -f "$path" ]]; then
+            sqlite3 "$DB" "DELETE FROM optimised WHERE path='$path';"
         fi
     done
+
+    count_after=$(sqlite3 "$DB" "SELECT COUNT(*) FROM optimised;")
+    echo "Removed $((count_before - count_after)) orphaned entries"
 }
 
 # Function to calculate and display progress stats
 display_stats() {
+    local total optimised percent
     total=$(eval "$FIND_IMAGES_CMD" | wc -l)
-    optimised=$($FIND_CMD -iname "*.optimised" | wc -l)
+    optimised=$(sqlite3 "$DB" "SELECT COUNT(*) FROM optimised;")
     percent=$(awk "BEGIN {printf \"%.2f\", ($optimised/$total)*100}")
     echo "Total images: $total, Optimised images: $optimised, Percentage optimised: $percent%"
 }
@@ -113,18 +142,15 @@ optimise_file() {
     esac
 }
 
-# Start processing images with progress bar
+# Main
 echo "Calculating initial statistics..."
 display_stats
 
 echo "Optimising images..."
-
-# Count the total number of files
 total_files=$(eval "$FIND_IMAGES_CMD" | wc -l)
 
-# Process the files and update progress bar
 eval "$FIND_IMAGES_CMD" | pv -l -s "$total_files" | while read -r file; do
-    if [ ! -f "${file}.optimised" ] || [ "$file" -nt "${file}.optimised" ]; then
+    if needs_optimise "$file"; then
         optimise_file "$file"
     fi
 done
@@ -132,9 +158,6 @@ done
 echo "Calculating final statistics..."
 display_stats
 
-# Cleanup orphaned .optimised and leftover .tmp.webp files
-echo "Cleaning up orphaned .optimised and leftover .tmp.webp files..."
-cleanup_optimised_and_tmp_files
+cleanup_orphaned
 
-echo "Images optimisation and cleanup complete"
-
+echo "Images optimisation complete"

@@ -60,7 +60,7 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`optimise-images.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Optimizes PNG, JPEG, WebP, and GIF images using various tools. Marks processed files to avoid reprocessing.
+    *   **Purpose:** Optimizes PNG, JPEG, WebP, and GIF images using various tools. Uses SQLite database at `private/image-optimisation/optimised.db` to track processed files and avoid reprocessing.
 
 *   **`renew-dev.sh`**
     *   **Type:** Shell script (`.sh`)
