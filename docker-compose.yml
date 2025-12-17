@@ -106,6 +106,7 @@ services:
       - ./logs/php:/var/log/php
       # configuration
       - ./config/php/90-php.ini:/etc/php/8.4/fpm/conf.d/90-php.ini
+      - ./config/php/zz-pm.conf:/etc/php/8.4/fpm/pool.d/zz-pm.conf
       - ./config/php/xdebug.ini:/etc/php/8.4/mods-available/xdebug.ini
       # for monitoring purposes
       - ./logs/nginx:/var/log/nginx
