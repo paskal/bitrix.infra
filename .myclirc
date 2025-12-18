@@ -1,0 +1,26 @@
+# mycli configuration for favor-group.ru MySQL access
+# vi: ft=dosini
+#
+# Used by fgmysql script which handles connection details
+#
+[main]
+smart_completion = True
+multi_line = False
+destructive_warning = True
+log_file = /tmp/mycli-favor.log
+log_level = INFO
+timing = True
+table_format = ascii
+redirect_format = csv
+syntax_style = default
+key_bindings = emacs
+prompt = '\t \u@\h:\d> '
+prompt_continuation = '->'
+less_chatty = True
+auto_vertical_output = False
+keyword_casing = auto
+enable_pager = True
+pager = 'less'
+
+[keys]
+control_r = auto

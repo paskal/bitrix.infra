@@ -473,3 +473,57 @@ To add required TXT entries, head to DNS entries page of your provider (Yandex C
 The `certbot` service is configured to handle renewals automatically.
 
 </details>
+
+<details>
+<summary>Read-only MySQL access (fgmysql)</summary>
+
+The `fgmysql` command provides read-only access to MySQL databases via SSH socket tunnel. It uses the `claude_ro` user with SELECT-only privileges.
+
+**Prerequisites:**
+- `mycli` installed (`brew install mycli` on macOS)
+- SSH access to the server configured
+
+**Setup:**
+
+1. Add SSH host alias to `~/.ssh/config`:
+   ```
+   Host bitrix
+       HostName your-server.example.com
+       User your-username
+       IdentityFile ~/.ssh/your-key
+   ```
+
+2. Add `MYSQL_CLAUDE_RO_PASSWORD` to server's `/web/private/environment/mysql.env`
+
+3. Create the MySQL user on the server:
+   ```sql
+   CREATE USER 'claude_ro'@'localhost' IDENTIFIED BY 'password_from_env';
+   GRANT SELECT ON favor_group_ru.* TO 'claude_ro'@'localhost';
+   GRANT SELECT ON dev_favor_group_ru.* TO 'claude_ro'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+
+4. Add to your shell profile:
+   ```shell
+   export PATH="/path/to/bitrix.infra/bin:$PATH"
+   export SSH_HOST="bitrix"  # optional, defaults to "bitrix"
+   ```
+
+**Usage:**
+```shell
+fgmysql                     # Interactive session (production)
+fgmysql -e "SELECT ..."     # Run query and exit
+fgmysql dev                 # Connect to dev database
+fgmysql dev -e "SELECT ..." # Query dev database
+```
+
+The tunnel starts automatically and password is fetched from the server (cached for 1 hour).
+
+**Manual tunnel management:**
+```shell
+./mysql-tunnel.sh start   # Start tunnel
+./mysql-tunnel.sh status  # Check status
+./mysql-tunnel.sh stop    # Stop tunnel
+```
+
+</details>

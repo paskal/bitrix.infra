@@ -1,0 +1,94 @@
+#!/bin/sh
+# Quick read-only MySQL access to favor-group.ru databases
+# Auto-starts SSH socket tunnel if not running
+# Uses read-only claude_ro user (SELECT only)
+#
+# Usage:
+#   fgmysql                     # Interactive session (prod)
+#   fgmysql -e "SELECT ..."     # Run query and exit
+#   fgmysql dev                 # Connect to dev database
+#   fgmysql dev -e "SELECT ..." # Query dev database
+
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+MYCLIRC="$SCRIPT_DIR/.myclirc"
+
+SOCKET_DIR="/tmp/mysql-tunnel"
+LOCAL_SOCKET="$SOCKET_DIR/mysqld.sock"
+REMOTE_SOCKET="/web/private/mysqld/mysqld.sock"
+SSH_HOST="${SSH_HOST:-bitrix}"
+PID_FILE="$SOCKET_DIR/tunnel.pid"
+
+# Fetch password from server (cached for 1 hour)
+PASS_CACHE="/tmp/.fgmysql_pass_cache"
+get_password() {
+    # Use cached password if less than 1 hour old
+    if [ -f "$PASS_CACHE" ] && [ "$(find "$PASS_CACHE" -mmin -60 2>/dev/null)" ]; then
+        cat "$PASS_CACHE"
+        return
+    fi
+
+    # Fetch from server
+    pass=$(ssh "$SSH_HOST" 'source /web/private/environment/mysql.env && echo "$MYSQL_CLAUDE_RO_PASSWORD"')
+
+    # Cache it with secure permissions from the start
+    (umask 077; printf '%s' "$pass" > "$PASS_CACHE")
+
+    printf '%s' "$pass"
+}
+
+# Test if socket is responding (macOS nc -z doesn't work with Unix sockets)
+socket_alive() {
+    [ -S "$LOCAL_SOCKET" ] && printf '' | nc -U -w 1 "$LOCAL_SOCKET" >/dev/null 2>&1
+}
+
+# Ensure tunnel is running
+ensure_tunnel() {
+    if socket_alive; then
+        return 0
+    fi
+    rm -f "$LOCAL_SOCKET"
+
+    mkdir -p "$SOCKET_DIR"
+    ssh -f -N -L "$LOCAL_SOCKET:$REMOTE_SOCKET" "$SSH_HOST"
+
+    # Save PID of the SSH tunnel process
+    pgrep -n -f "ssh.*-N.*$LOCAL_SOCKET" > "$PID_FILE" 2>/dev/null || true
+
+    i=0
+    while [ $i -lt 10 ]; do
+        [ -S "$LOCAL_SOCKET" ] && return 0
+        sleep 0.5
+        i=$((i + 1))
+    done
+
+    echo "Failed to start MySQL tunnel" >&2
+    return 1
+}
+
+ensure_tunnel || exit 1
+
+# Check if first arg is 'dev' to use dev database
+DB="favor_group_ru"
+if [ "${1:-}" = "dev" ]; then
+    DB="dev_favor_group_ru"
+    shift
+fi
+
+# Check if running in non-interactive mode (-e flag present)
+has_query_flag() {
+    for arg in "$@"; do
+        [ "$arg" = "-e" ] && return 0
+    done
+    return 1
+}
+
+# Fetch password and run mycli with password in env (not visible in process list)
+PASS=$(get_password)
+if has_query_flag "$@"; then
+    # Suppress informational messages in scripting mode (exit code preserved for errors)
+    exec env MYSQL_PWD="$PASS" mycli --myclirc "$MYCLIRC" -u claude_ro -S "$LOCAL_SOCKET" -D "$DB" "$@" 2>/dev/null
+else
+    exec env MYSQL_PWD="$PASS" mycli --myclirc "$MYCLIRC" -u claude_ro -S "$LOCAL_SOCKET" -D "$DB" "$@"
+fi
