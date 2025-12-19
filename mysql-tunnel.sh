@@ -18,13 +18,21 @@ socket_alive() {
     [ -S "$LOCAL_SOCKET" ] && printf '' | nc -U -w 1 "$LOCAL_SOCKET" >/dev/null 2>&1
 }
 
+# Kill any existing tunnel processes for this socket
+kill_stale_tunnels() {
+    pkill -f "ssh.*-N.*$LOCAL_SOCKET" 2>/dev/null || true
+    rm -f "$LOCAL_SOCKET" "$PID_FILE"
+}
+
 start_tunnel() {
     # Check if tunnel already exists and works
     if socket_alive; then
         echo "Tunnel already running at $LOCAL_SOCKET"
         return 0
     fi
-    rm -f "$LOCAL_SOCKET"
+
+    # Kill ALL existing tunnel processes before starting a new one
+    kill_stale_tunnels
 
     mkdir -p "$SOCKET_DIR"
 
@@ -50,11 +58,7 @@ start_tunnel() {
 }
 
 stop_tunnel() {
-    if [ -f "$PID_FILE" ]; then
-        kill "$(cat "$PID_FILE")" 2>/dev/null || true
-        rm -f "$PID_FILE"
-    fi
-    rm -f "$LOCAL_SOCKET"
+    kill_stale_tunnels
     echo "Tunnel stopped"
 }
 

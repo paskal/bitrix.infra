@@ -43,12 +43,20 @@ socket_alive() {
     [ -S "$LOCAL_SOCKET" ] && printf '' | nc -U -w 1 "$LOCAL_SOCKET" >/dev/null 2>&1
 }
 
+# Kill any existing tunnel processes for this socket
+kill_stale_tunnels() {
+    pkill -f "ssh.*-N.*$LOCAL_SOCKET" 2>/dev/null || true
+    rm -f "$LOCAL_SOCKET" "$PID_FILE"
+}
+
 # Ensure tunnel is running
 ensure_tunnel() {
     if socket_alive; then
         return 0
     fi
-    rm -f "$LOCAL_SOCKET"
+
+    # Kill ALL existing tunnel processes before starting a new one
+    kill_stale_tunnels
 
     mkdir -p "$SOCKET_DIR"
     ssh -f -N -L "$LOCAL_SOCKET:$REMOTE_SOCKET" "$SSH_HOST"
