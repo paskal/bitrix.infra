@@ -1,0 +1,347 @@
+#!/bin/sh
+# Yandex Webmaster API - URL Reindexing Tool
+#
+# Usage:
+#   yandex-reindex setup              - Initial setup (prints OAuth instructions)
+#   yandex-reindex list               - List all verified hosts
+#   yandex-reindex submit <file>      - Submit URLs from file for reindexing
+#   yandex-reindex submit-url <url>   - Submit single URL for reindexing
+#   yandex-reindex submit-regions <file> - Submit URLs for MSK, SPB, TULA
+#
+# Config: $SCRIPT_DIR/.yandex-webmaster (gitignored)
+# Run 'yandex-reindex setup' to configure - it will guide you through OAuth setup.
+
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/.yandex-webmaster"
+API_BASE="https://api.webmaster.yandex.net/v4"
+
+# Colours
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+load_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        . "$CONFIG_FILE"
+    fi
+}
+
+save_config() {
+    cat > "$CONFIG_FILE" << EOF
+YANDEX_CLIENT_ID=$YANDEX_CLIENT_ID
+YANDEX_OAUTH_TOKEN=$YANDEX_OAUTH_TOKEN
+YANDEX_USER_ID=$YANDEX_USER_ID
+YANDEX_HOST_MSK=$YANDEX_HOST_MSK
+YANDEX_HOST_SPB=$YANDEX_HOST_SPB
+YANDEX_HOST_TULA=$YANDEX_HOST_TULA
+EOF
+    chmod 600 "$CONFIG_FILE"
+    printf "${GREEN}Config saved to %s${NC}\n" "$CONFIG_FILE"
+}
+
+api_call() {
+    method=$1
+    endpoint=$2
+    data=${3:-}
+
+    if [ -z "${YANDEX_OAUTH_TOKEN:-}" ]; then
+        printf "${RED}Error: YANDEX_OAUTH_TOKEN not set${NC}\n"
+        echo "Run 'yandex-reindex setup' to configure"
+        exit 1
+    fi
+
+    if [ "$method" = "GET" ]; then
+        curl -s -X GET "$API_BASE$endpoint" \
+            -H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
+            -H "Content-Type: application/json"
+    else
+        curl -s -X POST "$API_BASE$endpoint" \
+            -H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$data"
+    fi
+}
+
+cmd_setup() {
+    load_config
+
+    if [ -z "${YANDEX_OAUTH_TOKEN:-}" ]; then
+        if [ -z "${YANDEX_CLIENT_ID:-}" ]; then
+            printf "${YELLOW}OAuth App Setup:${NC}\n"
+            echo "1. Go to https://oauth.yandex.ru/client/new"
+            echo "2. Fill in app name (e.g., 'Webmaster Reindex')"
+            echo "3. In 'Platforms', select 'Web services'"
+            echo "4. Click 'Add URL for development' in Redirect URI"
+            echo "5. In 'Access', find 'Yandex.Webmaster' and enable:"
+            echo "   - webmaster:verify"
+            echo "   - webmaster:hostinfo"
+            echo "6. Click 'Create app'"
+            echo ""
+            echo "Enter your Client ID:"
+            read -r YANDEX_CLIENT_ID
+        fi
+
+        echo ""
+        printf "${YELLOW}Get OAuth Token:${NC}\n"
+        echo "Visit this URL and click 'Allow':"
+        printf "${GREEN}https://oauth.yandex.ru/authorize?response_type=token&client_id=%s${NC}\n" "$YANDEX_CLIENT_ID"
+        echo ""
+        echo "After redirect, copy the token from the URL and paste here:"
+        read -r YANDEX_OAUTH_TOKEN
+    fi
+
+    printf "${YELLOW}Fetching user ID...${NC}\n"
+    user_response=$(api_call GET "/user")
+    YANDEX_USER_ID=$(echo "$user_response" | jq -r '.user_id')
+
+    if [ "$YANDEX_USER_ID" = "null" ] || [ -z "$YANDEX_USER_ID" ]; then
+        printf "${RED}Failed to get user ID. Response:${NC}\n"
+        echo "$user_response"
+        exit 1
+    fi
+
+    printf "${GREEN}User ID: %s${NC}\n" "$YANDEX_USER_ID"
+
+    printf "${YELLOW}Fetching hosts...${NC}\n"
+    hosts_response=$(api_call GET "/user/$YANDEX_USER_ID/hosts")
+
+    # Parse hosts and auto-detect known ones
+    echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)\t\(.ascii_host_url)"' | while IFS='	' read -r host_id host_url; do
+        printf "  ${GREEN}%s${NC} -> %s\n" "$host_id" "$host_url"
+    done
+
+    # Set variables (can't use subshell, so parse again)
+    YANDEX_HOST_MSK=""
+    YANDEX_HOST_SPB=""
+    YANDEX_HOST_TULA=""
+
+    hosts_data=$(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)\t\(.ascii_host_url)"')
+    echo "$hosts_data" | while IFS='	' read -r host_id host_url; do
+        case "$host_url" in
+            *"://favor-group.ru"*|*"://www.favor-group.ru"*)
+                echo "MSK:$host_id"
+                ;;
+            *"://spb.favor-group.ru"*)
+                echo "SPB:$host_id"
+                ;;
+            *"://tula.favor-group.ru"*)
+                echo "TULA:$host_id"
+                ;;
+        esac
+    done | while IFS=: read -r region host_id; do
+        case "$region" in
+            MSK) YANDEX_HOST_MSK="$host_id" ;;
+            SPB) YANDEX_HOST_SPB="$host_id" ;;
+            TULA) YANDEX_HOST_TULA="$host_id" ;;
+        esac
+    done
+
+    # Parse again to set variables (subshell workaround)
+    for line in $(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)|\(.ascii_host_url)"'); do
+        host_id=$(echo "$line" | cut -d'|' -f1)
+        host_url=$(echo "$line" | cut -d'|' -f2)
+        case "$host_url" in
+            *"://favor-group.ru"*|*"://www.favor-group.ru"*)
+                YANDEX_HOST_MSK="$host_id"
+                echo "    -> Detected as MSK"
+                ;;
+            *"://spb.favor-group.ru"*)
+                YANDEX_HOST_SPB="$host_id"
+                echo "    -> Detected as SPB"
+                ;;
+            *"://tula.favor-group.ru"*)
+                YANDEX_HOST_TULA="$host_id"
+                echo "    -> Detected as TULA"
+                ;;
+        esac
+    done
+
+    save_config
+
+    echo ""
+    printf "${GREEN}Setup complete!${NC}\n"
+    echo "MSK host: $YANDEX_HOST_MSK"
+    echo "SPB host: $YANDEX_HOST_SPB"
+    echo "TULA host: $YANDEX_HOST_TULA"
+}
+
+cmd_list() {
+    load_config
+
+    if [ -z "${YANDEX_USER_ID:-}" ]; then
+        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        exit 1
+    fi
+
+    printf "${YELLOW}Fetching hosts for user %s...${NC}\n" "$YANDEX_USER_ID"
+    hosts_response=$(api_call GET "/user/$YANDEX_USER_ID/hosts")
+
+    echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)\t\(.ascii_host_url)\t\(.main_mirror // "n/a")"' | \
+        column -t -s '	'
+}
+
+get_host_id_for_url() {
+    url=$1
+
+    case "$url" in
+        *"spb.favor-group.ru"*)
+            echo "$YANDEX_HOST_SPB"
+            ;;
+        *"tula.favor-group.ru"*)
+            echo "$YANDEX_HOST_TULA"
+            ;;
+        *)
+            echo "$YANDEX_HOST_MSK"
+            ;;
+    esac
+}
+
+submit_url() {
+    url=$1
+    host_id=$(get_host_id_for_url "$url")
+
+    if [ -z "$host_id" ]; then
+        printf "${RED}No host ID found for: %s${NC}\n" "$url"
+        return 1
+    fi
+
+    response=$(api_call POST "/user/$YANDEX_USER_ID/hosts/$host_id/recrawl/queue" "{\"url\": \"$url\"}")
+    task_id=$(echo "$response" | jq -r '.task_id // empty')
+    quota=$(echo "$response" | jq -r '.quota_remainder // empty')
+    error=$(echo "$response" | jq -r '.error_code // empty')
+
+    if [ -n "$task_id" ]; then
+        printf "${GREEN}✓${NC} %s (quota: %s)\n" "$url" "$quota"
+    elif [ "$error" = "URL_ALREADY_ADDED" ]; then
+        printf "${YELLOW}○${NC} %s (already queued)\n" "$url"
+    else
+        printf "${RED}✗${NC} %s\n" "$url"
+        echo "  Error: $response"
+    fi
+}
+
+cmd_submit_url() {
+    load_config
+
+    if [ -z "${YANDEX_USER_ID:-}" ]; then
+        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        exit 1
+    fi
+
+    url=${1:-}
+    if [ -z "$url" ]; then
+        echo "Usage: yandex-reindex submit-url <url>"
+        exit 1
+    fi
+
+    submit_url "$url"
+}
+
+cmd_submit() {
+    load_config
+
+    if [ -z "${YANDEX_USER_ID:-}" ]; then
+        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        exit 1
+    fi
+
+    file=${1:-}
+    if [ -z "$file" ] || [ ! -f "$file" ]; then
+        echo "Usage: yandex-reindex submit <file_with_urls>"
+        exit 1
+    fi
+
+    total=$(wc -l < "$file" | tr -d ' ')
+    count=0
+
+    printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
+    echo ""
+
+    while IFS= read -r url || [ -n "$url" ]; do
+        # Skip empty lines and comments
+        case "$url" in
+            ""|\#*) continue ;;
+        esac
+
+        count=$((count + 1))
+        submit_url "$url"
+
+        # Small delay to avoid rate limiting
+        sleep 0.2
+    done < "$file"
+
+    echo ""
+    printf "${GREEN}Done! Submitted %s URLs.${NC}\n" "$count"
+}
+
+cmd_submit_regions() {
+    load_config
+
+    if [ -z "${YANDEX_USER_ID:-}" ]; then
+        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        exit 1
+    fi
+
+    file=${1:-}
+    if [ -z "$file" ] || [ ! -f "$file" ]; then
+        echo "Usage: yandex-reindex submit-regions <file_with_urls>"
+        echo "Will submit URLs for MSK, SPB, and TULA regions"
+        exit 1
+    fi
+
+    for region in "MSK:" "SPB:spb." "TULA:tula."; do
+        name=$(echo "$region" | cut -d: -f1)
+        prefix=$(echo "$region" | cut -d: -f2)
+
+        printf "${YELLOW}=== Submitting for %s ===${NC}\n" "$name"
+
+        while IFS= read -r url || [ -n "$url" ]; do
+            case "$url" in
+                ""|\#*) continue ;;
+            esac
+
+            # Replace favor-group.ru with region prefix
+            regional_url=$(echo "$url" | sed "s|://favor-group.ru|://${prefix}favor-group.ru|")
+            submit_url "$regional_url"
+            sleep 0.2
+        done < "$file"
+
+        echo ""
+    done
+
+    printf "${GREEN}Done!${NC}\n"
+}
+
+# Main
+case "${1:-}" in
+    setup)
+        cmd_setup
+        ;;
+    list)
+        cmd_list
+        ;;
+    submit)
+        cmd_submit "${2:-}"
+        ;;
+    submit-url)
+        cmd_submit_url "${2:-}"
+        ;;
+    submit-regions)
+        cmd_submit_regions "${2:-}"
+        ;;
+    *)
+        echo "Yandex Webmaster API - URL Reindexing Tool"
+        echo ""
+        echo "Usage:"
+        echo "  yandex-reindex setup              - Initial setup (get token, user-id, host-ids)"
+        echo "  yandex-reindex list               - List all verified hosts"
+        echo "  yandex-reindex submit <file>      - Submit URLs from file"
+        echo "  yandex-reindex submit-url <url>   - Submit single URL"
+        echo "  yandex-reindex submit-regions <file> - Submit URLs for MSK, SPB, TULA"
+        echo ""
+        echo "Config: \$SCRIPT_DIR/.yandex-webmaster"
+        ;;
+esac

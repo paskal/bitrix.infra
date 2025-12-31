@@ -527,3 +527,46 @@ The tunnel starts automatically and password is fetched from the server (cached 
 ```
 
 </details>
+
+<details>
+<summary>Yandex Webmaster URL reindexing (yandex-reindex)</summary>
+
+The `yandex-reindex` command submits URLs to Yandex Webmaster for reindexing. Useful after content updates or fixing 404 errors.
+
+**Setup:**
+
+1. Add `bin/` to your PATH:
+   ```shell
+   export PATH="/path/to/bitrix.infra/bin:$PATH"
+   ```
+
+2. Run setup (it will guide you through OAuth app creation):
+   ```shell
+   yandex-reindex setup
+   ```
+
+The script will auto-detect host IDs for favor-group.ru sites.
+
+**Note:** This uses Yandex OAuth (oauth.yandex.ru), which is different from Yandex Cloud IAM tokens used by DNS/certbot scripts.
+
+**Usage:**
+```shell
+yandex-reindex list                    # List verified hosts
+yandex-reindex submit-url <url>        # Submit single URL
+yandex-reindex submit <file>           # Submit URLs from file
+yandex-reindex submit-regions <file>   # Submit URLs for MSK, SPB, TULA
+```
+
+**Example:**
+```shell
+# Create file with URLs to reindex
+cat > urls.txt << EOF
+https://favor-group.ru/catalog/profnastil/1484/
+https://favor-group.ru/catalog/profnastil/1485/
+EOF
+
+# Submit for reindexing
+yandex-reindex submit urls.txt
+```
+
+</details>
