@@ -551,10 +551,10 @@ The script will auto-detect host IDs for favor-group.ru sites.
 
 **Usage:**
 ```shell
-yandex-reindex list                    # List verified hosts
-yandex-reindex submit-url <url>        # Submit single URL
-yandex-reindex submit <file>           # Submit URLs from file
-yandex-reindex submit-regions <file>   # Submit URLs for MSK, SPB, TULA
+yandex-reindex list                      # List verified hosts
+yandex-reindex submit-url <url>...       # Submit one or more URLs
+yandex-reindex submit <file>             # Submit URLs from file
+yandex-reindex submit-regions <file>     # Submit URLs for MSK, SPB, TULA
 ```
 
 **Example:**

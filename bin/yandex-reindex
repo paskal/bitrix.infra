@@ -5,7 +5,7 @@
 #   yandex-reindex setup              - Initial setup (prints OAuth instructions)
 #   yandex-reindex list               - List all verified hosts
 #   yandex-reindex submit <file>      - Submit URLs from file for reindexing
-#   yandex-reindex submit-url <url>   - Submit single URL for reindexing
+#   yandex-reindex submit-url <url>...  - Submit one or more URLs for reindexing
 #   yandex-reindex submit-regions <file> - Submit URLs for MSK, SPB, TULA
 #
 # Config: $SCRIPT_DIR/.yandex-webmaster (gitignored)
@@ -231,13 +231,18 @@ cmd_submit_url() {
         exit 1
     fi
 
-    url=${1:-}
-    if [ -z "$url" ]; then
-        echo "Usage: yandex-reindex submit-url <url>"
+    if [ $# -eq 0 ]; then
+        echo "Usage: yandex-reindex submit-url <url> [<url>...]"
         exit 1
     fi
 
-    submit_url "$url"
+    for url in "$@"; do
+        submit_url "$url"
+        # Small delay between URLs to avoid rate limiting
+        if [ $# -gt 1 ]; then
+            sleep 0.2
+        fi
+    done
 }
 
 cmd_submit() {
@@ -327,7 +332,8 @@ case "${1:-}" in
         cmd_submit "${2:-}"
         ;;
     submit-url)
-        cmd_submit_url "${2:-}"
+        shift
+        cmd_submit_url "$@"
         ;;
     submit-regions)
         cmd_submit_regions "${2:-}"
@@ -339,7 +345,7 @@ case "${1:-}" in
         echo "  yandex-reindex setup              - Initial setup (get token, user-id, host-ids)"
         echo "  yandex-reindex list               - List all verified hosts"
         echo "  yandex-reindex submit <file>      - Submit URLs from file"
-        echo "  yandex-reindex submit-url <url>   - Submit single URL"
+        echo "  yandex-reindex submit-url <url>...  - Submit one or more URLs"
         echo "  yandex-reindex submit-regions <file> - Submit URLs for MSK, SPB, TULA"
         echo ""
         echo "Config: \$SCRIPT_DIR/.yandex-webmaster"
