@@ -2,7 +2,7 @@
 # Yandex Webmaster API - URL Reindexing Tool
 #
 # Usage:
-#   yandex-reindex setup                - Initial setup (OAuth, host detection)
+#   yandex-reindex setup                - Interactive setup (OAuth, select domains)
 #   yandex-reindex list                 - List all verified hosts
 #   yandex-reindex submit <file>        - Submit absolute URLs from file
 #   yandex-reindex submit-url <url>...  - Submit one or more absolute URLs
@@ -25,6 +25,7 @@ API_BASE="https://api.webmaster.yandex.net/v4"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 load_config() {
@@ -34,17 +35,16 @@ load_config() {
 }
 
 save_config() {
-    cat > "$CONFIG_FILE" << EOF
-YANDEX_CLIENT_ID=$YANDEX_CLIENT_ID
-YANDEX_OAUTH_TOKEN=$YANDEX_OAUTH_TOKEN
-YANDEX_USER_ID=$YANDEX_USER_ID
-YANDEX_HOST_MSK=$YANDEX_HOST_MSK
-YANDEX_HOST_SPB=$YANDEX_HOST_SPB
-YANDEX_HOST_TULA=$YANDEX_HOST_TULA
-YANDEX_URL_MSK=$YANDEX_URL_MSK
-YANDEX_URL_SPB=$YANDEX_URL_SPB
-YANDEX_URL_TULA=$YANDEX_URL_TULA
-EOF
+    {
+        echo "YANDEX_CLIENT_ID=$YANDEX_CLIENT_ID"
+        echo "YANDEX_OAUTH_TOKEN=$YANDEX_OAUTH_TOKEN"
+        echo "YANDEX_USER_ID=$YANDEX_USER_ID"
+        echo "YANDEX_REGIONS=\"$YANDEX_REGIONS\""
+        for region in $YANDEX_REGIONS; do
+            eval "echo \"YANDEX_HOST_${region}=\$YANDEX_HOST_${region}\""
+            eval "echo \"YANDEX_URL_${region}=\$YANDEX_URL_${region}\""
+        done
+    } > "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
     printf "${GREEN}Config saved to %s${NC}\n" "$CONFIG_FILE"
 }
@@ -87,7 +87,7 @@ cmd_setup() {
             echo "   - webmaster:hostinfo"
             echo "6. Click 'Create app'"
             echo ""
-            echo "Enter your Client ID:"
+            printf "Enter your Client ID: "
             read -r YANDEX_CLIENT_ID
         fi
 
@@ -96,7 +96,7 @@ cmd_setup() {
         echo "Visit this URL and click 'Allow':"
         printf "${GREEN}https://oauth.yandex.ru/authorize?response_type=token&client_id=%s${NC}\n" "$YANDEX_CLIENT_ID"
         echo ""
-        echo "After redirect, copy the token from the URL and paste here:"
+        printf "After redirect, copy the token from the URL and paste here: "
         read -r YANDEX_OAUTH_TOKEN
     fi
 
@@ -115,62 +115,97 @@ cmd_setup() {
     printf "${YELLOW}Fetching hosts...${NC}\n"
     hosts_response=$(api_call GET "/user/$YANDEX_USER_ID/hosts")
 
-    # Parse hosts and auto-detect known ones
-    echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)\t\(.ascii_host_url)"' | while IFS='	' read -r host_id host_url; do
-        printf "  ${GREEN}%s${NC} -> %s\n" "$host_id" "$host_url"
+    # Build list of hosts
+    hosts_list=$(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)|\(.ascii_host_url)"')
+    host_count=$(echo "$hosts_list" | wc -l | tr -d ' ')
+
+    echo ""
+    printf "${YELLOW}Available hosts:${NC}\n"
+    i=1
+    echo "$hosts_list" | while IFS='|' read -r host_id host_url; do
+        printf "  ${CYAN}%d)${NC} %s\n" "$i" "$host_url"
+        i=$((i + 1))
     done
 
-    # Set variables (can't use subshell, so parse again)
-    YANDEX_HOST_MSK=""
-    YANDEX_HOST_SPB=""
-    YANDEX_HOST_TULA=""
-    YANDEX_URL_MSK=""
-    YANDEX_URL_SPB=""
-    YANDEX_URL_TULA=""
+    # Select main domain
+    echo ""
+    printf "${YELLOW}Select MAIN domain (number):${NC} "
+    read -r main_choice
 
-    # Parse hosts to detect regions (MSK = main domain, SPB/TULA = subdomains)
-    for line in $(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)|\(.ascii_host_url)"'); do
-        host_id=$(echo "$line" | cut -d'|' -f1)
-        host_url=$(echo "$line" | cut -d'|' -f2)
-        # Extract base URL (remove trailing slash if present)
-        base_url=$(echo "$host_url" | sed 's|/$||')
+    # Parse selection
+    main_line=$(echo "$hosts_list" | sed -n "${main_choice}p")
+    main_host_id=$(echo "$main_line" | cut -d'|' -f1)
+    main_host_url=$(echo "$main_line" | cut -d'|' -f2 | sed 's|/$||')
 
-        # Check for subdomain pattern first (more specific matches)
-        if echo "$host_url" | grep -qE '://[a-z]+\.[^/]+\.[^/]+'; then
-            # Has subdomain - check which region
-            subdomain=$(echo "$host_url" | sed 's|.*://||; s|\..*||')
-            case "$subdomain" in
-                spb)
-                    YANDEX_HOST_SPB="$host_id"
-                    YANDEX_URL_SPB="$base_url"
-                    echo "    -> Detected as SPB"
-                    ;;
-                tula)
-                    YANDEX_HOST_TULA="$host_id"
-                    YANDEX_URL_TULA="$base_url"
-                    echo "    -> Detected as TULA"
-                    ;;
-            esac
-        else
-            # No subdomain or www - this is the main domain (MSK)
-            # Also match www.domain as main
-            if echo "$host_url" | grep -qE '://www\.'; then
-                continue  # Skip www variant, prefer non-www
-            fi
-            YANDEX_HOST_MSK="$host_id"
-            YANDEX_URL_MSK="$base_url"
-            echo "    -> Detected as MSK (main)"
+    if [ -z "$main_host_id" ]; then
+        printf "${RED}Invalid selection${NC}\n"
+        exit 1
+    fi
+
+    printf "${GREEN}Main domain: %s${NC}\n" "$main_host_url"
+
+    # Initialize regions with main
+    YANDEX_REGIONS="main"
+    YANDEX_HOST_main="$main_host_id"
+    YANDEX_URL_main="$main_host_url"
+
+    # Extract main domain for subdomain detection
+    main_domain=$(echo "$main_host_url" | sed 's|https://||; s|http://||; s|www\.||')
+
+    # Find subdomains of the main domain
+    subdomains=""
+    echo "$hosts_list" | while IFS='|' read -r host_id host_url; do
+        # Skip main domain itself
+        [ "$host_id" = "$main_host_id" ] && continue
+        # Check if it's a subdomain of main
+        if echo "$host_url" | grep -q "\.${main_domain}"; then
+            subdomain=$(echo "$host_url" | sed "s|https://||; s|http://||; s|\.${main_domain}.*||")
+            echo "$subdomain|$host_id|$host_url"
         fi
-    done
+    done > /tmp/yandex_subdomains_$$
+
+    if [ -s /tmp/yandex_subdomains_$$ ]; then
+        echo ""
+        printf "${YELLOW}Found subdomains of %s:${NC}\n" "$main_domain"
+        i=1
+        while IFS='|' read -r subdomain host_id host_url; do
+            printf "  ${CYAN}%d)${NC} %s (%s)\n" "$i" "$subdomain" "$host_url"
+            i=$((i + 1))
+        done < /tmp/yandex_subdomains_$$
+
+        echo ""
+        printf "${YELLOW}Enter subdomain numbers to add (space-separated), or press Enter to skip:${NC} "
+        read -r subdomain_choices
+
+        if [ -n "$subdomain_choices" ]; then
+            for choice in $subdomain_choices; do
+                sub_line=$(sed -n "${choice}p" /tmp/yandex_subdomains_$$)
+                if [ -n "$sub_line" ]; then
+                    subdomain=$(echo "$sub_line" | cut -d'|' -f1)
+                    host_id=$(echo "$sub_line" | cut -d'|' -f2)
+                    host_url=$(echo "$sub_line" | cut -d'|' -f3 | sed 's|/$||')
+
+                    YANDEX_REGIONS="$YANDEX_REGIONS $subdomain"
+                    eval "YANDEX_HOST_${subdomain}=\"$host_id\""
+                    eval "YANDEX_URL_${subdomain}=\"$host_url\""
+                    printf "${GREEN}Added: %s (%s)${NC}\n" "$subdomain" "$host_url"
+                fi
+            done
+        fi
+    fi
+
+    rm -f /tmp/yandex_subdomains_$$
 
     save_config
 
     echo ""
     printf "${GREEN}Setup complete!${NC}\n"
     echo "Configured regions:"
-    [ -n "$YANDEX_URL_MSK" ] && echo "  MSK: $YANDEX_URL_MSK (host: $YANDEX_HOST_MSK)"
-    [ -n "$YANDEX_URL_SPB" ] && echo "  SPB: $YANDEX_URL_SPB (host: $YANDEX_HOST_SPB)"
-    [ -n "$YANDEX_URL_TULA" ] && echo "  TULA: $YANDEX_URL_TULA (host: $YANDEX_HOST_TULA)"
+    for region in $YANDEX_REGIONS; do
+        eval "url=\$YANDEX_URL_${region}"
+        eval "host=\$YANDEX_HOST_${region}"
+        echo "  $region: $url (host: $host)"
+    done
 }
 
 cmd_list() {
@@ -190,18 +225,26 @@ cmd_list() {
 
 get_host_id_for_url() {
     url=$1
+    url_domain=$(echo "$url" | sed 's|https://||; s|/.*||')
 
-    case "$url" in
-        *"spb.favor-group.ru"*)
-            echo "$YANDEX_HOST_SPB"
-            ;;
-        *"tula.favor-group.ru"*)
-            echo "$YANDEX_HOST_TULA"
-            ;;
-        *)
-            echo "$YANDEX_HOST_MSK"
-            ;;
-    esac
+    # Try to match against configured regions (check subdomains before main)
+    # Reverse the order so subdomains are checked first
+    regions_reversed=""
+    for region in $YANDEX_REGIONS; do
+        regions_reversed="$region $regions_reversed"
+    done
+
+    for region in $regions_reversed; do
+        eval "region_url=\$YANDEX_URL_${region}"
+        region_domain=$(echo "$region_url" | sed 's|https://||; s|/.*||')
+        if [ "$url_domain" = "$region_domain" ]; then
+            eval "echo \$YANDEX_HOST_${region}"
+            return
+        fi
+    done
+
+    # Fallback to main
+    echo "$YANDEX_HOST_main"
 }
 
 submit_url() {
@@ -295,29 +338,28 @@ cmd_submit_regions() {
         exit 1
     fi
 
-    if [ -z "${YANDEX_URL_MSK:-}" ]; then
-        printf "${RED}Region URLs not configured. Run 'yandex-reindex setup' to refresh config.${NC}\n"
+    if [ -z "${YANDEX_REGIONS:-}" ]; then
+        printf "${RED}No regions configured. Run 'yandex-reindex setup' first.${NC}\n"
         exit 1
     fi
 
     file=${1:-}
     if [ -z "$file" ] || [ ! -f "$file" ]; then
         echo "Usage: yandex-reindex submit-regions <file_with_relative_urls>"
-        echo "Will submit URLs for all configured regions (MSK, SPB, TULA)"
+        echo "Will submit URLs for all configured regions: $YANDEX_REGIONS"
         echo "File must contain relative URLs starting with / (e.g., /catalog/section/)"
         exit 1
     fi
 
-    for region in "MSK:$YANDEX_URL_MSK" "SPB:$YANDEX_URL_SPB" "TULA:$YANDEX_URL_TULA"; do
-        name=$(echo "$region" | cut -d: -f1)
-        base_url=$(echo "$region" | cut -d: -f2-)
+    for region in $YANDEX_REGIONS; do
+        eval "base_url=\$YANDEX_URL_${region}"
 
         if [ -z "$base_url" ]; then
-            printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$name"
+            printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$region"
             continue
         fi
 
-        printf "${YELLOW}=== Submitting for %s (%s) ===${NC}\n" "$name" "$base_url"
+        printf "${YELLOW}=== Submitting for %s (%s) ===${NC}\n" "$region" "$base_url"
 
         while IFS= read -r url || [ -n "$url" ]; do
             case "$url" in
@@ -362,7 +404,7 @@ case "${1:-}" in
         echo "Yandex Webmaster API - URL Reindexing Tool"
         echo ""
         echo "Usage:"
-        echo "  yandex-reindex setup                - Initial setup (OAuth, host detection)"
+        echo "  yandex-reindex setup                - Interactive setup (OAuth, select domains)"
         echo "  yandex-reindex list                 - List all verified hosts"
         echo "  yandex-reindex submit <file>        - Submit absolute URLs from file"
         echo "  yandex-reindex submit-url <url>...  - Submit one or more absolute URLs"
