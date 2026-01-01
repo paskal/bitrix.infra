@@ -294,12 +294,13 @@ cmd_submit_regions() {
     if [ -z "$file" ] || [ ! -f "$file" ]; then
         echo "Usage: yandex-reindex submit-regions <file_with_urls>"
         echo "Will submit URLs for MSK, SPB, and TULA regions"
+        echo "Supports both relative (/catalog/...) and absolute (https://...) URLs"
         exit 1
     fi
 
-    for region in "MSK:" "SPB:spb." "TULA:tula."; do
+    for region in "MSK:https://favor-group.ru" "SPB:https://spb.favor-group.ru" "TULA:https://tula.favor-group.ru"; do
         name=$(echo "$region" | cut -d: -f1)
-        prefix=$(echo "$region" | cut -d: -f2)
+        base_url=$(echo "$region" | cut -d: -f2-)
 
         printf "${YELLOW}=== Submitting for %s ===${NC}\n" "$name"
 
@@ -308,8 +309,14 @@ cmd_submit_regions() {
                 ""|\#*) continue ;;
             esac
 
-            # Replace favor-group.ru with region prefix
-            regional_url=$(echo "$url" | sed "s|://favor-group.ru|://${prefix}favor-group.ru|")
+            # Handle relative URLs (starting with /)
+            if echo "$url" | grep -q '^/'; then
+                regional_url="${base_url}${url}"
+            else
+                # Handle absolute URLs - replace domain
+                regional_url=$(echo "$url" | sed "s|https://favor-group.ru|${base_url}|; s|https://www.favor-group.ru|${base_url}|")
+            fi
+
             submit_url "$regional_url"
             sleep 0.2
         done < "$file"
