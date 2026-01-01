@@ -2,11 +2,15 @@
 # Yandex Webmaster API - URL Reindexing Tool
 #
 # Usage:
-#   yandex-reindex setup              - Initial setup (prints OAuth instructions)
-#   yandex-reindex list               - List all verified hosts
-#   yandex-reindex submit <file>      - Submit URLs from file for reindexing
-#   yandex-reindex submit-url <url>...  - Submit one or more URLs for reindexing
-#   yandex-reindex submit-regions <file> - Submit URLs for MSK, SPB, TULA
+#   yandex-reindex setup                - Initial setup (OAuth, host detection)
+#   yandex-reindex list                 - List all verified hosts
+#   yandex-reindex submit <file>        - Submit absolute URLs from file
+#   yandex-reindex submit-url <url>...  - Submit one or more absolute URLs
+#   yandex-reindex submit-regions <file> - Submit relative URLs for all regions
+#
+# Examples:
+#   yandex-reindex submit-url https://example.com/page/
+#   yandex-reindex submit-regions urls.txt  # file contains /catalog/section/
 #
 # Config: $SCRIPT_DIR/.yandex-webmaster (gitignored)
 # Run 'yandex-reindex setup' to configure - it will guide you through OAuth setup.
@@ -37,6 +41,9 @@ YANDEX_USER_ID=$YANDEX_USER_ID
 YANDEX_HOST_MSK=$YANDEX_HOST_MSK
 YANDEX_HOST_SPB=$YANDEX_HOST_SPB
 YANDEX_HOST_TULA=$YANDEX_HOST_TULA
+YANDEX_URL_MSK=$YANDEX_URL_MSK
+YANDEX_URL_SPB=$YANDEX_URL_SPB
+YANDEX_URL_TULA=$YANDEX_URL_TULA
 EOF
     chmod 600 "$CONFIG_FILE"
     printf "${GREEN}Config saved to %s${NC}\n" "$CONFIG_FILE"
@@ -117,55 +124,53 @@ cmd_setup() {
     YANDEX_HOST_MSK=""
     YANDEX_HOST_SPB=""
     YANDEX_HOST_TULA=""
+    YANDEX_URL_MSK=""
+    YANDEX_URL_SPB=""
+    YANDEX_URL_TULA=""
 
-    hosts_data=$(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)\t\(.ascii_host_url)"')
-    echo "$hosts_data" | while IFS='	' read -r host_id host_url; do
-        case "$host_url" in
-            *"://favor-group.ru"*|*"://www.favor-group.ru"*)
-                echo "MSK:$host_id"
-                ;;
-            *"://spb.favor-group.ru"*)
-                echo "SPB:$host_id"
-                ;;
-            *"://tula.favor-group.ru"*)
-                echo "TULA:$host_id"
-                ;;
-        esac
-    done | while IFS=: read -r region host_id; do
-        case "$region" in
-            MSK) YANDEX_HOST_MSK="$host_id" ;;
-            SPB) YANDEX_HOST_SPB="$host_id" ;;
-            TULA) YANDEX_HOST_TULA="$host_id" ;;
-        esac
-    done
-
-    # Parse again to set variables (subshell workaround)
+    # Parse hosts to detect regions (MSK = main domain, SPB/TULA = subdomains)
     for line in $(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)|\(.ascii_host_url)"'); do
         host_id=$(echo "$line" | cut -d'|' -f1)
         host_url=$(echo "$line" | cut -d'|' -f2)
-        case "$host_url" in
-            *"://favor-group.ru"*|*"://www.favor-group.ru"*)
-                YANDEX_HOST_MSK="$host_id"
-                echo "    -> Detected as MSK"
-                ;;
-            *"://spb.favor-group.ru"*)
-                YANDEX_HOST_SPB="$host_id"
-                echo "    -> Detected as SPB"
-                ;;
-            *"://tula.favor-group.ru"*)
-                YANDEX_HOST_TULA="$host_id"
-                echo "    -> Detected as TULA"
-                ;;
-        esac
+        # Extract base URL (remove trailing slash if present)
+        base_url=$(echo "$host_url" | sed 's|/$||')
+
+        # Check for subdomain pattern first (more specific matches)
+        if echo "$host_url" | grep -qE '://[a-z]+\.[^/]+\.[^/]+'; then
+            # Has subdomain - check which region
+            subdomain=$(echo "$host_url" | sed 's|.*://||; s|\..*||')
+            case "$subdomain" in
+                spb)
+                    YANDEX_HOST_SPB="$host_id"
+                    YANDEX_URL_SPB="$base_url"
+                    echo "    -> Detected as SPB"
+                    ;;
+                tula)
+                    YANDEX_HOST_TULA="$host_id"
+                    YANDEX_URL_TULA="$base_url"
+                    echo "    -> Detected as TULA"
+                    ;;
+            esac
+        else
+            # No subdomain or www - this is the main domain (MSK)
+            # Also match www.domain as main
+            if echo "$host_url" | grep -qE '://www\.'; then
+                continue  # Skip www variant, prefer non-www
+            fi
+            YANDEX_HOST_MSK="$host_id"
+            YANDEX_URL_MSK="$base_url"
+            echo "    -> Detected as MSK (main)"
+        fi
     done
 
     save_config
 
     echo ""
     printf "${GREEN}Setup complete!${NC}\n"
-    echo "MSK host: $YANDEX_HOST_MSK"
-    echo "SPB host: $YANDEX_HOST_SPB"
-    echo "TULA host: $YANDEX_HOST_TULA"
+    echo "Configured regions:"
+    [ -n "$YANDEX_URL_MSK" ] && echo "  MSK: $YANDEX_URL_MSK (host: $YANDEX_HOST_MSK)"
+    [ -n "$YANDEX_URL_SPB" ] && echo "  SPB: $YANDEX_URL_SPB (host: $YANDEX_HOST_SPB)"
+    [ -n "$YANDEX_URL_TULA" ] && echo "  TULA: $YANDEX_URL_TULA (host: $YANDEX_HOST_TULA)"
 }
 
 cmd_list() {
@@ -290,34 +295,42 @@ cmd_submit_regions() {
         exit 1
     fi
 
-    file=${1:-}
-    if [ -z "$file" ] || [ ! -f "$file" ]; then
-        echo "Usage: yandex-reindex submit-regions <file_with_urls>"
-        echo "Will submit URLs for MSK, SPB, and TULA regions"
-        echo "Supports both relative (/catalog/...) and absolute (https://...) URLs"
+    if [ -z "${YANDEX_URL_MSK:-}" ]; then
+        printf "${RED}Region URLs not configured. Run 'yandex-reindex setup' to refresh config.${NC}\n"
         exit 1
     fi
 
-    for region in "MSK:https://favor-group.ru" "SPB:https://spb.favor-group.ru" "TULA:https://tula.favor-group.ru"; do
+    file=${1:-}
+    if [ -z "$file" ] || [ ! -f "$file" ]; then
+        echo "Usage: yandex-reindex submit-regions <file_with_relative_urls>"
+        echo "Will submit URLs for all configured regions (MSK, SPB, TULA)"
+        echo "File must contain relative URLs starting with / (e.g., /catalog/section/)"
+        exit 1
+    fi
+
+    for region in "MSK:$YANDEX_URL_MSK" "SPB:$YANDEX_URL_SPB" "TULA:$YANDEX_URL_TULA"; do
         name=$(echo "$region" | cut -d: -f1)
         base_url=$(echo "$region" | cut -d: -f2-)
 
-        printf "${YELLOW}=== Submitting for %s ===${NC}\n" "$name"
+        if [ -z "$base_url" ]; then
+            printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$name"
+            continue
+        fi
+
+        printf "${YELLOW}=== Submitting for %s (%s) ===${NC}\n" "$name" "$base_url"
 
         while IFS= read -r url || [ -n "$url" ]; do
             case "$url" in
                 ""|\#*) continue ;;
             esac
 
-            # Handle relative URLs (starting with /)
-            if echo "$url" | grep -q '^/'; then
-                regional_url="${base_url}${url}"
-            else
-                # Handle absolute URLs - replace domain
-                regional_url=$(echo "$url" | sed "s|https://favor-group.ru|${base_url}|; s|https://www.favor-group.ru|${base_url}|")
+            # Only accept relative URLs
+            if ! echo "$url" | grep -q '^/'; then
+                printf "${RED}Skipping non-relative URL: %s${NC}\n" "$url"
+                continue
             fi
 
-            submit_url "$regional_url"
+            submit_url "${base_url}${url}"
             sleep 0.2
         done < "$file"
 
@@ -349,11 +362,15 @@ case "${1:-}" in
         echo "Yandex Webmaster API - URL Reindexing Tool"
         echo ""
         echo "Usage:"
-        echo "  yandex-reindex setup              - Initial setup (get token, user-id, host-ids)"
-        echo "  yandex-reindex list               - List all verified hosts"
-        echo "  yandex-reindex submit <file>      - Submit URLs from file"
-        echo "  yandex-reindex submit-url <url>...  - Submit one or more URLs"
-        echo "  yandex-reindex submit-regions <file> - Submit URLs for MSK, SPB, TULA"
+        echo "  yandex-reindex setup                - Initial setup (OAuth, host detection)"
+        echo "  yandex-reindex list                 - List all verified hosts"
+        echo "  yandex-reindex submit <file>        - Submit absolute URLs from file"
+        echo "  yandex-reindex submit-url <url>...  - Submit one or more absolute URLs"
+        echo "  yandex-reindex submit-regions <file> - Submit relative URLs for all regions"
+        echo ""
+        echo "Examples:"
+        echo "  yandex-reindex submit-url https://example.com/page/"
+        echo "  yandex-reindex submit-regions urls.txt  # contains /catalog/section/"
         echo ""
         echo "Config: \$SCRIPT_DIR/.yandex-webmaster"
         ;;
