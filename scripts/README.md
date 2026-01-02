@@ -96,3 +96,28 @@ Below is a list of scripts and relevant files found in this directory:
     *   **Purpose:** Python utility for checking URLs, finding redirects, broken links, and extracting page titles. Supports updating redirect maps.
     *   **Notes:** May use `requirements.txt` for its dependencies.
 
+## bin/ Directory Tools
+
+*   **`bin/yandex-reindex`**
+    *   **Type:** Shell script
+    *   **Purpose:** Yandex Webmaster API tool for URL reindexing and site diagnostics.
+    *   **Commands:**
+        *   `setup` - Interactive OAuth setup and domain selection
+        *   `list` - List all verified hosts
+        *   `submit <file>` - Submit absolute URLs from file
+        *   `submit-url <url>...` - Submit one or more absolute URLs
+        *   `submit-regions <file>` - Submit relative URLs for all configured regions
+        *   `diagnostics` - Check site issues for all regions (exit 1 if FATAL/CRITICAL errors)
+    *   **Config:** `bin/.yandex-webmaster` (gitignored)
+    *   **Examples:**
+        ```bash
+        yandex-reindex setup                              # First-time setup
+        yandex-reindex submit-regions /tmp/urls.txt       # Submit URLs for all regions
+        yandex-reindex diagnostics && echo 'All OK'       # Check for issues (Zabbix-friendly)
+        ```
+
+*   **`bin/fgmysql`**
+    *   **Type:** Shell script
+    *   **Purpose:** MySQL client wrapper using SSH tunnel. Connects to favor-group.ru MySQL with read-only `claude_ro` user.
+    *   **Usage:** `fgmysql -e "SELECT ..."` or `fgmysql dev -e "SELECT ..."`
+

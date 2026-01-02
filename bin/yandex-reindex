@@ -7,6 +7,7 @@
 #   yandex-reindex submit <file>        - Submit absolute URLs from file
 #   yandex-reindex submit-url <url>...  - Submit one or more absolute URLs
 #   yandex-reindex submit-regions <file> - Submit relative URLs for all regions
+#   yandex-reindex diagnostics           - Check site issues for all regions (exit 1 if errors)
 #
 # Examples:
 #   yandex-reindex submit-url https://example.com/page/
@@ -382,6 +383,92 @@ cmd_submit_regions() {
     printf "${GREEN}Done!${NC}\n"
 }
 
+cmd_diagnostics() {
+    load_config
+
+    if [ -z "${YANDEX_USER_ID:-}" ]; then
+        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        exit 1
+    fi
+
+    if [ -z "${YANDEX_REGIONS:-}" ]; then
+        printf "${RED}No regions configured. Run 'yandex-reindex setup' first.${NC}\n"
+        exit 1
+    fi
+
+    has_errors=0
+    total_issues=0
+
+    for region in $YANDEX_REGIONS; do
+        eval "host_id=\$YANDEX_HOST_${region}"
+        eval "base_url=\$YANDEX_URL_${region}"
+
+        if [ -z "$host_id" ]; then
+            printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$region"
+            continue
+        fi
+
+        # Build webmaster URL for this host
+        webmaster_url="https://webmaster.yandex.ru/site/${host_id}/diagnostics/"
+
+        response=$(api_call GET "/user/$YANDEX_USER_ID/hosts/$host_id/diagnostics")
+
+        # Check for API errors
+        error_code=$(echo "$response" | jq -r '.error_code // empty')
+        if [ -n "$error_code" ]; then
+            printf "${RED}✗ %s (%s)${NC}\n" "$region" "$base_url"
+            printf "  API Error: %s\n" "$error_code"
+            has_errors=1
+            continue
+        fi
+
+        # Count issues by severity
+        fatal_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "FATAL")] | length')
+        critical_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "CRITICAL")] | length')
+        warning_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "POSSIBLE_PROBLEM")] | length')
+
+        region_issues=$((fatal_count + critical_count + warning_count))
+        total_issues=$((total_issues + region_issues))
+
+        if [ "$fatal_count" -gt 0 ] || [ "$critical_count" -gt 0 ]; then
+            has_errors=1
+        fi
+
+        # Print region header
+        if [ "$region_issues" -eq 0 ]; then
+            printf "${GREEN}✓ %s (%s)${NC} - no issues\n" "$region" "$base_url"
+        else
+            printf "${RED}✗ %s (%s)${NC} - %d issue(s)\n" "$region" "$base_url" "$region_issues"
+
+            # List FATAL issues
+            if [ "$fatal_count" -gt 0 ]; then
+                echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "FATAL") | "  🔴 FATAL: \(.key)"'
+            fi
+
+            # List CRITICAL issues
+            if [ "$critical_count" -gt 0 ]; then
+                echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "CRITICAL") | "  🟠 CRITICAL: \(.key)"'
+            fi
+
+            # List warnings
+            if [ "$warning_count" -gt 0 ]; then
+                echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "POSSIBLE_PROBLEM") | "  🟡 WARNING: \(.key)"'
+            fi
+
+            printf "  ${CYAN}→ %s${NC}\n" "$webmaster_url"
+        fi
+    done
+
+    echo ""
+    if [ "$total_issues" -eq 0 ]; then
+        printf "${GREEN}All regions OK - no issues detected${NC}\n"
+        exit 0
+    else
+        printf "${YELLOW}Total: %d issue(s) across all regions${NC}\n" "$total_issues"
+        exit "$has_errors"
+    fi
+}
+
 # Main
 case "${1:-}" in
     setup)
@@ -400,19 +487,24 @@ case "${1:-}" in
     submit-regions)
         cmd_submit_regions "${2:-}"
         ;;
+    diagnostics)
+        cmd_diagnostics
+        ;;
     *)
         echo "Yandex Webmaster API - URL Reindexing Tool"
         echo ""
         echo "Usage:"
-        echo "  yandex-reindex setup                - Interactive setup (OAuth, select domains)"
-        echo "  yandex-reindex list                 - List all verified hosts"
-        echo "  yandex-reindex submit <file>        - Submit absolute URLs from file"
-        echo "  yandex-reindex submit-url <url>...  - Submit one or more absolute URLs"
+        echo "  yandex-reindex setup                 - Interactive setup (OAuth, select domains)"
+        echo "  yandex-reindex list                  - List all verified hosts"
+        echo "  yandex-reindex submit <file>         - Submit absolute URLs from file"
+        echo "  yandex-reindex submit-url <url>...   - Submit one or more absolute URLs"
         echo "  yandex-reindex submit-regions <file> - Submit relative URLs for all regions"
+        echo "  yandex-reindex diagnostics           - Check site issues (exit 1 if FATAL/CRITICAL)"
         echo ""
         echo "Examples:"
         echo "  yandex-reindex submit-url https://example.com/page/"
         echo "  yandex-reindex submit-regions urls.txt  # contains /catalog/section/"
+        echo "  yandex-reindex diagnostics && echo 'All OK'"
         echo ""
         echo "Config: \$SCRIPT_DIR/.yandex-webmaster"
         ;;
