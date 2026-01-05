@@ -121,10 +121,8 @@ bing_submit_url() {
 		-H "Content-Type: application/json" \
 		-d "$payload")
 
-	# Bing returns {"d":null} on success
-	if echo "$response" | grep -q '"d":null'; then
-		printf "${GREEN}✓${NC} Bing: %s\n" "$url"
-	else
+	# Bing returns {"d":null} on success - only print on failure
+	if ! echo "$response" | grep -q '"d":null'; then
 		error_msg=$(echo "$response" | jq -r '.Message // .ErrorCode // "Unknown error"' 2>/dev/null || echo "$response")
 		printf "${RED}✗${NC} Bing: %s (%s)\n" "$url" "$error_msg"
 	fi
