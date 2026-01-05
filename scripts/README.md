@@ -98,22 +98,22 @@ Below is a list of scripts and relevant files found in this directory:
 
 ## bin/ Directory Tools
 
-*   **`bin/yandex-reindex`**
+*   **`bin/search-reindex`**
     *   **Type:** Shell script
-    *   **Purpose:** Yandex Webmaster API tool for URL reindexing and site diagnostics.
+    *   **Purpose:** Search engine URL reindexing tool (Yandex + Bing) and Yandex site diagnostics.
     *   **Commands:**
-        *   `setup` - Interactive OAuth setup and domain selection
-        *   `list` - List all verified hosts
+        *   `setup` - Interactive setup (Yandex OAuth + optional Bing API key)
+        *   `list` - List all verified Yandex hosts
         *   `submit <file>` - Submit absolute URLs from file
         *   `submit-url <url>...` - Submit one or more absolute URLs
         *   `submit-regions <file>` - Submit relative URLs for all configured regions
-        *   `diagnostics` - Check site issues for all regions (exit 1 if FATAL/CRITICAL errors)
-    *   **Config:** `bin/.yandex-webmaster` (gitignored)
+        *   `diagnostics` - Check Yandex site issues (exit 1 if FATAL/CRITICAL errors)
+    *   **Config:** `bin/.search-reindex` (gitignored)
     *   **Examples:**
         ```bash
-        yandex-reindex setup                              # First-time setup
-        yandex-reindex submit-regions /tmp/urls.txt       # Submit URLs for all regions
-        yandex-reindex diagnostics && echo 'All OK'       # Check for issues (Zabbix-friendly)
+        search-reindex setup                              # First-time setup
+        search-reindex submit-regions /tmp/urls.txt       # Submit URLs for all regions
+        search-reindex diagnostics && echo 'All OK'       # Check for issues (Zabbix-friendly)
         ```
 
 *   **`bin/fgmysql`**

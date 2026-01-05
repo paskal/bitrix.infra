@@ -529,9 +529,9 @@ The tunnel starts automatically and password is fetched from the server (cached 
 </details>
 
 <details>
-<summary>Yandex Webmaster URL reindexing (yandex-reindex)</summary>
+<summary>Search engine URL reindexing (search-reindex)</summary>
 
-The `yandex-reindex` command submits URLs to Yandex Webmaster for reindexing. Useful after content updates or fixing 404 errors.
+The `search-reindex` command submits URLs to Yandex and Bing for reindexing. Useful after content updates or fixing 404 errors.
 
 **Setup:**
 
@@ -540,21 +540,22 @@ The `yandex-reindex` command submits URLs to Yandex Webmaster for reindexing. Us
    export PATH="/path/to/bitrix.infra/bin:$PATH"
    ```
 
-2. Run setup (it will guide you through OAuth app creation):
+2. Run setup (it will guide you through OAuth app creation for Yandex and optionally Bing API key):
    ```shell
-   yandex-reindex setup
+   search-reindex setup
    ```
 
 The script will auto-detect host IDs for favor-group.ru sites.
 
-**Note:** This uses Yandex OAuth (oauth.yandex.ru), which is different from Yandex Cloud IAM tokens used by DNS/certbot scripts.
+**Note:** Yandex uses OAuth (oauth.yandex.ru), Bing uses a simple API key from Bing Webmaster Tools.
 
 **Usage:**
 ```shell
-yandex-reindex list                      # List verified hosts
-yandex-reindex submit-url <url>...       # Submit one or more URLs
-yandex-reindex submit <file>             # Submit URLs from file
-yandex-reindex submit-regions <file>     # Submit URLs for MSK, SPB, TULA
+search-reindex list                      # List verified Yandex hosts
+search-reindex submit-url <url>...       # Submit one or more URLs
+search-reindex submit <file>             # Submit URLs from file
+search-reindex submit-regions <file>     # Submit URLs for MSK, SPB, TULA
+search-reindex diagnostics               # Check Yandex site issues
 ```
 
 **Example:**
@@ -565,8 +566,8 @@ https://favor-group.ru/catalog/profnastil/1484/
 https://favor-group.ru/catalog/profnastil/1485/
 EOF
 
-# Submit for reindexing
-yandex-reindex submit urls.txt
+# Submit for reindexing (goes to both Yandex and Bing if configured)
+search-reindex submit urls.txt
 ```
 
 </details>

@@ -1,26 +1,28 @@
 #!/bin/sh
-# Yandex Webmaster API - URL Reindexing Tool
+# Search Engine URL Reindexing Tool (Yandex + Bing)
 #
 # Usage:
-#   yandex-reindex setup                - Interactive setup (OAuth, select domains)
-#   yandex-reindex list                 - List all verified hosts
-#   yandex-reindex submit <file>        - Submit absolute URLs from file
-#   yandex-reindex submit-url <url>...  - Submit one or more absolute URLs
-#   yandex-reindex submit-regions <file> - Submit relative URLs for all regions
-#   yandex-reindex diagnostics           - Check site issues for all regions (exit 1 if errors)
+#   search-reindex setup                - Interactive setup (OAuth, select domains, Bing API)
+#   search-reindex list                 - List all verified Yandex hosts
+#   search-reindex submit <file>        - Submit absolute URLs from file
+#   search-reindex submit-url <url>...  - Submit one or more absolute URLs
+#   search-reindex submit-regions <file> - Submit relative URLs for all regions
+#   search-reindex diagnostics           - Check Yandex site issues (exit 1 if errors)
 #
 # Examples:
-#   yandex-reindex submit-url https://example.com/page/
-#   yandex-reindex submit-regions urls.txt  # file contains /catalog/section/
+#   search-reindex submit-url https://example.com/page/
+#   search-reindex submit-regions urls.txt  # file contains /catalog/section/
 #
-# Config: $SCRIPT_DIR/.yandex-webmaster (gitignored)
-# Run 'yandex-reindex setup' to configure - it will guide you through OAuth setup.
+# Config: $SCRIPT_DIR/.search-reindex (gitignored)
+# Run 'search-reindex setup' to configure - it will guide you through OAuth setup.
+# Bing submission is optional and can be enabled during setup.
 
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/.yandex-webmaster"
+CONFIG_FILE="$SCRIPT_DIR/.search-reindex"
 API_BASE="https://api.webmaster.yandex.net/v4"
+BING_API_BASE="https://ssl.bing.com/webmaster/api.svc/json"
 
 # Colours
 RED='\033[0;31m'
@@ -45,6 +47,11 @@ save_config() {
             eval "echo \"YANDEX_HOST_${region}=\$YANDEX_HOST_${region}\""
             eval "echo \"YANDEX_URL_${region}=\$YANDEX_URL_${region}\""
         done
+        # Bing settings (optional)
+        if [ -n "${BING_API_KEY:-}" ]; then
+            echo "BING_API_KEY=$BING_API_KEY"
+            echo "BING_SITE_URL=$BING_SITE_URL"
+        fi
     } > "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
     printf "${GREEN}Config saved to %s${NC}\n" "$CONFIG_FILE"
@@ -57,7 +64,7 @@ api_call() {
 
     if [ -z "${YANDEX_OAUTH_TOKEN:-}" ]; then
         printf "${RED}Error: YANDEX_OAUTH_TOKEN not set${NC}\n"
-        echo "Run 'yandex-reindex setup' to configure"
+        echo "Run 'search-reindex setup' to configure"
         exit 1
     fi
 
@@ -70,6 +77,30 @@ api_call() {
             -H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$data"
+    fi
+}
+
+bing_submit_url() {
+    url=$1
+
+    if [ -z "${BING_API_KEY:-}" ]; then
+        return 0
+    fi
+
+    # Build JSON payload safely using jq to handle escaping
+    payload=$(jq -n --arg site "$BING_SITE_URL" --arg url "$url" \
+        '{siteUrl: $site, urlList: [$url]}')
+
+    response=$(curl -s -X POST "${BING_API_BASE}/SubmitUrlbatch?apikey=${BING_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "$payload")
+
+    # Bing returns {"d":null} on success
+    if echo "$response" | grep -q '"d":null'; then
+        printf "${GREEN}✓${NC} Bing: %s\n" "$url"
+    else
+        error_msg=$(echo "$response" | jq -r '.Message // .ErrorCode // "Unknown error"' 2>/dev/null || echo "$response")
+        printf "${RED}✗${NC} Bing: %s (%s)\n" "$url" "$error_msg"
     fi
 }
 
@@ -197,23 +228,70 @@ cmd_setup() {
 
     rm -f /tmp/yandex_subdomains_$$
 
+    # Bing setup (optional)
+    echo ""
+    printf "${YELLOW}=== Bing Webmaster Setup (optional) ===${NC}\n"
+
+    if [ -n "${BING_API_KEY:-}" ]; then
+        echo "Bing is currently configured for: $BING_SITE_URL"
+        printf "Reconfigure Bing? [y/N]: "
+        read -r setup_bing
+    else
+        echo "Bing uses a simple API key for URL submission."
+        echo ""
+        printf "Set up Bing submission? [y/N]: "
+        read -r setup_bing
+    fi
+
+    if [ "$setup_bing" = "y" ] || [ "$setup_bing" = "Y" ]; then
+        echo ""
+        printf "${YELLOW}To get your Bing API key:${NC}\n"
+        echo "1. Go to: ${CYAN}https://www.bing.com/webmasters/home?siteUrl=${YANDEX_URL_main}/${NC}"
+        echo "2. Sign in and add/verify your site if not done"
+        echo "3. Click 'API access' in the left menu"
+        echo "4. Click 'Generate' to create an API key, then copy it"
+        echo ""
+        printf "Enter your Bing API key (or press Enter to disable): "
+        read -r new_bing_key
+
+        if [ -n "$new_bing_key" ]; then
+            BING_API_KEY="$new_bing_key"
+            # Use the main domain URL for Bing
+            BING_SITE_URL="$YANDEX_URL_main"
+            printf "${GREEN}Bing configured for: %s${NC}\n" "$BING_SITE_URL"
+        else
+            BING_API_KEY=""
+            BING_SITE_URL=""
+            printf "${YELLOW}Bing disabled${NC}\n"
+        fi
+    fi
+
     save_config
 
     echo ""
     printf "${GREEN}Setup complete!${NC}\n"
-    echo "Configured regions:"
+    echo ""
+    echo "Yandex regions:"
     for region in $YANDEX_REGIONS; do
         eval "url=\$YANDEX_URL_${region}"
         eval "host=\$YANDEX_HOST_${region}"
         echo "  $region: $url (host: $host)"
     done
+
+    if [ -n "${BING_API_KEY:-}" ]; then
+        echo ""
+        echo "Bing: $BING_SITE_URL (enabled)"
+    else
+        echo ""
+        echo "Bing: not configured (run setup again to add)"
+    fi
 }
 
 cmd_list() {
     load_config
 
     if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        printf "${RED}Run 'search-reindex setup' first${NC}\n"
         exit 1
     fi
 
@@ -263,25 +341,28 @@ submit_url() {
     error=$(echo "$response" | jq -r '.error_code // empty')
 
     if [ -n "$task_id" ]; then
-        printf "${GREEN}✓${NC} %s (quota: %s)\n" "$url" "$quota"
+        printf "${GREEN}✓${NC} Yandex: %s (quota: %s)\n" "$url" "$quota"
     elif [ "$error" = "URL_ALREADY_ADDED" ]; then
-        printf "${YELLOW}○${NC} %s (already queued)\n" "$url"
+        printf "${YELLOW}○${NC} Yandex: %s (already queued)\n" "$url"
     else
-        printf "${RED}✗${NC} %s\n" "$url"
+        printf "${RED}✗${NC} Yandex: %s\n" "$url"
         echo "  Error: $response"
     fi
+
+    # Also submit to Bing if configured
+    bing_submit_url "$url"
 }
 
 cmd_submit_url() {
     load_config
 
     if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        printf "${RED}Run 'search-reindex setup' first${NC}\n"
         exit 1
     fi
 
     if [ $# -eq 0 ]; then
-        echo "Usage: yandex-reindex submit-url <url> [<url>...]"
+        echo "Usage: search-reindex submit-url <url> [<url>...]"
         exit 1
     fi
 
@@ -298,13 +379,13 @@ cmd_submit() {
     load_config
 
     if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        printf "${RED}Run 'search-reindex setup' first${NC}\n"
         exit 1
     fi
 
     file=${1:-}
     if [ -z "$file" ] || [ ! -f "$file" ]; then
-        echo "Usage: yandex-reindex submit <file_with_urls>"
+        echo "Usage: search-reindex submit <file_with_urls>"
         exit 1
     fi
 
@@ -335,18 +416,18 @@ cmd_submit_regions() {
     load_config
 
     if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        printf "${RED}Run 'search-reindex setup' first${NC}\n"
         exit 1
     fi
 
     if [ -z "${YANDEX_REGIONS:-}" ]; then
-        printf "${RED}No regions configured. Run 'yandex-reindex setup' first.${NC}\n"
+        printf "${RED}No regions configured. Run 'search-reindex setup' first.${NC}\n"
         exit 1
     fi
 
     file=${1:-}
     if [ -z "$file" ] || [ ! -f "$file" ]; then
-        echo "Usage: yandex-reindex submit-regions <file_with_relative_urls>"
+        echo "Usage: search-reindex submit-regions <file_with_relative_urls>"
         echo "Will submit URLs for all configured regions: $YANDEX_REGIONS"
         echo "File must contain relative URLs starting with / (e.g., /catalog/section/)"
         exit 1
@@ -387,12 +468,12 @@ cmd_diagnostics() {
     load_config
 
     if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'yandex-reindex setup' first${NC}\n"
+        printf "${RED}Run 'search-reindex setup' first${NC}\n"
         exit 1
     fi
 
     if [ -z "${YANDEX_REGIONS:-}" ]; then
-        printf "${RED}No regions configured. Run 'yandex-reindex setup' first.${NC}\n"
+        printf "${RED}No regions configured. Run 'search-reindex setup' first.${NC}\n"
         exit 1
     fi
 
@@ -491,21 +572,22 @@ case "${1:-}" in
         cmd_diagnostics
         ;;
     *)
-        echo "Yandex Webmaster API - URL Reindexing Tool"
+        echo "Search Engine URL Reindexing Tool (Yandex + Bing)"
         echo ""
         echo "Usage:"
-        echo "  yandex-reindex setup                 - Interactive setup (OAuth, select domains)"
-        echo "  yandex-reindex list                  - List all verified hosts"
-        echo "  yandex-reindex submit <file>         - Submit absolute URLs from file"
-        echo "  yandex-reindex submit-url <url>...   - Submit one or more absolute URLs"
-        echo "  yandex-reindex submit-regions <file> - Submit relative URLs for all regions"
-        echo "  yandex-reindex diagnostics           - Check site issues (exit 1 if FATAL/CRITICAL)"
+        echo "  search-reindex setup                 - Interactive setup (OAuth, domains, Bing API)"
+        echo "  search-reindex list                  - List all verified Yandex hosts"
+        echo "  search-reindex submit <file>         - Submit absolute URLs from file"
+        echo "  search-reindex submit-url <url>...   - Submit one or more absolute URLs"
+        echo "  search-reindex submit-regions <file> - Submit relative URLs for all regions"
+        echo "  search-reindex diagnostics           - Check Yandex site issues (exit 1 if FATAL/CRITICAL)"
         echo ""
         echo "Examples:"
-        echo "  yandex-reindex submit-url https://example.com/page/"
-        echo "  yandex-reindex submit-regions urls.txt  # contains /catalog/section/"
-        echo "  yandex-reindex diagnostics && echo 'All OK'"
+        echo "  search-reindex submit-url https://example.com/page/"
+        echo "  search-reindex submit-regions urls.txt  # contains /catalog/section/"
+        echo "  search-reindex diagnostics && echo 'All OK'"
         echo ""
-        echo "Config: \$SCRIPT_DIR/.yandex-webmaster"
+        echo "Config: \$SCRIPT_DIR/.search-reindex"
+        echo "URLs are submitted to both Yandex and Bing (if configured)."
         ;;
 esac
