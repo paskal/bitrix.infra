@@ -23,56 +23,59 @@ PID_FILE="$SOCKET_DIR/tunnel.pid"
 # Fetch password from server (cached for 1 hour)
 PASS_CACHE="/tmp/.fgmysql_pass_cache"
 get_password() {
-    # Use cached password if less than 1 hour old
-    if [ -f "$PASS_CACHE" ] && [ "$(find "$PASS_CACHE" -mmin -60 2>/dev/null)" ]; then
-        cat "$PASS_CACHE"
-        return
-    fi
+	# Use cached password if less than 1 hour old
+	if [ -f "$PASS_CACHE" ] && [ "$(find "$PASS_CACHE" -mmin -60 2>/dev/null)" ]; then
+		cat "$PASS_CACHE"
+		return
+	fi
 
-    # Fetch from server
-    pass=$(ssh "$SSH_HOST" 'source /web/private/environment/mysql.env && echo "$MYSQL_CLAUDE_RO_PASSWORD"')
+	# Fetch from server
+	pass=$(ssh "$SSH_HOST" 'source /web/private/environment/mysql.env && echo "$MYSQL_CLAUDE_RO_PASSWORD"')
 
-    # Cache it with secure permissions from the start
-    (umask 077; printf '%s' "$pass" > "$PASS_CACHE")
+	# Cache it with secure permissions from the start
+	(
+		umask 077
+		printf '%s' "$pass" >"$PASS_CACHE"
+	)
 
-    printf '%s' "$pass"
+	printf '%s' "$pass"
 }
 
 # Test if socket is responding (macOS nc -z doesn't work with Unix sockets)
 socket_alive() {
-    [ -S "$LOCAL_SOCKET" ] && printf '' | nc -U -w 1 "$LOCAL_SOCKET" >/dev/null 2>&1
+	[ -S "$LOCAL_SOCKET" ] && printf '' | nc -U -w 1 "$LOCAL_SOCKET" >/dev/null 2>&1
 }
 
 # Kill any existing tunnel processes for this socket
 kill_stale_tunnels() {
-    pkill -f "ssh.*-N.*$LOCAL_SOCKET" 2>/dev/null || true
-    rm -f "$LOCAL_SOCKET" "$PID_FILE"
+	pkill -f "ssh.*-N.*$LOCAL_SOCKET" 2>/dev/null || true
+	rm -f "$LOCAL_SOCKET" "$PID_FILE"
 }
 
 # Ensure tunnel is running
 ensure_tunnel() {
-    if socket_alive; then
-        return 0
-    fi
+	if socket_alive; then
+		return 0
+	fi
 
-    # Kill ALL existing tunnel processes before starting a new one
-    kill_stale_tunnels
+	# Kill ALL existing tunnel processes before starting a new one
+	kill_stale_tunnels
 
-    mkdir -p "$SOCKET_DIR"
-    ssh -f -N -L "$LOCAL_SOCKET:$REMOTE_SOCKET" "$SSH_HOST"
+	mkdir -p "$SOCKET_DIR"
+	ssh -f -N -L "$LOCAL_SOCKET:$REMOTE_SOCKET" "$SSH_HOST"
 
-    # Save PID of the SSH tunnel process
-    pgrep -n -f "ssh.*-N.*$LOCAL_SOCKET" > "$PID_FILE" 2>/dev/null || true
+	# Save PID of the SSH tunnel process
+	pgrep -n -f "ssh.*-N.*$LOCAL_SOCKET" >"$PID_FILE" 2>/dev/null || true
 
-    i=0
-    while [ $i -lt 10 ]; do
-        [ -S "$LOCAL_SOCKET" ] && return 0
-        sleep 0.5
-        i=$((i + 1))
-    done
+	i=0
+	while [ $i -lt 10 ]; do
+		[ -S "$LOCAL_SOCKET" ] && return 0
+		sleep 0.5
+		i=$((i + 1))
+	done
 
-    echo "Failed to start MySQL tunnel" >&2
-    return 1
+	echo "Failed to start MySQL tunnel" >&2
+	return 1
 }
 
 ensure_tunnel || exit 1
@@ -80,23 +83,23 @@ ensure_tunnel || exit 1
 # Check if first arg is 'dev' to use dev database
 DB="favor_group_ru"
 if [ "${1:-}" = "dev" ]; then
-    DB="dev_favor_group_ru"
-    shift
+	DB="dev_favor_group_ru"
+	shift
 fi
 
 # Check if running in non-interactive mode (-e flag present)
 has_query_flag() {
-    for arg in "$@"; do
-        [ "$arg" = "-e" ] && return 0
-    done
-    return 1
+	for arg in "$@"; do
+		[ "$arg" = "-e" ] && return 0
+	done
+	return 1
 }
 
 # Fetch password and run mycli with password in env (not visible in process list)
 PASS=$(get_password)
 if has_query_flag "$@"; then
-    # Suppress informational messages in scripting mode (exit code preserved for errors)
-    exec env MYSQL_PWD="$PASS" mycli --myclirc "$MYCLIRC" -u claude_ro -S "$LOCAL_SOCKET" -D "$DB" "$@" 2>/dev/null
+	# Suppress informational messages in scripting mode (exit code preserved for errors)
+	exec env MYSQL_PWD="$PASS" mycli --myclirc "$MYCLIRC" -u claude_ro -S "$LOCAL_SOCKET" -D "$DB" "$@" 2>/dev/null
 else
-    exec env MYSQL_PWD="$PASS" mycli --myclirc "$MYCLIRC" -u claude_ro -S "$LOCAL_SOCKET" -D "$DB" "$@"
+	exec env MYSQL_PWD="$PASS" mycli --myclirc "$MYCLIRC" -u claude_ro -S "$LOCAL_SOCKET" -D "$DB" "$@"
 fi

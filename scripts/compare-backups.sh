@@ -9,9 +9,9 @@ set -e -u
 BACKUP_DIR="./backup/restore"
 DEST="boto3+s3://favor-group-backup/duplicity_web_$(hostname)"
 S3_ENDPOINT="https://storage.yandexcloud.net"
-HOME_DIR="/home/admin"  # Duplicity needs HOME to read AWS credentials
+HOME_DIR="/home/admin" # Duplicity needs HOME to read AWS credentials
 LOGFILE="/web/logs/compare-backups.log"
-CACHE_DIR="/web/backup/.duplicity-cache"  # Match location in file-backup.sh
+CACHE_DIR="/web/backup/.duplicity-cache" # Match location in file-backup.sh
 DIFF_FILE="${BACKUP_DIR}/backup_diff.txt"
 
 # Create restore directory if it doesn't exist
@@ -23,7 +23,7 @@ mkdir -p "${CACHE_DIR}"
 # Function to list available backups
 list_backups() {
   echo "Listing available backups..."
-  
+
   # Use duplicity to list all available backups
   HOME="${HOME_DIR}" duplicity \
     collection-status \
@@ -38,52 +38,52 @@ list_backups() {
 select_backup() {
   local prompt="$1"
   local available_backups
-  
+
   # Get the list of backups
   available_backups=$(list_backups)
-  
+
   # Check if we have any backups
   if [ -z "${available_backups}" ]; then
     echo "No backups found. Exiting."
     exit 1
   fi
-  
+
   # Display backups and let user choose
   echo "${prompt}"
   echo "Available backups:"
-  
+
   # Convert to array for selection
-  IFS=$'\n' read -rd '' -a backup_array <<< "${available_backups}"
-  
+  IFS=$'\n' read -rd '' -a backup_array <<<"${available_backups}"
+
   # Display menu
   for i in "${!backup_array[@]}"; do
-    echo "$((i+1))) ${backup_array[$i]}"
+    echo "$((i + 1))) ${backup_array[$i]}"
   done
-  
+
   # Get user selection
   local selection
   read -rp "Select backup number: " selection
-  
+
   # Validate selection
   if ! [[ "${selection}" =~ ^[0-9]+$ ]] || [ "${selection}" -lt 1 ] || [ "${selection}" -gt "${#backup_array[@]}" ]; then
     echo "Invalid selection. Please try again."
     exit 1
   fi
-  
+
   # Return the selected backup time string (extract date part)
-  echo "${backup_array[$((selection-1))]}" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+  echo "${backup_array[$((selection - 1))]}" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
 }
 
 # Function to restore backup to a specific directory
 restore_backup() {
   local backup_time="$1"
   local restore_dir="$2"
-  
+
   echo "Restoring backup from ${backup_time} to ${restore_dir}..."
-  
+
   # Clear the target directory first
   rm -rf "${restore_dir:?}/"*
-  
+
   # Restore the backup as of the specified time
   HOME="${HOME_DIR}" duplicity \
     restore \
@@ -94,7 +94,7 @@ restore_backup() {
     --archive-dir "${CACHE_DIR}" \
     --force \
     "${DEST}" "${restore_dir}"
-    
+
   echo "Restore to ${restore_dir} completed."
 }
 
@@ -103,16 +103,16 @@ compare_backups() {
   local older_dir="$1"
   local newer_dir="$2"
   local diff_file="$3"
-  
+
   echo "Comparing backups..."
-  
+
   # Use diff to create a comparison between the two directories
-  diff -rua "${older_dir}" "${newer_dir}" > "${diff_file}" 2>/dev/null || true
-  
+  diff -rua "${older_dir}" "${newer_dir}" >"${diff_file}" 2>/dev/null || true
+
   # Count number of differences
   local diff_count
   diff_count=$(grep -E "^(\+\+\+|---)" "${diff_file}" | wc -l)
-  
+
   echo "Comparison completed. Found approximately $((diff_count / 2)) differences."
   echo "Diff file created at: ${diff_file}"
 }

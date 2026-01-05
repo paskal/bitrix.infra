@@ -11,8 +11,14 @@ fi
 # Validate identifier for use in SQL (alphanumeric, underscore, hyphen only)
 validate_sql_identifier() {
   case "$1" in
-    *[!a-zA-Z0-9_-]*) echo "Invalid characters in SQL identifier: $1" >&2; exit 1 ;;
-    '') echo "Empty SQL identifier not allowed" >&2; exit 1 ;;
+  *[!a-zA-Z0-9_-]*)
+    echo "Invalid characters in SQL identifier: $1" >&2
+    exit 1
+    ;;
+  '')
+    echo "Empty SQL identifier not allowed" >&2
+    exit 1
+    ;;
   esac
 }
 
@@ -93,7 +99,7 @@ if [ ${USE_EXISTING_BACKUP} -eq 1 ]; then
     echo "Error: Backup file ${BACKUP_PATH} does not exist"
     exit 1
   fi
-  
+
   echo "Selected backup: ${BACKUP_PATH}"
 fi
 
@@ -153,7 +159,7 @@ dump_file="prod-dump.sql"
 if [ ${USE_EXISTING_BACKUP} -eq 1 ]; then
   echo "Using existing backup: ${BACKUP_PATH}"
   # Decompress the backup
-  zcat "${BACKUP_PATH}" > "${dump_file}"
+  zcat "${BACKUP_PATH}" >"${dump_file}"
 else
   # --no-tablespaces allows running not from root
   # --single-transaction will start a transaction before running
@@ -226,4 +232,3 @@ rm -f "${dump_file}"
 rm -f ./private/mysql-data/deleteme_*
 
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
-
