@@ -32,562 +32,560 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 load_config() {
-    if [ -f "$CONFIG_FILE" ]; then
-        . "$CONFIG_FILE"
-    fi
+	if [ -f "$CONFIG_FILE" ]; then
+		. "$CONFIG_FILE"
+	fi
 }
 
 save_config() {
-    {
-        echo "YANDEX_CLIENT_ID=$YANDEX_CLIENT_ID"
-        echo "YANDEX_OAUTH_TOKEN=$YANDEX_OAUTH_TOKEN"
-        echo "YANDEX_USER_ID=$YANDEX_USER_ID"
-        echo "YANDEX_REGIONS=\"$YANDEX_REGIONS\""
-        for region in $YANDEX_REGIONS; do
-            eval "echo \"YANDEX_HOST_${region}=\$YANDEX_HOST_${region}\""
-            eval "echo \"YANDEX_URL_${region}=\$YANDEX_URL_${region}\""
-        done
-        # Bing settings (optional)
-        if [ -n "${BING_API_KEY:-}" ]; then
-            echo "BING_API_KEY=$BING_API_KEY"
-            echo "BING_SITE_URL=$BING_SITE_URL"
-        fi
-    } > "$CONFIG_FILE"
-    chmod 600 "$CONFIG_FILE"
-    printf "${GREEN}Config saved to %s${NC}\n" "$CONFIG_FILE"
+	{
+		echo "YANDEX_CLIENT_ID=$YANDEX_CLIENT_ID"
+		echo "YANDEX_OAUTH_TOKEN=$YANDEX_OAUTH_TOKEN"
+		echo "YANDEX_USER_ID=$YANDEX_USER_ID"
+		echo "YANDEX_REGIONS=\"$YANDEX_REGIONS\""
+		for region in $YANDEX_REGIONS; do
+			eval "echo \"YANDEX_HOST_${region}=\$YANDEX_HOST_${region}\""
+			eval "echo \"YANDEX_URL_${region}=\$YANDEX_URL_${region}\""
+		done
+		# Bing settings (optional)
+		if [ -n "${BING_API_KEY:-}" ]; then
+			echo "BING_API_KEY=$BING_API_KEY"
+			echo "BING_SITE_URL=$BING_SITE_URL"
+		fi
+	} >"$CONFIG_FILE"
+	chmod 600 "$CONFIG_FILE"
+	printf "${GREEN}Config saved to %s${NC}\n" "$CONFIG_FILE"
 }
 
 api_call() {
-    method=$1
-    endpoint=$2
-    data=${3:-}
+	method=$1
+	endpoint=$2
+	data=${3:-}
 
-    if [ -z "${YANDEX_OAUTH_TOKEN:-}" ]; then
-        printf "${RED}Error: YANDEX_OAUTH_TOKEN not set${NC}\n"
-        echo "Run 'search-reindex setup' to configure"
-        exit 1
-    fi
+	if [ -z "${YANDEX_OAUTH_TOKEN:-}" ]; then
+		printf "${RED}Error: YANDEX_OAUTH_TOKEN not set${NC}\n"
+		echo "Run 'search-reindex setup' to configure"
+		exit 1
+	fi
 
-    if [ "$method" = "GET" ]; then
-        curl -s -X GET "$API_BASE$endpoint" \
-            -H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
-            -H "Content-Type: application/json"
-    else
-        curl -s -X POST "$API_BASE$endpoint" \
-            -H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$data"
-    fi
+	if [ "$method" = "GET" ]; then
+		curl -s -X GET "$API_BASE$endpoint" \
+			-H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
+			-H "Content-Type: application/json"
+	else
+		curl -s -X POST "$API_BASE$endpoint" \
+			-H "Authorization: OAuth $YANDEX_OAUTH_TOKEN" \
+			-H "Content-Type: application/json" \
+			-d "$data"
+	fi
 }
 
 bing_submit_url() {
-    url=$1
+	url=$1
 
-    if [ -z "${BING_API_KEY:-}" ]; then
-        return 0
-    fi
+	if [ -z "${BING_API_KEY:-}" ]; then
+		return 0
+	fi
 
-    # Build JSON payload safely using jq to handle escaping
-    payload=$(jq -n --arg site "$BING_SITE_URL" --arg url "$url" \
-        '{siteUrl: $site, urlList: [$url]}')
+	# Build JSON payload safely using jq to handle escaping
+	payload=$(jq -n --arg site "$BING_SITE_URL" --arg url "$url" \
+		'{siteUrl: $site, urlList: [$url]}')
 
-    response=$(curl -s -X POST "${BING_API_BASE}/SubmitUrlbatch?apikey=${BING_API_KEY}" \
-        -H "Content-Type: application/json" \
-        -d "$payload")
+	response=$(curl -s -X POST "${BING_API_BASE}/SubmitUrlbatch?apikey=${BING_API_KEY}" \
+		-H "Content-Type: application/json" \
+		-d "$payload")
 
-    # Bing returns {"d":null} on success
-    if echo "$response" | grep -q '"d":null'; then
-        printf "${GREEN}✓${NC} Bing: %s\n" "$url"
-    else
-        error_msg=$(echo "$response" | jq -r '.Message // .ErrorCode // "Unknown error"' 2>/dev/null || echo "$response")
-        printf "${RED}✗${NC} Bing: %s (%s)\n" "$url" "$error_msg"
-    fi
+	# Bing returns {"d":null} on success
+	if echo "$response" | grep -q '"d":null'; then
+		printf "${GREEN}✓${NC} Bing: %s\n" "$url"
+	else
+		error_msg=$(echo "$response" | jq -r '.Message // .ErrorCode // "Unknown error"' 2>/dev/null || echo "$response")
+		printf "${RED}✗${NC} Bing: %s (%s)\n" "$url" "$error_msg"
+	fi
 }
 
 cmd_setup() {
-    load_config
+	load_config
 
-    if [ -z "${YANDEX_OAUTH_TOKEN:-}" ]; then
-        if [ -z "${YANDEX_CLIENT_ID:-}" ]; then
-            printf "${YELLOW}OAuth App Setup:${NC}\n"
-            echo "1. Go to https://oauth.yandex.ru/client/new"
-            echo "2. Fill in app name (e.g., 'Webmaster Reindex')"
-            echo "3. In 'Platforms', select 'Web services'"
-            echo "4. Click 'Add URL for development' in Redirect URI"
-            echo "5. In 'Access', find 'Yandex.Webmaster' and enable:"
-            echo "   - webmaster:verify"
-            echo "   - webmaster:hostinfo"
-            echo "6. Click 'Create app'"
-            echo ""
-            printf "Enter your Client ID: "
-            read -r YANDEX_CLIENT_ID
-        fi
+	if [ -z "${YANDEX_OAUTH_TOKEN:-}" ]; then
+		if [ -z "${YANDEX_CLIENT_ID:-}" ]; then
+			printf "${YELLOW}OAuth App Setup:${NC}\n"
+			echo "1. Go to https://oauth.yandex.ru/client/new"
+			echo "2. Fill in app name (e.g., 'Webmaster Reindex')"
+			echo "3. In 'Platforms', select 'Web services'"
+			echo "4. Click 'Add URL for development' in Redirect URI"
+			echo "5. In 'Access', find 'Yandex.Webmaster' and enable:"
+			echo "   - webmaster:verify"
+			echo "   - webmaster:hostinfo"
+			echo "6. Click 'Create app'"
+			echo ""
+			printf "Enter your Client ID: "
+			read -r YANDEX_CLIENT_ID
+		fi
 
-        echo ""
-        printf "${YELLOW}Get OAuth Token:${NC}\n"
-        echo "Visit this URL and click 'Allow':"
-        printf "${GREEN}https://oauth.yandex.ru/authorize?response_type=token&client_id=%s${NC}\n" "$YANDEX_CLIENT_ID"
-        echo ""
-        printf "After redirect, copy the token from the URL and paste here: "
-        read -r YANDEX_OAUTH_TOKEN
-    fi
+		echo ""
+		printf "${YELLOW}Get OAuth Token:${NC}\n"
+		echo "Visit this URL and click 'Allow':"
+		printf "${GREEN}https://oauth.yandex.ru/authorize?response_type=token&client_id=%s${NC}\n" "$YANDEX_CLIENT_ID"
+		echo ""
+		printf "After redirect, copy the token from the URL and paste here: "
+		read -r YANDEX_OAUTH_TOKEN
+	fi
 
-    printf "${YELLOW}Fetching user ID...${NC}\n"
-    user_response=$(api_call GET "/user")
-    YANDEX_USER_ID=$(echo "$user_response" | jq -r '.user_id')
+	printf "${YELLOW}Fetching user ID...${NC}\n"
+	user_response=$(api_call GET "/user")
+	YANDEX_USER_ID=$(echo "$user_response" | jq -r '.user_id')
 
-    if [ "$YANDEX_USER_ID" = "null" ] || [ -z "$YANDEX_USER_ID" ]; then
-        printf "${RED}Failed to get user ID. Response:${NC}\n"
-        echo "$user_response"
-        exit 1
-    fi
+	if [ "$YANDEX_USER_ID" = "null" ] || [ -z "$YANDEX_USER_ID" ]; then
+		printf "${RED}Failed to get user ID. Response:${NC}\n"
+		echo "$user_response"
+		exit 1
+	fi
 
-    printf "${GREEN}User ID: %s${NC}\n" "$YANDEX_USER_ID"
+	printf "${GREEN}User ID: %s${NC}\n" "$YANDEX_USER_ID"
 
-    printf "${YELLOW}Fetching hosts...${NC}\n"
-    hosts_response=$(api_call GET "/user/$YANDEX_USER_ID/hosts")
+	printf "${YELLOW}Fetching hosts...${NC}\n"
+	hosts_response=$(api_call GET "/user/$YANDEX_USER_ID/hosts")
 
-    # Build list of hosts
-    hosts_list=$(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)|\(.ascii_host_url)"')
-    host_count=$(echo "$hosts_list" | wc -l | tr -d ' ')
+	# Build list of hosts
+	hosts_list=$(echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)|\(.ascii_host_url)"')
 
-    echo ""
-    printf "${YELLOW}Available hosts:${NC}\n"
-    i=1
-    echo "$hosts_list" | while IFS='|' read -r host_id host_url; do
-        printf "  ${CYAN}%d)${NC} %s\n" "$i" "$host_url"
-        i=$((i + 1))
-    done
+	echo ""
+	printf "${YELLOW}Available hosts:${NC}\n"
+	i=1
+	echo "$hosts_list" | while IFS='|' read -r host_id host_url; do
+		printf "  ${CYAN}%d)${NC} %s\n" "$i" "$host_url"
+		i=$((i + 1))
+	done
 
-    # Select main domain
-    echo ""
-    printf "${YELLOW}Select MAIN domain (number):${NC} "
-    read -r main_choice
+	# Select main domain
+	echo ""
+	printf "${YELLOW}Select MAIN domain (number):${NC} "
+	read -r main_choice
 
-    # Parse selection
-    main_line=$(echo "$hosts_list" | sed -n "${main_choice}p")
-    main_host_id=$(echo "$main_line" | cut -d'|' -f1)
-    main_host_url=$(echo "$main_line" | cut -d'|' -f2 | sed 's|/$||')
+	# Parse selection
+	main_line=$(echo "$hosts_list" | sed -n "${main_choice}p")
+	main_host_id=$(echo "$main_line" | cut -d'|' -f1)
+	main_host_url=$(echo "$main_line" | cut -d'|' -f2 | sed 's|/$||')
 
-    if [ -z "$main_host_id" ]; then
-        printf "${RED}Invalid selection${NC}\n"
-        exit 1
-    fi
+	if [ -z "$main_host_id" ]; then
+		printf "${RED}Invalid selection${NC}\n"
+		exit 1
+	fi
 
-    printf "${GREEN}Main domain: %s${NC}\n" "$main_host_url"
+	printf "${GREEN}Main domain: %s${NC}\n" "$main_host_url"
 
-    # Initialize regions with main
-    YANDEX_REGIONS="main"
-    YANDEX_HOST_main="$main_host_id"
-    YANDEX_URL_main="$main_host_url"
+	# Initialize regions with main
+	YANDEX_REGIONS="main"
+	YANDEX_HOST_main="$main_host_id"
+	YANDEX_URL_main="$main_host_url"
 
-    # Extract main domain for subdomain detection
-    main_domain=$(echo "$main_host_url" | sed 's|https://||; s|http://||; s|www\.||')
+	# Extract main domain for subdomain detection
+	main_domain=$(echo "$main_host_url" | sed 's|https://||; s|http://||; s|www\.||')
 
-    # Find subdomains of the main domain
-    subdomains=""
-    echo "$hosts_list" | while IFS='|' read -r host_id host_url; do
-        # Skip main domain itself
-        [ "$host_id" = "$main_host_id" ] && continue
-        # Check if it's a subdomain of main
-        if echo "$host_url" | grep -q "\.${main_domain}"; then
-            subdomain=$(echo "$host_url" | sed "s|https://||; s|http://||; s|\.${main_domain}.*||")
-            echo "$subdomain|$host_id|$host_url"
-        fi
-    done > /tmp/yandex_subdomains_$$
+	# Find subdomains of the main domain
+	echo "$hosts_list" | while IFS='|' read -r host_id host_url; do
+		# Skip main domain itself
+		[ "$host_id" = "$main_host_id" ] && continue
+		# Check if it's a subdomain of main
+		if echo "$host_url" | grep -q "\.${main_domain}"; then
+			subdomain=$(echo "$host_url" | sed "s|https://||; s|http://||; s|\.${main_domain}.*||")
+			echo "$subdomain|$host_id|$host_url"
+		fi
+	done >/tmp/yandex_subdomains_$$
 
-    if [ -s /tmp/yandex_subdomains_$$ ]; then
-        echo ""
-        printf "${YELLOW}Found subdomains of %s:${NC}\n" "$main_domain"
-        i=1
-        while IFS='|' read -r subdomain host_id host_url; do
-            printf "  ${CYAN}%d)${NC} %s (%s)\n" "$i" "$subdomain" "$host_url"
-            i=$((i + 1))
-        done < /tmp/yandex_subdomains_$$
+	if [ -s /tmp/yandex_subdomains_$$ ]; then
+		echo ""
+		printf "${YELLOW}Found subdomains of %s:${NC}\n" "$main_domain"
+		i=1
+		while IFS='|' read -r subdomain host_id host_url; do
+			printf "  ${CYAN}%d)${NC} %s (%s)\n" "$i" "$subdomain" "$host_url"
+			i=$((i + 1))
+		done </tmp/yandex_subdomains_$$
 
-        echo ""
-        printf "${YELLOW}Enter subdomain numbers to add (space-separated), or press Enter to skip:${NC} "
-        read -r subdomain_choices
+		echo ""
+		printf "${YELLOW}Enter subdomain numbers to add (space-separated), or press Enter to skip:${NC} "
+		read -r subdomain_choices
 
-        if [ -n "$subdomain_choices" ]; then
-            for choice in $subdomain_choices; do
-                sub_line=$(sed -n "${choice}p" /tmp/yandex_subdomains_$$)
-                if [ -n "$sub_line" ]; then
-                    subdomain=$(echo "$sub_line" | cut -d'|' -f1)
-                    host_id=$(echo "$sub_line" | cut -d'|' -f2)
-                    host_url=$(echo "$sub_line" | cut -d'|' -f3 | sed 's|/$||')
+		if [ -n "$subdomain_choices" ]; then
+			for choice in $subdomain_choices; do
+				sub_line=$(sed -n "${choice}p" /tmp/yandex_subdomains_$$)
+				if [ -n "$sub_line" ]; then
+					subdomain=$(echo "$sub_line" | cut -d'|' -f1)
+					host_id=$(echo "$sub_line" | cut -d'|' -f2)
+					host_url=$(echo "$sub_line" | cut -d'|' -f3 | sed 's|/$||')
 
-                    YANDEX_REGIONS="$YANDEX_REGIONS $subdomain"
-                    eval "YANDEX_HOST_${subdomain}=\"$host_id\""
-                    eval "YANDEX_URL_${subdomain}=\"$host_url\""
-                    printf "${GREEN}Added: %s (%s)${NC}\n" "$subdomain" "$host_url"
-                fi
-            done
-        fi
-    fi
+					YANDEX_REGIONS="$YANDEX_REGIONS $subdomain"
+					eval "YANDEX_HOST_${subdomain}=\"$host_id\""
+					eval "YANDEX_URL_${subdomain}=\"$host_url\""
+					printf "${GREEN}Added: %s (%s)${NC}\n" "$subdomain" "$host_url"
+				fi
+			done
+		fi
+	fi
 
-    rm -f /tmp/yandex_subdomains_$$
+	rm -f /tmp/yandex_subdomains_$$
 
-    # Bing setup (optional)
-    echo ""
-    printf "${YELLOW}=== Bing Webmaster Setup (optional) ===${NC}\n"
+	# Bing setup (optional)
+	echo ""
+	printf "${YELLOW}=== Bing Webmaster Setup (optional) ===${NC}\n"
 
-    if [ -n "${BING_API_KEY:-}" ]; then
-        echo "Bing is currently configured for: $BING_SITE_URL"
-        printf "Reconfigure Bing? [y/N]: "
-        read -r setup_bing
-    else
-        echo "Bing uses a simple API key for URL submission."
-        echo ""
-        printf "Set up Bing submission? [y/N]: "
-        read -r setup_bing
-    fi
+	if [ -n "${BING_API_KEY:-}" ]; then
+		echo "Bing is currently configured for: $BING_SITE_URL"
+		printf "Reconfigure Bing? [y/N]: "
+		read -r setup_bing
+	else
+		echo "Bing uses a simple API key for URL submission."
+		echo ""
+		printf "Set up Bing submission? [y/N]: "
+		read -r setup_bing
+	fi
 
-    if [ "$setup_bing" = "y" ] || [ "$setup_bing" = "Y" ]; then
-        echo ""
-        printf "${YELLOW}To get your Bing API key:${NC}\n"
-        echo "1. Go to: ${CYAN}https://www.bing.com/webmasters/home?siteUrl=${YANDEX_URL_main}/${NC}"
-        echo "2. Sign in and add/verify your site if not done"
-        echo "3. Click 'API access' in the left menu"
-        echo "4. Click 'Generate' to create an API key, then copy it"
-        echo ""
-        printf "Enter your Bing API key (or press Enter to disable): "
-        read -r new_bing_key
+	if [ "$setup_bing" = "y" ] || [ "$setup_bing" = "Y" ]; then
+		echo ""
+		printf "${YELLOW}To get your Bing API key:${NC}\n"
+		echo "1. Go to: ${CYAN}https://www.bing.com/webmasters/home?siteUrl=${YANDEX_URL_main}/${NC}"
+		echo "2. Sign in and add/verify your site if not done"
+		echo "3. Click 'API access' in the left menu"
+		echo "4. Click 'Generate' to create an API key, then copy it"
+		echo ""
+		printf "Enter your Bing API key (or press Enter to disable): "
+		read -r new_bing_key
 
-        if [ -n "$new_bing_key" ]; then
-            BING_API_KEY="$new_bing_key"
-            # Use the main domain URL for Bing
-            BING_SITE_URL="$YANDEX_URL_main"
-            printf "${GREEN}Bing configured for: %s${NC}\n" "$BING_SITE_URL"
-        else
-            BING_API_KEY=""
-            BING_SITE_URL=""
-            printf "${YELLOW}Bing disabled${NC}\n"
-        fi
-    fi
+		if [ -n "$new_bing_key" ]; then
+			BING_API_KEY="$new_bing_key"
+			# Use the main domain URL for Bing
+			BING_SITE_URL="$YANDEX_URL_main"
+			printf "${GREEN}Bing configured for: %s${NC}\n" "$BING_SITE_URL"
+		else
+			BING_API_KEY=""
+			BING_SITE_URL=""
+			printf "${YELLOW}Bing disabled${NC}\n"
+		fi
+	fi
 
-    save_config
+	save_config
 
-    echo ""
-    printf "${GREEN}Setup complete!${NC}\n"
-    echo ""
-    echo "Yandex regions:"
-    for region in $YANDEX_REGIONS; do
-        eval "url=\$YANDEX_URL_${region}"
-        eval "host=\$YANDEX_HOST_${region}"
-        echo "  $region: $url (host: $host)"
-    done
+	echo ""
+	printf "${GREEN}Setup complete!${NC}\n"
+	echo ""
+	echo "Yandex regions:"
+	for region in $YANDEX_REGIONS; do
+		eval "url=\$YANDEX_URL_${region}"
+		eval "host=\$YANDEX_HOST_${region}"
+		echo "  $region: $url (host: $host)"
+	done
 
-    if [ -n "${BING_API_KEY:-}" ]; then
-        echo ""
-        echo "Bing: $BING_SITE_URL (enabled)"
-    else
-        echo ""
-        echo "Bing: not configured (run setup again to add)"
-    fi
+	if [ -n "${BING_API_KEY:-}" ]; then
+		echo ""
+		echo "Bing: $BING_SITE_URL (enabled)"
+	else
+		echo ""
+		echo "Bing: not configured (run setup again to add)"
+	fi
 }
 
 cmd_list() {
-    load_config
+	load_config
 
-    if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'search-reindex setup' first${NC}\n"
-        exit 1
-    fi
+	if [ -z "${YANDEX_USER_ID:-}" ]; then
+		printf "${RED}Run 'search-reindex setup' first${NC}\n"
+		exit 1
+	fi
 
-    printf "${YELLOW}Fetching hosts for user %s...${NC}\n" "$YANDEX_USER_ID"
-    hosts_response=$(api_call GET "/user/$YANDEX_USER_ID/hosts")
+	printf "${YELLOW}Fetching hosts for user %s...${NC}\n" "$YANDEX_USER_ID"
+	hosts_response=$(api_call GET "/user/$YANDEX_USER_ID/hosts")
 
-    echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)\t\(.ascii_host_url)\t\(.main_mirror // "n/a")"' | \
-        column -t -s '	'
+	echo "$hosts_response" | jq -r '.hosts[] | "\(.host_id)\t\(.ascii_host_url)\t\(.main_mirror // "n/a")"' |
+		column -t -s '	'
 }
 
 get_host_id_for_url() {
-    url=$1
-    url_domain=$(echo "$url" | sed 's|https://||; s|/.*||')
+	url=$1
+	url_domain=$(echo "$url" | sed 's|https://||; s|/.*||')
 
-    # Try to match against configured regions (check subdomains before main)
-    # Reverse the order so subdomains are checked first
-    regions_reversed=""
-    for region in $YANDEX_REGIONS; do
-        regions_reversed="$region $regions_reversed"
-    done
+	# Try to match against configured regions (check subdomains before main)
+	# Reverse the order so subdomains are checked first
+	regions_reversed=""
+	for region in $YANDEX_REGIONS; do
+		regions_reversed="$region $regions_reversed"
+	done
 
-    for region in $regions_reversed; do
-        eval "region_url=\$YANDEX_URL_${region}"
-        region_domain=$(echo "$region_url" | sed 's|https://||; s|/.*||')
-        if [ "$url_domain" = "$region_domain" ]; then
-            eval "echo \$YANDEX_HOST_${region}"
-            return
-        fi
-    done
+	for region in $regions_reversed; do
+		eval "region_url=\$YANDEX_URL_${region}"
+		region_domain=$(echo "$region_url" | sed 's|https://||; s|/.*||')
+		if [ "$url_domain" = "$region_domain" ]; then
+			eval "echo \$YANDEX_HOST_${region}"
+			return
+		fi
+	done
 
-    # Fallback to main
-    echo "$YANDEX_HOST_main"
+	# Fallback to main
+	echo "$YANDEX_HOST_main"
 }
 
 submit_url() {
-    url=$1
-    host_id=$(get_host_id_for_url "$url")
+	url=$1
+	host_id=$(get_host_id_for_url "$url")
 
-    if [ -z "$host_id" ]; then
-        printf "${RED}No host ID found for: %s${NC}\n" "$url"
-        return 1
-    fi
+	if [ -z "$host_id" ]; then
+		printf "${RED}No host ID found for: %s${NC}\n" "$url"
+		return 1
+	fi
 
-    response=$(api_call POST "/user/$YANDEX_USER_ID/hosts/$host_id/recrawl/queue" "{\"url\": \"$url\"}")
-    task_id=$(echo "$response" | jq -r '.task_id // empty')
-    quota=$(echo "$response" | jq -r '.quota_remainder // empty')
-    error=$(echo "$response" | jq -r '.error_code // empty')
+	response=$(api_call POST "/user/$YANDEX_USER_ID/hosts/$host_id/recrawl/queue" "{\"url\": \"$url\"}")
+	task_id=$(echo "$response" | jq -r '.task_id // empty')
+	quota=$(echo "$response" | jq -r '.quota_remainder // empty')
+	error=$(echo "$response" | jq -r '.error_code // empty')
 
-    if [ -n "$task_id" ]; then
-        printf "${GREEN}✓${NC} Yandex: %s (quota: %s)\n" "$url" "$quota"
-    elif [ "$error" = "URL_ALREADY_ADDED" ]; then
-        printf "${YELLOW}○${NC} Yandex: %s (already queued)\n" "$url"
-    else
-        printf "${RED}✗${NC} Yandex: %s\n" "$url"
-        echo "  Error: $response"
-    fi
+	if [ -n "$task_id" ]; then
+		printf "${GREEN}✓${NC} Yandex: %s (quota: %s)\n" "$url" "$quota"
+	elif [ "$error" = "URL_ALREADY_ADDED" ]; then
+		printf "${YELLOW}○${NC} Yandex: %s (already queued)\n" "$url"
+	else
+		printf "${RED}✗${NC} Yandex: %s\n" "$url"
+		echo "  Error: $response"
+	fi
 
-    # Also submit to Bing if configured
-    bing_submit_url "$url"
+	# Also submit to Bing if configured
+	bing_submit_url "$url"
 }
 
 cmd_submit_url() {
-    load_config
+	load_config
 
-    if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'search-reindex setup' first${NC}\n"
-        exit 1
-    fi
+	if [ -z "${YANDEX_USER_ID:-}" ]; then
+		printf "${RED}Run 'search-reindex setup' first${NC}\n"
+		exit 1
+	fi
 
-    if [ $# -eq 0 ]; then
-        echo "Usage: search-reindex submit-url <url> [<url>...]"
-        exit 1
-    fi
+	if [ $# -eq 0 ]; then
+		echo "Usage: search-reindex submit-url <url> [<url>...]"
+		exit 1
+	fi
 
-    for url in "$@"; do
-        submit_url "$url"
-        # Small delay between URLs to avoid rate limiting
-        if [ $# -gt 1 ]; then
-            sleep 0.2
-        fi
-    done
+	for url in "$@"; do
+		submit_url "$url"
+		# Small delay between URLs to avoid rate limiting
+		if [ $# -gt 1 ]; then
+			sleep 0.2
+		fi
+	done
 }
 
 cmd_submit() {
-    load_config
+	load_config
 
-    if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'search-reindex setup' first${NC}\n"
-        exit 1
-    fi
+	if [ -z "${YANDEX_USER_ID:-}" ]; then
+		printf "${RED}Run 'search-reindex setup' first${NC}\n"
+		exit 1
+	fi
 
-    file=${1:-}
-    if [ -z "$file" ] || [ ! -f "$file" ]; then
-        echo "Usage: search-reindex submit <file_with_urls>"
-        exit 1
-    fi
+	file=${1:-}
+	if [ -z "$file" ] || [ ! -f "$file" ]; then
+		echo "Usage: search-reindex submit <file_with_urls>"
+		exit 1
+	fi
 
-    total=$(wc -l < "$file" | tr -d ' ')
-    count=0
+	total=$(wc -l <"$file" | tr -d ' ')
+	count=0
 
-    printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
-    echo ""
+	printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
+	echo ""
 
-    while IFS= read -r url || [ -n "$url" ]; do
-        # Skip empty lines and comments
-        case "$url" in
-            ""|\#*) continue ;;
-        esac
+	while IFS= read -r url || [ -n "$url" ]; do
+		# Skip empty lines and comments
+		case "$url" in
+		"" | \#*) continue ;;
+		esac
 
-        count=$((count + 1))
-        submit_url "$url"
+		count=$((count + 1))
+		submit_url "$url"
 
-        # Small delay to avoid rate limiting
-        sleep 0.2
-    done < "$file"
+		# Small delay to avoid rate limiting
+		sleep 0.2
+	done <"$file"
 
-    echo ""
-    printf "${GREEN}Done! Submitted %s URLs.${NC}\n" "$count"
+	echo ""
+	printf "${GREEN}Done! Submitted %s URLs.${NC}\n" "$count"
 }
 
 cmd_submit_regions() {
-    load_config
+	load_config
 
-    if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'search-reindex setup' first${NC}\n"
-        exit 1
-    fi
+	if [ -z "${YANDEX_USER_ID:-}" ]; then
+		printf "${RED}Run 'search-reindex setup' first${NC}\n"
+		exit 1
+	fi
 
-    if [ -z "${YANDEX_REGIONS:-}" ]; then
-        printf "${RED}No regions configured. Run 'search-reindex setup' first.${NC}\n"
-        exit 1
-    fi
+	if [ -z "${YANDEX_REGIONS:-}" ]; then
+		printf "${RED}No regions configured. Run 'search-reindex setup' first.${NC}\n"
+		exit 1
+	fi
 
-    file=${1:-}
-    if [ -z "$file" ] || [ ! -f "$file" ]; then
-        echo "Usage: search-reindex submit-regions <file_with_relative_urls>"
-        echo "Will submit URLs for all configured regions: $YANDEX_REGIONS"
-        echo "File must contain relative URLs starting with / (e.g., /catalog/section/)"
-        exit 1
-    fi
+	file=${1:-}
+	if [ -z "$file" ] || [ ! -f "$file" ]; then
+		echo "Usage: search-reindex submit-regions <file_with_relative_urls>"
+		echo "Will submit URLs for all configured regions: $YANDEX_REGIONS"
+		echo "File must contain relative URLs starting with / (e.g., /catalog/section/)"
+		exit 1
+	fi
 
-    for region in $YANDEX_REGIONS; do
-        eval "base_url=\$YANDEX_URL_${region}"
+	for region in $YANDEX_REGIONS; do
+		eval "base_url=\$YANDEX_URL_${region}"
 
-        if [ -z "$base_url" ]; then
-            printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$region"
-            continue
-        fi
+		if [ -z "$base_url" ]; then
+			printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$region"
+			continue
+		fi
 
-        printf "${YELLOW}=== Submitting for %s (%s) ===${NC}\n" "$region" "$base_url"
+		printf "${YELLOW}=== Submitting for %s (%s) ===${NC}\n" "$region" "$base_url"
 
-        while IFS= read -r url || [ -n "$url" ]; do
-            case "$url" in
-                ""|\#*) continue ;;
-            esac
+		while IFS= read -r url || [ -n "$url" ]; do
+			case "$url" in
+			"" | \#*) continue ;;
+			esac
 
-            # Only accept relative URLs
-            if ! echo "$url" | grep -q '^/'; then
-                printf "${RED}Skipping non-relative URL: %s${NC}\n" "$url"
-                continue
-            fi
+			# Only accept relative URLs
+			if ! echo "$url" | grep -q '^/'; then
+				printf "${RED}Skipping non-relative URL: %s${NC}\n" "$url"
+				continue
+			fi
 
-            submit_url "${base_url}${url}"
-            sleep 0.2
-        done < "$file"
+			submit_url "${base_url}${url}"
+			sleep 0.2
+		done <"$file"
 
-        echo ""
-    done
+		echo ""
+	done
 
-    printf "${GREEN}Done!${NC}\n"
+	printf "${GREEN}Done!${NC}\n"
 }
 
 cmd_diagnostics() {
-    load_config
+	load_config
 
-    if [ -z "${YANDEX_USER_ID:-}" ]; then
-        printf "${RED}Run 'search-reindex setup' first${NC}\n"
-        exit 1
-    fi
+	if [ -z "${YANDEX_USER_ID:-}" ]; then
+		printf "${RED}Run 'search-reindex setup' first${NC}\n"
+		exit 1
+	fi
 
-    if [ -z "${YANDEX_REGIONS:-}" ]; then
-        printf "${RED}No regions configured. Run 'search-reindex setup' first.${NC}\n"
-        exit 1
-    fi
+	if [ -z "${YANDEX_REGIONS:-}" ]; then
+		printf "${RED}No regions configured. Run 'search-reindex setup' first.${NC}\n"
+		exit 1
+	fi
 
-    has_errors=0
-    total_issues=0
+	has_errors=0
+	total_issues=0
 
-    for region in $YANDEX_REGIONS; do
-        eval "host_id=\$YANDEX_HOST_${region}"
-        eval "base_url=\$YANDEX_URL_${region}"
+	for region in $YANDEX_REGIONS; do
+		eval "host_id=\$YANDEX_HOST_${region}"
+		eval "base_url=\$YANDEX_URL_${region}"
 
-        if [ -z "$host_id" ]; then
-            printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$region"
-            continue
-        fi
+		if [ -z "$host_id" ]; then
+			printf "${YELLOW}Skipping %s (not configured)${NC}\n" "$region"
+			continue
+		fi
 
-        # Build webmaster URL for this host
-        webmaster_url="https://webmaster.yandex.ru/site/${host_id}/diagnostics/"
+		# Build webmaster URL for this host
+		webmaster_url="https://webmaster.yandex.ru/site/${host_id}/diagnostics/"
 
-        response=$(api_call GET "/user/$YANDEX_USER_ID/hosts/$host_id/diagnostics")
+		response=$(api_call GET "/user/$YANDEX_USER_ID/hosts/$host_id/diagnostics")
 
-        # Check for API errors
-        error_code=$(echo "$response" | jq -r '.error_code // empty')
-        if [ -n "$error_code" ]; then
-            printf "${RED}✗ %s (%s)${NC}\n" "$region" "$base_url"
-            printf "  API Error: %s\n" "$error_code"
-            has_errors=1
-            continue
-        fi
+		# Check for API errors
+		error_code=$(echo "$response" | jq -r '.error_code // empty')
+		if [ -n "$error_code" ]; then
+			printf "${RED}✗ %s (%s)${NC}\n" "$region" "$base_url"
+			printf "  API Error: %s\n" "$error_code"
+			has_errors=1
+			continue
+		fi
 
-        # Count issues by severity
-        fatal_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "FATAL")] | length')
-        critical_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "CRITICAL")] | length')
-        warning_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "POSSIBLE_PROBLEM")] | length')
+		# Count issues by severity
+		fatal_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "FATAL")] | length')
+		critical_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "CRITICAL")] | length')
+		warning_count=$(echo "$response" | jq '[.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "POSSIBLE_PROBLEM")] | length')
 
-        region_issues=$((fatal_count + critical_count + warning_count))
-        total_issues=$((total_issues + region_issues))
+		region_issues=$((fatal_count + critical_count + warning_count))
+		total_issues=$((total_issues + region_issues))
 
-        if [ "$fatal_count" -gt 0 ] || [ "$critical_count" -gt 0 ]; then
-            has_errors=1
-        fi
+		if [ "$fatal_count" -gt 0 ] || [ "$critical_count" -gt 0 ]; then
+			has_errors=1
+		fi
 
-        # Print region header
-        if [ "$region_issues" -eq 0 ]; then
-            printf "${GREEN}✓ %s (%s)${NC} - no issues\n" "$region" "$base_url"
-        else
-            printf "${RED}✗ %s (%s)${NC} - %d issue(s)\n" "$region" "$base_url" "$region_issues"
+		# Print region header
+		if [ "$region_issues" -eq 0 ]; then
+			printf "${GREEN}✓ %s (%s)${NC} - no issues\n" "$region" "$base_url"
+		else
+			printf "${RED}✗ %s (%s)${NC} - %d issue(s)\n" "$region" "$base_url" "$region_issues"
 
-            # List FATAL issues
-            if [ "$fatal_count" -gt 0 ]; then
-                echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "FATAL") | "  🔴 FATAL: \(.key)"'
-            fi
+			# List FATAL issues
+			if [ "$fatal_count" -gt 0 ]; then
+				echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "FATAL") | "  🔴 FATAL: \(.key)"'
+			fi
 
-            # List CRITICAL issues
-            if [ "$critical_count" -gt 0 ]; then
-                echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "CRITICAL") | "  🟠 CRITICAL: \(.key)"'
-            fi
+			# List CRITICAL issues
+			if [ "$critical_count" -gt 0 ]; then
+				echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "CRITICAL") | "  🟠 CRITICAL: \(.key)"'
+			fi
 
-            # List warnings
-            if [ "$warning_count" -gt 0 ]; then
-                echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "POSSIBLE_PROBLEM") | "  🟡 WARNING: \(.key)"'
-            fi
+			# List warnings
+			if [ "$warning_count" -gt 0 ]; then
+				echo "$response" | jq -r '.problems | to_entries[] | select(.value.state == "PRESENT" and .value.severity == "POSSIBLE_PROBLEM") | "  🟡 WARNING: \(.key)"'
+			fi
 
-            printf "  ${CYAN}→ %s${NC}\n" "$webmaster_url"
-        fi
-    done
+			printf "  ${CYAN}→ %s${NC}\n" "$webmaster_url"
+		fi
+	done
 
-    echo ""
-    if [ "$total_issues" -eq 0 ]; then
-        printf "${GREEN}All regions OK - no issues detected${NC}\n"
-        exit 0
-    else
-        printf "${YELLOW}Total: %d issue(s) across all regions${NC}\n" "$total_issues"
-        exit "$has_errors"
-    fi
+	echo ""
+	if [ "$total_issues" -eq 0 ]; then
+		printf "${GREEN}All regions OK - no issues detected${NC}\n"
+		exit 0
+	else
+		printf "${YELLOW}Total: %d issue(s) across all regions${NC}\n" "$total_issues"
+		exit "$has_errors"
+	fi
 }
 
 # Main
 case "${1:-}" in
-    setup)
-        cmd_setup
-        ;;
-    list)
-        cmd_list
-        ;;
-    submit)
-        cmd_submit "${2:-}"
-        ;;
-    submit-url)
-        shift
-        cmd_submit_url "$@"
-        ;;
-    submit-regions)
-        cmd_submit_regions "${2:-}"
-        ;;
-    diagnostics)
-        cmd_diagnostics
-        ;;
-    *)
-        echo "Search Engine URL Reindexing Tool (Yandex + Bing)"
-        echo ""
-        echo "Usage:"
-        echo "  search-reindex setup                 - Interactive setup (OAuth, domains, Bing API)"
-        echo "  search-reindex list                  - List all verified Yandex hosts"
-        echo "  search-reindex submit <file>         - Submit absolute URLs from file"
-        echo "  search-reindex submit-url <url>...   - Submit one or more absolute URLs"
-        echo "  search-reindex submit-regions <file> - Submit relative URLs for all regions"
-        echo "  search-reindex diagnostics           - Check Yandex site issues (exit 1 if FATAL/CRITICAL)"
-        echo ""
-        echo "Examples:"
-        echo "  search-reindex submit-url https://example.com/page/"
-        echo "  search-reindex submit-regions urls.txt  # contains /catalog/section/"
-        echo "  search-reindex diagnostics && echo 'All OK'"
-        echo ""
-        echo "Config: \$SCRIPT_DIR/.search-reindex"
-        echo "URLs are submitted to both Yandex and Bing (if configured)."
-        ;;
+setup)
+	cmd_setup
+	;;
+list)
+	cmd_list
+	;;
+submit)
+	cmd_submit "${2:-}"
+	;;
+submit-url)
+	shift
+	cmd_submit_url "$@"
+	;;
+submit-regions)
+	cmd_submit_regions "${2:-}"
+	;;
+diagnostics)
+	cmd_diagnostics
+	;;
+*)
+	echo "Search Engine URL Reindexing Tool (Yandex + Bing)"
+	echo ""
+	echo "Usage:"
+	echo "  search-reindex setup                 - Interactive setup (OAuth, domains, Bing API)"
+	echo "  search-reindex list                  - List all verified Yandex hosts"
+	echo "  search-reindex submit <file>         - Submit absolute URLs from file"
+	echo "  search-reindex submit-url <url>...   - Submit one or more absolute URLs"
+	echo "  search-reindex submit-regions <file> - Submit relative URLs for all regions"
+	echo "  search-reindex diagnostics           - Check Yandex site issues (exit 1 if FATAL/CRITICAL)"
+	echo ""
+	echo "Examples:"
+	echo "  search-reindex submit-url https://example.com/page/"
+	echo "  search-reindex submit-regions urls.txt  # contains /catalog/section/"
+	echo "  search-reindex diagnostics && echo 'All OK'"
+	echo ""
+	echo "Config: \$SCRIPT_DIR/.search-reindex"
+	echo "URLs are submitted to both Yandex and Bing (if configured)."
+	;;
 esac
