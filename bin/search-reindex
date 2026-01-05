@@ -31,6 +31,32 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Timing constants
+URL_DELAY=0.2
+# Estimated time per URL submission (API calls + delay). Yandex ~0.5s, Bing ~0.3s, sleep 0.2s
+EST_TIME_PER_URL=1.0
+
+# Format seconds as human-readable duration (e.g., "1m 30s" or "45s")
+format_duration() {
+	seconds=$1
+	if [ "$seconds" -ge 60 ]; then
+		mins=$((seconds / 60))
+		secs=$((seconds % 60))
+		if [ "$secs" -eq 0 ]; then
+			printf "%dm" "$mins"
+		else
+			printf "%dm %ds" "$mins" "$secs"
+		fi
+	else
+		printf "%ds" "$seconds"
+	fi
+}
+
+# Format timestamp as HH:MM:SS
+format_time() {
+	date -r "$1" "+%H:%M:%S" 2>/dev/null || date -d "@$1" "+%H:%M:%S" 2>/dev/null
+}
+
 load_config() {
 	if [ -f "$CONFIG_FILE" ]; then
 		. "$CONFIG_FILE"
@@ -387,10 +413,20 @@ cmd_submit() {
 		exit 1
 	fi
 
-	total=$(wc -l <"$file" | tr -d ' ')
+	# Count actual URLs (excluding empty lines and comments)
+	total=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
 	count=0
 
+	# Calculate timing
+	start_time=$(date +%s)
+	# Estimate includes API response time + sleep delay
+	est_seconds=$(echo "$total $EST_TIME_PER_URL" | awk '{printf "%.0f", $1 * $2}')
+	end_time=$((start_time + est_seconds))
+
 	printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
+	printf "${CYAN}Started:${NC}   %s\n" "$(format_time "$start_time")"
+	printf "${CYAN}Duration:${NC}  ~%s\n" "$(format_duration "$est_seconds")"
+	printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
 	echo ""
 
 	while IFS= read -r url || [ -n "$url" ]; do
@@ -403,11 +439,14 @@ cmd_submit() {
 		submit_url "$url"
 
 		# Small delay to avoid rate limiting
-		sleep 0.2
+		sleep "$URL_DELAY"
 	done <"$file"
 
+	actual_end=$(date +%s)
+	actual_duration=$((actual_end - start_time))
+
 	echo ""
-	printf "${GREEN}Done! Submitted %s URLs.${NC}\n" "$count"
+	printf "${GREEN}Done!${NC} Submitted %s URLs in %s (finished %s)\n" "$count" "$(format_duration "$actual_duration")" "$(format_time "$actual_end")"
 }
 
 cmd_submit_regions() {
@@ -431,6 +470,30 @@ cmd_submit_regions() {
 		exit 1
 	fi
 
+	# Count regions and URLs for timing estimate
+	region_count=0
+	for region in $YANDEX_REGIONS; do
+		eval "base_url=\$YANDEX_URL_${region}"
+		[ -n "$base_url" ] && region_count=$((region_count + 1))
+	done
+
+	# Count actual URLs (excluding empty lines and comments)
+	url_count=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
+	total_submissions=$((url_count * region_count))
+
+	# Calculate timing
+	start_time=$(date +%s)
+	# Estimate includes API response time + sleep delay
+	est_seconds=$(echo "$total_submissions $EST_TIME_PER_URL" | awk '{printf "%.0f", $1 * $2}')
+	end_time=$((start_time + est_seconds))
+
+	printf "${YELLOW}Submitting %s URLs × %s regions = %s total submissions${NC}\n" "$url_count" "$region_count" "$total_submissions"
+	printf "${CYAN}Started:${NC}   %s\n" "$(format_time "$start_time")"
+	printf "${CYAN}Duration:${NC}  ~%s\n" "$(format_duration "$est_seconds")"
+	printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
+	echo ""
+
+	submitted=0
 	for region in $YANDEX_REGIONS; do
 		eval "base_url=\$YANDEX_URL_${region}"
 
@@ -453,13 +516,17 @@ cmd_submit_regions() {
 			fi
 
 			submit_url "${base_url}${url}"
-			sleep 0.2
+			submitted=$((submitted + 1))
+			sleep "$URL_DELAY"
 		done <"$file"
 
 		echo ""
 	done
 
-	printf "${GREEN}Done!${NC}\n"
+	actual_end=$(date +%s)
+	actual_duration=$((actual_end - start_time))
+
+	printf "${GREEN}Done!${NC} Submitted %s URLs in %s (finished %s)\n" "$submitted" "$(format_duration "$actual_duration")" "$(format_time "$actual_end")"
 }
 
 cmd_diagnostics() {
