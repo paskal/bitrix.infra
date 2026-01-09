@@ -18,6 +18,8 @@
 
 set -eu
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Colours
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -32,7 +34,7 @@ spb|115402362246|sankt-peterburg
 tula|1031908668|tula"
 
 # MySQL credentials - source from environment file
-MYSQL_ENV="/web/private/environment/mysql.env"
+MYSQL_ENV="$SCRIPT_DIR/../private/environment/mysql.env"
 
 # Fetch org data from Yandex Maps reviews widget
 fetch_org_data() {
@@ -51,7 +53,7 @@ fetch_org_data() {
 
 	# Extract rating from: <p class="mini-badge__stars-count">4,9</p>
 	# Convert comma to dot for numeric format
-	rating=$(grep -o 'mini-badge__stars-count">[0-9,]*<' "$tmpfile" 2>/dev/null | \
+	rating=$(grep -o 'mini-badge__stars-count">[0-9,]*<' "$tmpfile" 2>/dev/null |
 		sed 's/mini-badge__stars-count">//; s/<//; s/,/./')
 
 	# Extract review count from: "64 отзыва • 107 оценок" - we want the ratings count (107)
@@ -74,6 +76,16 @@ update_database() {
 	rating=$2
 	review_count=$3
 
+	# Validate numeric values before SQL use
+	if ! echo "$rating" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+		echo "ERROR: Invalid rating format: $rating" >&2
+		return 1
+	fi
+	if ! echo "$review_count" | grep -qE '^[0-9]+$'; then
+		echo "ERROR: Invalid count format: $review_count" >&2
+		return 1
+	fi
+
 	# Load MySQL credentials
 	if [ ! -f "$MYSQL_ENV" ]; then
 		echo "ERROR: MySQL env file not found: $MYSQL_ENV" >&2
@@ -81,7 +93,7 @@ update_database() {
 	fi
 	. "$MYSQL_ENV"
 
-	# Build SQL to update properties
+	# Build SQL to update properties (IBLOCK_ID 36 = Regions)
 	sql="
 SET @element_id = (SELECT ID FROM b_iblock_element WHERE IBLOCK_ID = 36 AND CODE = '${element_code}' AND ACTIVE = 'Y' LIMIT 1);
 SET @prop_rating_id = (SELECT ID FROM b_iblock_property WHERE IBLOCK_ID = 36 AND CODE = 'EXTENDED_REVIEWS_RAITING' LIMIT 1);
@@ -96,7 +108,7 @@ VALUES
 "
 
 	# Execute via docker
-	docker exec "$(docker ps -qf 'name=mysql')" mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" favor_group_ru -e "$sql" 2>/dev/null
+	docker exec "$(docker ps -qf 'name=^mysql$')" mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" favor_group_ru -e "$sql" 2>/dev/null
 }
 
 cmd_fetch() {
@@ -150,7 +162,8 @@ cmd_update() {
 
 cmd_cron() {
 	# Silent mode - only output on error
-	echo "$ORGS" | while IFS='|' read -r region org_id element_code; do
+	errors=0
+	while IFS='|' read -r region org_id element_code; do
 		[ -z "$region" ] && continue
 
 		result=$(fetch_org_data "$org_id")
@@ -161,11 +174,16 @@ cmd_cron() {
 		if [ "$status" = "OK" ]; then
 			if ! update_database "$element_code" "$rating" "$count" 2>/dev/null; then
 				echo "ERROR: Failed to update $region in database" >&2
+				errors=$((errors + 1))
 			fi
 		else
 			echo "ERROR: Failed to fetch $region: $status" >&2
+			errors=$((errors + 1))
 		fi
-	done
+	done <<EOF
+$ORGS
+EOF
+	[ "$errors" -eq 0 ]
 }
 
 # Main
