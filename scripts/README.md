@@ -106,13 +106,14 @@ Below is a list of scripts and relevant files found in this directory:
         *   `list` - List all verified Yandex hosts
         *   `submit <file>` - Submit absolute URLs from file
         *   `submit-url <url>...` - Submit one or more absolute URLs
-        *   `submit-regions <file>` - Submit relative URLs for all configured regions
+        *   `submit-regions <file|->` - Submit relative URLs for all regions (use `-` for stdin)
         *   `diagnostics` - Check Yandex site issues (exit 1 if FATAL/CRITICAL errors)
     *   **Config:** `bin/.search-reindex` (gitignored)
     *   **Examples:**
         ```bash
         search-reindex setup                              # First-time setup
         search-reindex submit-regions /tmp/urls.txt       # Submit URLs for all regions
+        echo "/" | search-reindex submit-regions -        # Read URLs from stdin
         search-reindex diagnostics && echo 'All OK'       # Check for issues (Zabbix-friendly)
         ```
 

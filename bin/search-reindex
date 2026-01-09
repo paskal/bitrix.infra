@@ -6,12 +6,13 @@
 #   search-reindex list                 - List all verified Yandex hosts
 #   search-reindex submit <file>        - Submit absolute URLs from file
 #   search-reindex submit-url <url>...  - Submit one or more absolute URLs
-#   search-reindex submit-regions <file> - Submit relative URLs for all regions
+#   search-reindex submit-regions <file|-> - Submit relative URLs for all regions
 #   search-reindex diagnostics           - Check Yandex site issues (exit 1 if errors)
 #
 # Examples:
 #   search-reindex submit-url https://example.com/page/
 #   search-reindex submit-regions urls.txt  # file contains /catalog/section/
+#   echo "/" | search-reindex submit-regions -  # read from stdin
 #
 # Config: $SCRIPT_DIR/.search-reindex (gitignored)
 # Run 'search-reindex setup' to configure - it will guide you through OAuth setup.
@@ -463,8 +464,16 @@ cmd_submit_regions() {
 	fi
 
 	file=${1:-}
-	if [ -z "$file" ] || [ ! -f "$file" ]; then
+	stdin_temp=""
+	if [ "$file" = "-" ]; then
+		# Read from stdin into temp file
+		stdin_temp=$(mktemp)
+		cat > "$stdin_temp"
+		file="$stdin_temp"
+	elif [ -z "$file" ] || [ ! -f "$file" ]; then
 		echo "Usage: search-reindex submit-regions <file_with_relative_urls>"
+		echo "       search-reindex submit-regions -  # read from stdin"
+		echo "       echo '/catalog/' | search-reindex submit-regions -"
 		echo "Will submit URLs for all configured regions: $YANDEX_REGIONS"
 		echo "File must contain relative URLs starting with / (e.g., /catalog/section/)"
 		exit 1
@@ -527,6 +536,9 @@ cmd_submit_regions() {
 	actual_duration=$((actual_end - start_time))
 
 	printf "${GREEN}Done!${NC} Submitted %s URLs in %s (finished %s)\n" "$submitted" "$(format_duration "$actual_duration")" "$(format_time "$actual_end")"
+
+	# Clean up stdin temp file if used
+	[ -n "$stdin_temp" ] && rm -f "$stdin_temp"
 }
 
 cmd_diagnostics() {
@@ -644,12 +656,13 @@ diagnostics)
 	echo "  search-reindex list                  - List all verified Yandex hosts"
 	echo "  search-reindex submit <file>         - Submit absolute URLs from file"
 	echo "  search-reindex submit-url <url>...   - Submit one or more absolute URLs"
-	echo "  search-reindex submit-regions <file> - Submit relative URLs for all regions"
+	echo "  search-reindex submit-regions <file|-> - Submit relative URLs for all regions (use - for stdin)"
 	echo "  search-reindex diagnostics           - Check Yandex site issues (exit 1 if FATAL/CRITICAL)"
 	echo ""
 	echo "Examples:"
 	echo "  search-reindex submit-url https://example.com/page/"
 	echo "  search-reindex submit-regions urls.txt  # contains /catalog/section/"
+	echo "  echo '/' | search-reindex submit-regions -  # read from stdin"
 	echo "  search-reindex diagnostics && echo 'All OK'"
 	echo ""
 	echo "Config: \$SCRIPT_DIR/.search-reindex"
