@@ -1,0 +1,199 @@
+#!/bin/sh
+# Yandex Maps Reviews Scraper
+#
+# Fetches rating and review count from Yandex Maps for configured organizations
+# and updates Bitrix database properties.
+#
+# Usage:
+#   yandex-reviews fetch     - Fetch and display ratings (dry-run)
+#   yandex-reviews update    - Fetch and update database
+#   yandex-reviews cron      - Silent mode for cron (only outputs on error)
+#
+# Cron example (every 5 days):
+#   0 3 */5 * * /web/bin/yandex-reviews cron
+#
+# Config: Define organizations in ORGS variable below
+# Database: Updates EXTENDED_REVIEWS_COUNT and EXTENDED_REVIEWS_RAITING properties
+#           in iblock 36 (Regions)
+
+set -eu
+
+# Colours
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Organization IDs from Yandex Maps (extracted from iframe embed URLs)
+# Format: "region_name|yandex_org_id|bitrix_element_code"
+ORGS="moscow|182044956767|moskva
+spb|115402362246|sankt-peterburg
+tula|1031908668|tula"
+
+# MySQL credentials - source from environment file
+MYSQL_ENV="/web/private/environment/mysql.env"
+
+# Fetch org data from Yandex Maps reviews widget
+fetch_org_data() {
+	org_id=$1
+	tmpfile="/tmp/yandex_org_${org_id}.html"
+
+	# Fetch the reviews widget page (more reliable than main org page)
+	if ! curl -sL \
+		-H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+		"https://yandex.ru/maps-reviews-widget/${org_id}?comments" \
+		-o "$tmpfile" 2>/dev/null; then
+		echo "FETCH_ERROR|0|0"
+		rm -f "$tmpfile"
+		return 1
+	fi
+
+	# Extract rating from: <p class="mini-badge__stars-count">4,9</p>
+	# Convert comma to dot for numeric format
+	rating=$(grep -o 'mini-badge__stars-count">[0-9,]*<' "$tmpfile" 2>/dev/null | \
+		sed 's/mini-badge__stars-count">//; s/<//; s/,/./')
+
+	# Extract review count from: "64 отзыва • 107 оценок" - we want the ratings count (107)
+	# Pattern: <number> оцен
+	review_count=$(grep -o '[0-9]* оцен' "$tmpfile" 2>/dev/null | head -1 | sed 's/ оцен//')
+
+	rm -f "$tmpfile"
+
+	if [ -z "$rating" ] || [ -z "$review_count" ]; then
+		echo "PARSE_ERROR|${rating:-0}|${review_count:-0}"
+		return 1
+	fi
+
+	echo "OK|$rating|$review_count"
+}
+
+# Update Bitrix database
+update_database() {
+	element_code=$1
+	rating=$2
+	review_count=$3
+
+	# Load MySQL credentials
+	if [ ! -f "$MYSQL_ENV" ]; then
+		echo "ERROR: MySQL env file not found: $MYSQL_ENV" >&2
+		return 1
+	fi
+	. "$MYSQL_ENV"
+
+	# Build SQL to update properties
+	sql="
+SET @element_id = (SELECT ID FROM b_iblock_element WHERE IBLOCK_ID = 36 AND CODE = '${element_code}' AND ACTIVE = 'Y' LIMIT 1);
+SET @prop_rating_id = (SELECT ID FROM b_iblock_property WHERE IBLOCK_ID = 36 AND CODE = 'EXTENDED_REVIEWS_RAITING' LIMIT 1);
+SET @prop_count_id = (SELECT ID FROM b_iblock_property WHERE IBLOCK_ID = 36 AND CODE = 'EXTENDED_REVIEWS_COUNT' LIMIT 1);
+
+DELETE FROM b_iblock_element_property WHERE IBLOCK_ELEMENT_ID = @element_id AND IBLOCK_PROPERTY_ID IN (@prop_rating_id, @prop_count_id);
+
+INSERT INTO b_iblock_element_property (IBLOCK_ELEMENT_ID, IBLOCK_PROPERTY_ID, VALUE, VALUE_NUM)
+VALUES
+    (@element_id, @prop_rating_id, '${rating}', ${rating}),
+    (@element_id, @prop_count_id, '${review_count}', ${review_count});
+"
+
+	# Execute via docker
+	docker exec "$(docker ps -qf 'name=mysql')" mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" favor_group_ru -e "$sql" 2>/dev/null
+}
+
+cmd_fetch() {
+	printf "${YELLOW}Fetching Yandex Maps ratings...${NC}\n\n"
+
+	echo "$ORGS" | while IFS='|' read -r region org_id element_code; do
+		[ -z "$region" ] && continue
+
+		printf "${CYAN}%s${NC} (org: %s)... " "$region" "$org_id"
+
+		result=$(fetch_org_data "$org_id")
+		status=$(echo "$result" | cut -d'|' -f1)
+		rating=$(echo "$result" | cut -d'|' -f2)
+		count=$(echo "$result" | cut -d'|' -f3)
+
+		if [ "$status" = "OK" ]; then
+			printf "${GREEN}★ %s${NC} (%s reviews)\n" "$rating" "$count"
+		else
+			printf "${RED}%s${NC} (rating: %s, count: %s)\n" "$status" "$rating" "$count"
+		fi
+	done
+}
+
+cmd_update() {
+	printf "${YELLOW}Fetching and updating Yandex Maps ratings...${NC}\n\n"
+
+	echo "$ORGS" | while IFS='|' read -r region org_id element_code; do
+		[ -z "$region" ] && continue
+
+		printf "${CYAN}%s${NC}... " "$region"
+
+		result=$(fetch_org_data "$org_id")
+		status=$(echo "$result" | cut -d'|' -f1)
+		rating=$(echo "$result" | cut -d'|' -f2)
+		count=$(echo "$result" | cut -d'|' -f3)
+
+		if [ "$status" = "OK" ]; then
+			if update_database "$element_code" "$rating" "$count"; then
+				printf "${GREEN}★ %s (%s reviews) - updated${NC}\n" "$rating" "$count"
+			else
+				printf "${RED}★ %s (%s reviews) - DB update failed${NC}\n" "$rating" "$count"
+			fi
+		else
+			printf "${RED}%s - skipped${NC}\n" "$status"
+		fi
+	done
+
+	echo ""
+	printf "${GREEN}Done!${NC}\n"
+}
+
+cmd_cron() {
+	# Silent mode - only output on error
+	echo "$ORGS" | while IFS='|' read -r region org_id element_code; do
+		[ -z "$region" ] && continue
+
+		result=$(fetch_org_data "$org_id")
+		status=$(echo "$result" | cut -d'|' -f1)
+		rating=$(echo "$result" | cut -d'|' -f2)
+		count=$(echo "$result" | cut -d'|' -f3)
+
+		if [ "$status" = "OK" ]; then
+			if ! update_database "$element_code" "$rating" "$count" 2>/dev/null; then
+				echo "ERROR: Failed to update $region in database" >&2
+			fi
+		else
+			echo "ERROR: Failed to fetch $region: $status" >&2
+		fi
+	done
+}
+
+# Main
+case "${1:-}" in
+fetch)
+	cmd_fetch
+	;;
+update)
+	cmd_update
+	;;
+cron)
+	cmd_cron
+	;;
+*)
+	echo "Yandex Maps Reviews Scraper"
+	echo ""
+	echo "Usage:"
+	echo "  yandex-reviews fetch   - Fetch and display ratings (dry-run)"
+	echo "  yandex-reviews update  - Fetch and update database"
+	echo "  yandex-reviews cron    - Silent mode for cron (only outputs on error)"
+	echo ""
+	echo "Configured organizations:"
+	echo "$ORGS" | while IFS='|' read -r region org_id element_code; do
+		[ -z "$region" ] && continue
+		echo "  $region: https://yandex.ru/maps/org/$org_id/"
+	done
+	echo ""
+	echo "Cron example (every 5 days at 3am):"
+	echo "  0 3 */5 * * /web/bin/yandex-reviews cron"
+	;;
+esac
