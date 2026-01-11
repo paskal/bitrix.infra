@@ -34,8 +34,6 @@ NC='\033[0m'
 
 # Timing constants
 URL_DELAY=0.2
-# Estimated time per URL submission (API calls + delay). Yandex ~0.5s, Bing ~0.3s, sleep 0.2s
-EST_TIME_PER_URL=1.0
 
 # Format seconds as human-readable duration (e.g., "1m 30s" or "45s")
 format_duration() {
@@ -107,16 +105,33 @@ api_call() {
 	fi
 }
 
-bing_submit_url() {
-	url=$1
-
+# Submit multiple URLs to Bing in a single batch request
+# Usage: bing_submit_batch url1 url2 url3 ...
+#    or: echo -e "url1\nurl2" | bing_submit_batch
+bing_submit_batch() {
 	if [ -z "${BING_API_KEY:-}" ]; then
 		return 0
 	fi
 
-	# Build JSON payload safely using jq to handle escaping
-	payload=$(jq -n --arg site "$BING_SITE_URL" --arg url "$url" \
-		'{siteUrl: $site, urlList: [$url]}')
+	# Collect URLs from arguments or stdin
+	if [ $# -gt 0 ]; then
+		urls=$(printf '%s\n' "$@")
+	else
+		urls=$(cat)
+	fi
+
+	# Skip if no URLs
+	[ -z "$urls" ] && return 0
+
+	url_count=$(echo "$urls" | wc -l | tr -d ' ')
+
+	# Build JSON array of URLs using jq
+	url_json=$(echo "$urls" | jq -R . | jq -s .)
+
+	payload=$(jq -n --arg site "$BING_SITE_URL" --argjson urls "$url_json" \
+		'{siteUrl: $site, urlList: $urls}')
+
+	printf "${CYAN}Submitting %s URLs to Bing...${NC}\n" "$url_count"
 
 	response=$(curl -s -X POST "${BING_API_BASE}/SubmitUrlbatch?apikey=${BING_API_KEY}" \
 		-H "Content-Type: application/json" \
@@ -124,10 +139,10 @@ bing_submit_url() {
 
 	# Bing returns {"d":null} on success
 	if echo "$response" | grep -q '"d":null'; then
-		printf "${GREEN}✓${NC} Bing sent OK\n"
+		printf "${GREEN}✓${NC} Bing: %s URLs submitted successfully\n" "$url_count"
 	else
 		error_msg=$(echo "$response" | jq -r '.Message // .ErrorCode // "Unknown error"' 2>/dev/null || echo "$response")
-		printf "${RED}✗${NC} Bing: %s (%s)\n" "$url" "$error_msg"
+		printf "${RED}✗${NC} Bing batch failed: %s\n" "$error_msg"
 	fi
 }
 
@@ -373,9 +388,6 @@ submit_url() {
 		printf "${RED}✗${NC} Yandex: %s\n" "$url"
 		echo "  Error: $response"
 	fi
-
-	# Also submit to Bing if configured
-	bing_submit_url "$url"
 }
 
 cmd_submit_url() {
@@ -391,11 +403,17 @@ cmd_submit_url() {
 		exit 1
 	fi
 
+	# Submit all URLs to Bing first (batch)
+	bing_submit_batch "$@"
+	echo ""
+
+	# Then submit to Yandex one by one
+	printf "${YELLOW}Submitting to Yandex...${NC}\n"
 	for url in "$@"; do
 		submit_url "$url"
 		# Small delay between URLs to avoid rate limiting
 		if [ $# -gt 1 ]; then
-			sleep 0.2
+			sleep "$URL_DELAY"
 		fi
 	done
 }
@@ -418,10 +436,9 @@ cmd_submit() {
 	total=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
 	count=0
 
-	# Calculate timing
+	# Calculate timing (Yandex only, Bing is instant batch)
 	start_time=$(date +%s)
-	# Estimate includes API response time + sleep delay
-	est_seconds=$(echo "$total $EST_TIME_PER_URL" | awk '{printf "%.0f", $1 * $2}')
+	est_seconds=$(echo "$total 0.7" | awk '{printf "%.0f", $1 * $2}')
 	end_time=$((start_time + est_seconds))
 
 	printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
@@ -430,6 +447,12 @@ cmd_submit() {
 	printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
 	echo ""
 
+	# Submit all URLs to Bing first (single batch request)
+	grep -v '^\s*$\|^\s*#' "$file" | bing_submit_batch
+	echo ""
+
+	# Then submit to Yandex one by one
+	printf "${YELLOW}Submitting to Yandex...${NC}\n"
 	while IFS= read -r url || [ -n "$url" ]; do
 		# Skip empty lines and comments
 		case "$url" in
@@ -468,7 +491,7 @@ cmd_submit_regions() {
 	if [ "$file" = "-" ]; then
 		# Read from stdin into temp file
 		stdin_temp=$(mktemp)
-		cat > "$stdin_temp"
+		cat >"$stdin_temp"
 		file="$stdin_temp"
 	elif [ -z "$file" ] || [ ! -f "$file" ]; then
 		echo "Usage: search-reindex submit-regions <file_with_relative_urls>"
@@ -490,10 +513,9 @@ cmd_submit_regions() {
 	url_count=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
 	total_submissions=$((url_count * region_count))
 
-	# Calculate timing
+	# Calculate timing (Yandex only, Bing is instant batch)
 	start_time=$(date +%s)
-	# Estimate includes API response time + sleep delay
-	est_seconds=$(echo "$total_submissions $EST_TIME_PER_URL" | awk '{printf "%.0f", $1 * $2}')
+	est_seconds=$(echo "$total_submissions 0.7" | awk '{printf "%.0f", $1 * $2}')
 	end_time=$((start_time + est_seconds))
 
 	printf "${YELLOW}Submitting %s URLs × %s regions = %s total submissions${NC}\n" "$url_count" "$region_count" "$total_submissions"
@@ -502,6 +524,24 @@ cmd_submit_regions() {
 	printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
 	echo ""
 
+	# Build list of all absolute URLs for Bing batch submission
+	bing_urls_file=$(mktemp)
+	for region in $YANDEX_REGIONS; do
+		eval "base_url=\$YANDEX_URL_${region}"
+		[ -z "$base_url" ] && continue
+
+		while IFS= read -r url || [ -n "$url" ]; do
+			case "$url" in "" | \#*) continue ;; esac
+			echo "$url" | grep -q '^/' && echo "${base_url}${url}" >>"$bing_urls_file"
+		done <"$file"
+	done
+
+	# Submit all URLs to Bing first (single batch request)
+	bing_submit_batch <"$bing_urls_file"
+	rm -f "$bing_urls_file"
+	echo ""
+
+	# Then submit to Yandex one by one per region
 	submitted=0
 	for region in $YANDEX_REGIONS; do
 		eval "base_url=\$YANDEX_URL_${region}"
@@ -511,7 +551,7 @@ cmd_submit_regions() {
 			continue
 		fi
 
-		printf "${YELLOW}=== Submitting for %s (%s) ===${NC}\n" "$region" "$base_url"
+		printf "${YELLOW}=== Submitting to Yandex for %s (%s) ===${NC}\n" "$region" "$base_url"
 
 		while IFS= read -r url || [ -n "$url" ]; do
 			case "$url" in
@@ -539,6 +579,7 @@ cmd_submit_regions() {
 
 	# Clean up stdin temp file if used
 	[ -n "$stdin_temp" ] && rm -f "$stdin_temp"
+	return 0
 }
 
 cmd_diagnostics() {
