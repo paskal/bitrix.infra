@@ -40,3 +40,5 @@
 56 3  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/prod/bitrix/modules/acrit.export/cli/export.php profile=32 auto=Y site=s1 >> /web/prod/upload/acrit.export/log/log_32.e63f31938c399df95752fe5013735c65.txt 2>&1
 59 3  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/prod/bitrix/modules/acrit.export/cli/export.php profile=35 auto=Y site=s1 >> /web/prod/upload/acrit.export/log/log_35.e63f31938c399df95752fe5013735c65.txt 2>&1
 2 4  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/prod/bitrix/modules/acrit.export/cli/export.php profile=36 auto=Y site=s1 >> /web/prod/upload/acrit.export/log/log_36.e63f31938c399df95752fe5013735c65.txt 2>&1
+5 4  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/prod/bitrix/modules/acrit.export/cli/export.php profile=37 auto=Y site=s1 >> /web/prod/upload/acrit.export/log/log_37.e63f31938c399df95752fe5013735c65.txt 2>&1
+8 4  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php -f /web/prod/bitrix/modules/acrit.export/cli/export.php profile=38 auto=Y site=s1 >> /web/prod/upload/acrit.export/log/log_38.e63f31938c399df95752fe5013735c65.txt 2>&1
