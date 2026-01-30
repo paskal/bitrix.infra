@@ -22,6 +22,7 @@
 # sitemap generation
 0  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/sitemap.bitrix.php  2>&1 >>/web/prod/local/cron/sitemap.bitrix.log
 1  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/sitemap.aspro.php   2>&1 >>/web/prod/local/cron/sitemap.aspro.log
+1  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/sitemap.offers.php  2>&1 >>/web/prod/local/cron/sitemap.offers.log
 2  0  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/prod/local/cron/sitemap.regions.php 2>&1 >>/web/prod/local/cron/sitemap.regions.log
 #*  *  *  *  * www-data /usr/bin/nice -n 10 /usr/bin/php /web/dev/local/cron/sitemap.bitrix.php 2>&1 >>/web/dev/local/cron/sitemap.bitrix.log
 # exports to yandex and google
