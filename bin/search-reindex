@@ -366,6 +366,13 @@ get_host_id_for_url() {
 	echo "$YANDEX_HOST_main"
 }
 
+check_yandex_quota() {
+	# quota is shared across all regions, any host_id works
+	host_id=$YANDEX_HOST_main
+	response=$(api_call GET "/user/$YANDEX_USER_ID/hosts/$host_id/recrawl/quota")
+	echo "$response" | jq -r '.quota_remainder // 0'
+}
+
 submit_url() {
 	url=$1
 	host_id=$(get_host_id_for_url "$url")
@@ -403,6 +410,10 @@ cmd_submit_url() {
 		exit 1
 	fi
 
+	# Check quota
+	quota=$(check_yandex_quota)
+	printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions)\n" "$quota"
+
 	# Submit all URLs to Bing first (batch)
 	bing_submit_batch "$@"
 	echo ""
@@ -436,9 +447,18 @@ cmd_submit() {
 	total=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
 	count=0
 
+	# Check Yandex quota before starting
+	quota=$(check_yandex_quota)
+	usable=$((quota > 0 ? quota - 1 : 0))
+	printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions, keeping 1 reserve)\n" "$quota"
+	if [ "$total" -gt "$usable" ]; then
+		printf "${YELLOW}⚠${NC}  Can submit %s of %s URLs to Yandex (quota limit)\n" "$usable" "$total"
+	fi
+
 	# Calculate timing (Yandex only, Bing is instant batch)
+	yandex_total=$((total < usable ? total : usable))
 	start_time=$(date +%s)
-	est_seconds=$(echo "$total 0.7" | awk '{printf "%.0f", $1 * $2}')
+	est_seconds=$(echo "$yandex_total 0.7" | awk '{printf "%.0f", $1 * $2}')
 	end_time=$((start_time + est_seconds))
 
 	printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
@@ -459,6 +479,12 @@ cmd_submit() {
 		"" | \#*) continue ;;
 		esac
 
+		# Stop if we've hit the usable quota
+		if [ "$count" -ge "$usable" ]; then
+			printf "${YELLOW}⚠${NC}  Stopping Yandex submissions: quota limit reached (%s/%s URLs sent)\n" "$count" "$total"
+			break
+		fi
+
 		count=$((count + 1))
 		submit_url "$url"
 
@@ -471,6 +497,10 @@ cmd_submit() {
 
 	echo ""
 	printf "${GREEN}Done!${NC} Submitted %s URLs in %s (finished %s)\n" "$count" "$(format_duration "$actual_duration")" "$(format_time "$actual_end")"
+	if [ "$count" -lt "$total" ]; then
+		skipped=$((total - count))
+		printf "${YELLOW}⚠${NC}  %s URLs skipped (Yandex quota). Resume from line %s next session.\n" "$skipped" "$((count + 1))"
+	fi
 }
 
 cmd_submit_regions() {
@@ -513,9 +543,18 @@ cmd_submit_regions() {
 	url_count=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
 	total_submissions=$((url_count * region_count))
 
+	# Check Yandex quota before starting
+	quota=$(check_yandex_quota)
+	usable=$((quota > 0 ? quota - 1 : 0))
+	printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions, keeping 1 reserve)\n" "$quota"
+	if [ "$total_submissions" -gt "$usable" ]; then
+		printf "${YELLOW}⚠${NC}  Can submit %s of %s URLs to Yandex (quota limit)\n" "$usable" "$total_submissions"
+	fi
+
 	# Calculate timing (Yandex only, Bing is instant batch)
+	yandex_total=$((total_submissions < usable ? total_submissions : usable))
 	start_time=$(date +%s)
-	est_seconds=$(echo "$total_submissions 0.7" | awk '{printf "%.0f", $1 * $2}')
+	est_seconds=$(echo "$yandex_total 0.7" | awk '{printf "%.0f", $1 * $2}')
 	end_time=$((start_time + est_seconds))
 
 	printf "${YELLOW}Submitting %s URLs × %s regions = %s total submissions${NC}\n" "$url_count" "$region_count" "$total_submissions"
@@ -564,6 +603,12 @@ cmd_submit_regions() {
 				continue
 			fi
 
+			# Stop if we've hit the usable quota
+			if [ "$submitted" -ge "$usable" ]; then
+				printf "${YELLOW}⚠${NC}  Stopping: quota limit reached (%s/%s submitted)\n" "$submitted" "$total_submissions"
+				break 2
+			fi
+
 			submit_url "${base_url}${url}"
 			submitted=$((submitted + 1))
 			sleep "$URL_DELAY"
@@ -576,6 +621,10 @@ cmd_submit_regions() {
 	actual_duration=$((actual_end - start_time))
 
 	printf "${GREEN}Done!${NC} Submitted %s URLs in %s (finished %s)\n" "$submitted" "$(format_duration "$actual_duration")" "$(format_time "$actual_end")"
+	if [ "$submitted" -lt "$total_submissions" ]; then
+		skipped=$((total_submissions - submitted))
+		printf "${YELLOW}⚠${NC}  %s URLs skipped (Yandex quota).\n" "$skipped"
+	fi
 
 	# Clean up stdin temp file if used
 	[ -n "$stdin_temp" ] && rm -f "$stdin_temp"
