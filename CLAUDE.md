@@ -31,6 +31,12 @@
 - Host timezone: UTC, php-cron container timezone: Europe/Moscow (UTC+3)
 - File timestamps on server are in UTC
 
+## Nginx Config Deployment
+- File-level Docker bind mounts track inodes; `rsync` creates new inodes invisible to the container
+- Deploy via `tee` to write in-place: `ssh bitrix 'tee /web/config/nginx/file.conf' < config/nginx/file.conf > /dev/null`
+- Always test before reload: `docker exec nginx nginx -t && docker exec nginx nginx -s reload`
+- Directory-level mounts (e.g. `conf.d/`) don't have the inode issue
+
 ## Cron File Deployment
 - `/web/config/cron` directory is owned by root; to deploy cron changes:
   `sudo chown admin:admin /web/config/cron && git pull && sudo chown root:root /web/config/cron && sudo chown root:root /web/config/cron/*.cron && sudo chmod 0644 /web/config/cron/*.cron`
