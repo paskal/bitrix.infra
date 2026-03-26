@@ -98,27 +98,96 @@ Below is a list of scripts and relevant files found in this directory:
 
 ## bin/ Directory Tools
 
-*   **`bin/search-reindex`**
-    *   **Type:** Shell script
-    *   **Purpose:** Search engine URL reindexing tool (Yandex + Bing) and Yandex site diagnostics.
-    *   **Commands:**
-        *   `setup` - Interactive setup (Yandex OAuth + optional Bing API key)
-        *   `list` - List all verified Yandex hosts
-        *   `submit <file>` - Submit absolute URLs from file
-        *   `submit-url <url>...` - Submit one or more absolute URLs
-        *   `submit-regions <file|->` - Submit relative URLs for all regions (use `-` for stdin)
-        *   `diagnostics` - Check Yandex site issues (exit 1 if FATAL/CRITICAL errors)
-    *   **Config:** `bin/.search-reindex` (gitignored)
-    *   **Examples:**
-        ```bash
-        search-reindex setup                              # First-time setup
-        search-reindex submit-regions /tmp/urls.txt       # Submit URLs for all regions
-        echo "/" | search-reindex submit-regions -        # Read URLs from stdin
-        search-reindex diagnostics && echo 'All OK'       # Check for issues (Zabbix-friendly)
-        ```
+### fgmysql — Read-only MySQL access
 
-*   **`bin/fgmysql`**
-    *   **Type:** Shell script
-    *   **Purpose:** MySQL client wrapper using SSH tunnel. Connects to favor-group.ru MySQL with read-only `claude_ro` user.
-    *   **Usage:** `fgmysql -e "SELECT ..."` or `fgmysql dev -e "SELECT ..."`
+Read-only MySQL CLI via SSH socket tunnel, using the `claude_ro` user with SELECT-only privileges. Designed for safe database access from AI agents (e.g. Claude Code) and ad-hoc queries.
+
+**Prerequisites:**
+- `mycli` installed (`brew install mycli` on macOS)
+- SSH access to the server configured
+
+**Setup:**
+
+1. Add SSH host alias to `~/.ssh/config`:
+   ```
+   Host bitrix
+       HostName your-server.example.com
+       User your-username
+       IdentityFile ~/.ssh/your-key
+   ```
+
+2. Add `MYSQL_CLAUDE_RO_PASSWORD` to server's `/web/private/environment/mysql.env`
+
+3. Create the MySQL user on the server:
+   ```sql
+   CREATE USER 'claude_ro'@'localhost' IDENTIFIED BY 'password_from_env';
+   GRANT SELECT ON favor_group_ru.* TO 'claude_ro'@'localhost';
+   GRANT SELECT ON dev_favor_group_ru.* TO 'claude_ro'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+
+4. Add to your shell profile:
+   ```shell
+   export PATH="/path/to/bitrix.infra/bin:$PATH"
+   export SSH_HOST="bitrix"  # optional, defaults to "bitrix"
+   ```
+
+**Usage:**
+```shell
+fgmysql                     # Interactive session (production)
+fgmysql -e "SELECT ..."     # Run query and exit
+fgmysql dev                 # Connect to dev database
+fgmysql dev -e "SELECT ..." # Query dev database
+```
+
+The tunnel starts automatically and password is fetched from the server (cached for 1 hour).
+
+**Manual tunnel management:**
+```shell
+./mysql-tunnel.sh start   # Start tunnel
+./mysql-tunnel.sh status  # Check status
+./mysql-tunnel.sh stop    # Stop tunnel
+```
+
+### search-reindex — Search engine URL reindexing
+
+Submits URLs to Yandex and Bing for reindexing. Useful after content updates, fixing 404 errors, or adding new pages.
+
+**Setup:**
+
+1. Add `bin/` to your PATH:
+   ```shell
+   export PATH="/path/to/bitrix.infra/bin:$PATH"
+   ```
+
+2. Run interactive setup (guides you through Yandex OAuth app creation and optional Bing API key):
+   ```shell
+   search-reindex setup
+   ```
+
+The script auto-detects host IDs for favor-group.ru sites. Yandex uses OAuth (oauth.yandex.ru), Bing uses a simple API key from Bing Webmaster Tools. Config is stored in `bin/.search-reindex` (gitignored).
+
+**Usage:**
+```shell
+search-reindex list                      # List verified Yandex hosts
+search-reindex submit-url <url>...       # Submit one or more URLs
+search-reindex submit <file>             # Submit URLs from file
+search-reindex submit-regions <file>     # Submit URLs for MSK, SPB, TULA
+search-reindex diagnostics               # Check Yandex site issues
+```
+
+**Examples:**
+```shell
+# Submit specific URLs for reindexing (goes to both Yandex and Bing)
+search-reindex submit-url https://favor-group.ru/catalog/profnastil/1484/
+
+# Submit URLs from file for all regional subdomains
+search-reindex submit-regions /tmp/urls.txt
+
+# Read relative URLs from stdin
+echo "/catalog/new-page/" | search-reindex submit-regions -
+
+# Check for site issues (exit 1 if FATAL/CRITICAL — Zabbix-friendly)
+search-reindex diagnostics && echo 'All OK'
+```
 

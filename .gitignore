@@ -22,8 +22,11 @@
 # web files folder
 /web
 
-# private folder
-/private
+# private folder (except .env.example templates)
+/private/*
+!/private/environment
+/private/environment/*
+!/private/environment/*.env.example
 
 # default directory in linux mount
 /lost+found/

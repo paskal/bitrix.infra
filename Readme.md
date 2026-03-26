@@ -4,64 +4,120 @@ This repository contains infrastructure code behind Bitrix-based [site](https://
 
 It's a Bitrix website completely enclosed within docker-compose to be as portable and maintainable as possible, and a set of scripts around its maintenance like dev site redeploy or production site backup.
 
+## Architecture
+
+```mermaid
+flowchart TB
+    User["Browser"] -->|"HTTP/3, TLS 1.3,<br>Brotli"| Nginx
+
+    subgraph Docker["Docker Compose"]
+        Nginx["Nginx<br>(brotli + lua + HTTP/3)"]
+
+        Nginx -->|"FastCGI :9000"| PHP["PHP-FPM 8.4"]
+        Nginx -->|"static files"| Web["Web Files<br>prod / dev"]
+
+        PHP -->|"Unix socket"| MySQL[("Percona MySQL 8.0<br>(socket-only, no TCP)")]
+        PHP --> Memcached["Memcached<br>Cache (2 GB)"]
+        PHP --> MemSessions["Memcached<br>Sessions (128 MB)"]
+        PHP --> Web
+
+        PHPCron["PHP Cron<br>(agents, exports,<br>sitemaps)"] -->|"Unix socket"| MySQL
+        PHPCron --> Memcached
+        PHPCron --> MemSessions
+        PHPCron --> Web
+
+        subgraph Optional["Optional Services (profiles)"]
+            Certbot["DNSroboCert<br>(Let's Encrypt)"]
+            Zabbix["Zabbix Agent 2"]
+            Adminer["Adminer"]
+            Updater["Updater<br>(webhooks)"]
+            FTP["Pure-FTPD"]
+        end
+
+        Zabbix -->|"monitor"| MySQL
+        Zabbix -->|"monitor"| Nginx
+        Adminer -->|"Unix socket"| MySQL
+    end
+
+    subgraph HostCron["Host Cron"]
+        Backup["Backups<br>(duplicity + mysqldump)"]
+        Minify["JS/CSS Minify<br>(hourly)"]
+        ImgOpt["Image Optimisation<br>(weekly)"]
+    end
+
+    Backup -->|"incremental + dumps"| S3[("Yandex S3")]
+    Certbot -->|"DNS-01 challenge"| YcDNS["Yandex Cloud DNS"]
+
+    subgraph Regions["Domains"]
+        MSK["favor-group.ru"]
+        SPB["spb.favor-group.ru"]
+        Tula["tula.favor-group.ru"]
+        Dev["dev.favor-group.ru"]
+        CDN["static.cdn-favor-group.ru"]
+    end
+
+    Regions --> Nginx
+```
+
+The site serves three regions (Moscow, St Petersburg, Tula) via subdomains, each with its own robots.txt, sitemap, redirect map, and product export feeds. All traffic goes through a single nginx instance with HTTP/3 (QUIC), brotli compression, and multi-layer bot detection. MySQL is accessible only via Unix socket (no TCP port exposed). Backups run to Yandex Object Storage: incremental file backups via duplicity daily, MySQL dumps twice daily.
+
 ## Is it fast?
 
 You bet! Here is a performance on Yandex.Cloud server with Intel Cascade Lake 8 vCPUs, 16Gb of RAM and 120Gb SSD 4000 read\write IOPS and 60Mb/s bandwidth.
 
 <img width="1100" alt="image" src="https://user-images.githubusercontent.com/712534/172490266-88710b9f-3776-4c5b-9852-590181d1d204.png">
 
-## Getting Started
+## What's inside?
 
-Follow these steps to get your Bitrix environment up and running:
+### Core
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/paskal/bitrix.infra.git
-    cd bitrix.infra
-    ```
+- [Nginx](https://www.nginx.com/) [![Image Size](https://img.shields.io/docker/image-size/paskal/nginx)](https://hub.docker.com/r/paskal/nginx) with [brotli](https://github.com/google/ngx_brotli), HTTP/3 (QUIC) and Lua modules — proxies requests to php-fpm and serves static assets directly
+- [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php) 8.2 [![Image Size 8.2](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.2)](https://hub.docker.com/r/paskal/bitrix-php) 8.3 [![Image Size 8.3](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.3)](https://hub.docker.com/r/paskal/bitrix-php) 8.4 [![Image Size 8.4](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.4)](https://hub.docker.com/r/paskal/bitrix-php) 8.5 [![Image Size 8.5](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.5)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
+- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server/8.0)](https://hub.docker.com/r/percona/percona-server) because of its monitoring capabilities
+- [memcached](https://memcached.org/) [![Image Size](https://img.shields.io/docker/image-size/_/memcached/1-alpine)](https://hub.docker.com/r/_/memcached) for bitrix cache and user sessions
 
-2.  **Create Environment Files:**
-    Navigate to the `private/environment/` directory. You will need to create several environment files based on the templates or examples provided. These include:
-    *   `mysql.env`
-    *   `ftp.env`
-    *   `dnsrobocert.env` (Note: this file is for the `certbot` service, which uses DNSroboCert technology)
-    *   `zabbix.env`
-    *   `updater.env`
-    Detailed information about the required variables for each file can be found in the "[File structure > /private > private/environment](#privateenvironment)" section of this Readme.
+### Multi-region setup
 
-3.  **Set File Permissions:**
-    Before starting the containers for the first time, it's crucial to set the correct file and directory permissions. Run the provided script:
-    ```bash
-    sudo ./scripts/fix-rights.sh
-    ```
-    This script ensures that services like MySQL, PHP, and Nginx have the necessary access rights. See the "[File system permissions](#file-system-permissions)" section for more details.
+The site serves three cities — Moscow (`favor-group.ru`), Saint Petersburg (`spb.favor-group.ru`) and Tula (`tula.favor-group.ru`) — from a single Bitrix installation, database and document root. The Bitrix `aspro.max` module handles region-aware content, while nginx and cron scripts handle the SEO layer.
 
-4.  **Start the Services:**
-    Use Docker Compose to start the services. For a basic setup with only core services, run:
-    ```bash
-    docker-compose up -d
-    ```
-    This project primarily uses pre-built Docker images from a container registry (like GitHub Container Registry - GHCR). Therefore, running `docker-compose build` or adding the `--build` flag is generally not necessary for standard usage. Docker Compose will automatically pull the specified images if they are not present locally. You would typically only need to use `--build` if you have made custom modifications to the Dockerfiles and need to rebuild the images locally.
+<details><summary>How multi-region SEO works</summary>
 
-    To manage optional services, refer to the "[Managing Optional Services with Profiles](#managing-optional-services-with-profiles)" section.
+- **robots.txt** — nginx rewrites `/robots.txt` to `/aspro_regions/robots/robots_$host.txt`, so each subdomain gets its own file. A cron script (`alter-robots-txt.sh`, every 10 minutes) patches these files after Bitrix regenerates them: Moscow indexes everything, SPb blocks `/info/blog/` (centralised on Moscow to avoid duplicate content), Tula additionally blocks `/montag/` and `/projects/` which don't exist for that region.
+- **sitemaps** — nginx rewrites `/sitemap*.xml` to `/aspro_regions/sitemap/sitemap*_$host.xml`. Four cron jobs generate them nightly: `sitemap.bitrix.php`, `sitemap.aspro.php`, `sitemap.offers.php` and `sitemap.regions.php`.
+- **redirect maps** — `config/nginx/conf.d/redirects-map.conf` contains four `map` blocks: one per region (`$new_uri_msk`, `$new_uri_spb`, `$new_uri_tula`) for region-specific redirects (e.g. Tula bounces all `/montag/` and `/projects/` URLs to Moscow), plus a global `$new_uri` map for site-wide URL cleanup.
 
-## How to make use of it
+</details>
 
-You couldn't use it as-is without alterations. However, I tried to make everything as generic as possible to make adoption for another project easy. To use it, read through [docker-compose.yml](docker-compose.yml)
-and then read the rest of this Readme. For information about maintenance and utility scripts, see [scripts/README.md](scripts/README.md).
+### Yandex Metrika cookie extension
 
-[bitrixdock](https://github.com/bitrixdock/bitrixdock) (Russian) project was an inspiration for this one and had way better setup instructions. Please start with it if you don't know what to do with many files in that repo.
+Safari's [Intelligent Tracking Prevention](https://webkit.org/blog/category/privacy/) (ITP) limits cookies set by JavaScript to 7 days (24 hours in some cases). This means the Metrika visitor identifier (`_ym_uid`) expires between visits, causing returning visitors to appear as new ones in analytics. Following [Yandex's official recommendation](https://yandex.ru/support/metrica/general/safari-cookie.html), nginx re-sets the Metrika cookies (`_ym_uid`, `_ym_d`, `_ym_ucs`) server-side via `Set-Cookie` headers with a 1-year lifetime — browsers respect the full expiry for server-set cookies.
 
-### File system permissions
+<details><summary>Implementation details</summary>
 
-All files touched by MySQL use UID/GID 1001, and PHP and Nginx use UID/GID 1000.
-**It is crucial to run the `sudo ./scripts/fix-rights.sh` script after cloning the repository and creating your environment files, and before running `docker-compose up` for the first time.** This script sets the permissions appropriately for all containers to run correctly.
+The implementation uses nginx `map` blocks (`config/nginx/conf.d/metrika-cookies.conf`) rather than `if` directives to avoid the ["if is evil"](https://www.nginx.com/resources/wiki/start/topics/depth/ifisevil/) problem — using `add_header` inside an `if` block replaces all parent-level headers, which would drop `Cache-Control`, security headers and CSP from static file responses. When the cookie is absent the map resolves to an empty string and no header is emitted.
 
-It might be easier to switch everything to User and Group 1000 for consistency later.
+</details>
 
-### Relevant parts of Bitrix config
+### Optional
 
-Documentation: sessions [1](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24868) [2](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24870) (ru [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.3435.4816.14028.14026), [2](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=32&LESSON_ID=9421)), [cache](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&CHAPTER_ID=05962&LESSON_PATH=5936.5959.5962) ([ru](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=43&LESSON_ID=2795))
+- PHP cron container (`php-cron`) with same settings as PHP serving web requests
+- [adminer](https://www.adminer.org/) (`adminer`) [![Image Size](https://img.shields.io/docker/image-size/_/adminer)](https://hub.docker.com/r/_/adminer) as phpmyadmin alternative for work with MySQL
+- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) (`ftp`) [![Image Size](https://img.shields.io/docker/image-size/stilliard/pure-ftpd)](https://hub.docker.com/r/stilliard/pure-ftpd) for ftp access
+- [DNSroboCert](https://github.com/adferrand/dnsrobocert) (`certbot`) [![Image Size](https://img.shields.io/docker/image-size/adferrand/dnsrobocert)](https://hub.docker.com/r/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation using the `adferrand/dnsrobocert` image.
+- [zabbix-agent2](https://www.zabbix.com/zabbix_agent) (`zabbix-agent`) [![Image Size](https://img.shields.io/docker/image-size/paskal/zabbix-agent2)](https://hub.docker.com/r/paskal/zabbix-agent2) for monitoring
+- Webhooks server (`updater`) for automated tasks.
+
+### Automation (host cron)
+
+These run on the host machine outside Docker, scheduled via `config/cron/host.cron`:
+
+- **JS/CSS minification** — runs hourly via [`tdewolff/minify`](https://github.com/tdewolff/minify) Docker image on `web/prod/local` and `web/dev/local`, producing `.min.js`/`.min.css` files
+- **Image optimisation** — runs weekly (Saturday night) via `scripts/optimise-images.sh`, processing PNG ([optipng](http://optipng.sourceforge.net/) + [advpng](https://www.advancemame.it/comp-readme)), JPEG ([jpegoptim](https://github.com/tjko/jpegoptim)), WebP ([cwebp](https://developers.google.com/speed/webp/docs/cwebp)) and GIF ([gifsicle](https://www.lcdf.org/gifsicle/)) in `web/prod/upload`. Uses a SQLite database to track already-processed files and avoid redundant work
+- **Log rotation** — configured in `config/logrotate/` for nginx (weekly for production access logs at 100 MB minimum, monthly for others) and PHP (monthly for error, cron and msmtp logs). Nginx logs are reopened via `nginx -s reopen`, PHP-FPM via `USR1` signal
+
+### Bitrix configuration
+
+These are the relevant Bitrix config files that connect the CMS to the dockerised services (memcached for sessions/cache, MySQL via socket, cron agents). Documentation: sessions [1](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24868) [2](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24870) (ru [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.3435.4816.14028.14026), [2](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=32&LESSON_ID=9421)), [cache](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&CHAPTER_ID=05962&LESSON_PATH=5936.5959.5962) ([ru](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=43&LESSON_ID=2795))
 
 <details><summary>bitrix/php_interface/dbconn.php</summary>
 
@@ -168,23 +224,34 @@ return array(
 
 </details>
 
-## What's inside?
+## Getting Started
 
-### Core
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/paskal/bitrix.infra.git
+    cd bitrix.infra
+    ```
 
-- [Nginx](https://www.nginx.com/) [![Image Size](https://img.shields.io/docker/image-size/paskal/nginx)](https://hub.docker.com/r/paskal/nginx) with [brotli](https://github.com/google/ngx_brotli) proxying requests to php-fpm and serving static assets directly
-- [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php) 8.2 [![Image Size 8.2](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.2)](https://hub.docker.com/r/paskal/bitrix-php) 8.3 [![Image Size 8.3](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.3)](https://hub.docker.com/r/paskal/bitrix-php) 8.4 [![Image Size 8.4](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.4)](https://hub.docker.com/r/paskal/bitrix-php) 8.5 [![Image Size 8.5](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.5)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
-- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server/8.0)](https://hub.docker.com/r/percona/percona-server) because of it's monitoring capabilities
-- [memcached](https://memcached.org/) [![Image Size](https://img.shields.io/docker/image-size/_/memcached/1-alpine)](https://hub.docker.com/r/_/memcached) for bitrix cache and user sessions
+2.  **Create environment files:**
+    Copy the example files in `private/environment/` and fill in your values:
+    ```bash
+    for f in private/environment/*.env.example; do cp "$f" "${f%.example}"; done
+    ```
+    Edit each `.env` file — the examples contain comments explaining every variable. At minimum you need `mysql.env`; the others are for optional services (FTP, monitoring, certificates, webhooks).
 
-### Optional
+3.  **Set file permissions:**
+    MySQL uses UID/GID 1001, PHP and Nginx use UID/GID 1000. Run the provided script to set ownership correctly:
+    ```bash
+    sudo ./scripts/fix-rights.sh
+    ```
 
-- PHP cron container (`php-cron`) with same settings as PHP serving web requests
-- [adminer](https://www.adminer.org/) (`adminer`) [![Image Size](https://img.shields.io/docker/image-size/_/adminer)](https://hub.docker.com/r/_/adminer) as phpmyadmin alternative for work with MySQL
-- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) (`ftp`) [![Image Size](https://img.shields.io/docker/image-size/stilliard/pure-ftpd)](https://hub.docker.com/r/stilliard/pure-ftpd) for ftp access
-- [DNSroboCert](https://github.com/adferrand/dnsrobocert) (`certbot`) [![Image Size](https://img.shields.io/docker/image-size/adferrand/dnsrobocert)](https://hub.docker.com/r/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation using the `adferrand/dnsrobocert` image.
-- [zabbix-agent2](https://www.zabbix.com/zabbix_agent) (`zabbix-agent`) [![Image Size](https://img.shields.io/docker/image-size/paskal/zabbix-agent2)](https://hub.docker.com/r/paskal/zabbix-agent2) for monitoring
-- Webhooks server (`updater`) for automated tasks.
+4.  **Start the services:**
+    ```bash
+    docker-compose up -d
+    ```
+    Pre-built images are pulled from GHCR automatically. You only need `--build` if you've modified the Dockerfiles locally. To enable optional services, see [Managing Optional Services with Profiles](#managing-optional-services-with-profiles).
+
+For information about maintenance and utility scripts, see [scripts/README.md](scripts/README.md).
 
 ## File structure
 
@@ -205,6 +272,8 @@ return array(
 
 - `php` directory contains the build Dockerfiles (e.g., `Dockerfile.8.1`, `Dockerfile.8.2`, `Dockerfile.8.3`, `Dockerfile.8.4`, `Dockerfile.8.5`) and php configuration, applied on top of package-provided one.
 
+- `logrotate` directory contains rotation configs for nginx and PHP logs, mounted into the `php-cron` container which runs logrotate daily
+
 ### /logs
 
 `mysql`, `nginx`, `php` logs. cron and msmtp logs will be written to the `php` directory.
@@ -213,63 +282,30 @@ return array(
 
 Maintenance and utility scripts for the infrastructure. See [scripts/README.md](scripts/README.md) for detailed documentation of each script.
 
+### /bin
+
+CLI tools: `fgmysql` (read-only MySQL access via SSH tunnel) and `search-reindex` (Yandex/Bing URL reindexing). See [scripts/README.md](scripts/README.md#bin-directory-tools) for setup and usage.
+
 ### /web
 
 Site files in directories `web/prod` and `web/dev`.
 
-<span id="privateenvironment"></span>
 ### /private
 
-- `private/environment` is a directory with environment files for docker-compose
+- `private/environment/` — environment files for docker-compose services. Copy `.env.example` files to `.env` and fill in your values. Each example file is commented with descriptions of every variable:
+    - `mysql.env` — Percona MySQL credentials (root, application user, read-only agent user)
+    - `dnsrobocert.env` — Yandex Cloud DNS credentials for Let's Encrypt wildcard certificates
+    - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, key restrictions)
+    - `updater.env` — webhook server shared secret
+    - `ftp.env` — Pure-FTPD credentials
 
-    - `private/environment/mysql.env` should contain the [following variables](https://hub.docker.com/r/percona/percona-server):
+- `private/letsencrypt/` — filled with certificates after the `certbot` service runs
 
-      ```bash
-      MYSQL_ROOT_PASSWORD=mysql_root_password
-      MYSQL_USER=bitrix_user
-      MYSQL_PASSWORD=bitrix_mysql_password
-      ```
+- `private/mysql-data/` — MySQL data directory (created automatically on first start)
 
-    - `private/environment/ftp.env` should contain the [following variables](https://hub.docker.com/r/stilliard/pure-ftpd):
+- `private/mysqld/` — MySQL Unix socket for connections without network
 
-      ```bash
-      FTP_USER_NAME=ftp_username
-      FTP_USER_PASS=ftp_password
-      ```
-
-    - `private/environment/dnsrobocert.env` should contain Yandex Cloud DNS API key for the `certbot` service (which uses the [adferrand/dnsrobocert](https://hub.docker.com/r/adferrand/dnsrobocert) image):
-
-      ```
-      # Run `yc components update` once to get the key, and `update-dns-token.sh` script will renew it automatically afterwards
-      AUTH_KEY=insert_key_there
-      DNS_ZONE_ID=insert_zone_id_there
-      ```
-    - `private/environment/updater.env` should contain a secret key for the updater service:
-      ```bash
-      KEY=your_secret_key_here
-      ```
-
-  - `private/environment/zabbix.env` should contain the [following variables](https://hub.docker.com/r/zabbix/zabbix-agent2):
-
-    ```bash
-    ZBX_HOSTNAME=myhostname
-    ZBX_SERVER_HOST=zabbix.example.com
-    ```
-
-    MySQL setup if you want to use Zabbix for monitoring of the database:
-    ```sql
-    drop user if exists 'zbx_monitor'@'localhost';
-    create user if not exists `zbx_monitor`@`localhost` identified by 'generate_random_password_here';
-    grant process, replication client, show databases, show view on *.* to `zbx_monitor`@`localhost`;
-    ```
-
-- `private/letsencrypt` directory will be filled with certificates after the `certbot` service (using DNSroboCert technology) runs.
-
-- `private/mysql-data` directory will be filled with database data automatically after the start of mysql container
-
-- `private/mysqld` directory will contain MySQL unix socket for connections without network
-
-- `private/msmtprc` is a file with [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp)
+- `private/msmtprc` — [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp) for PHP mail sending
 
 ## Managing Optional Services with Profiles
 
@@ -471,103 +507,5 @@ docker-compose run --rm --entrypoint "\
 
 To add required TXT entries, head to DNS entries page of your provider (Yandex Cloud).
 The `certbot` service is configured to handle renewals automatically.
-
-</details>
-
-<details>
-<summary>Read-only MySQL access (fgmysql)</summary>
-
-The `fgmysql` command provides read-only access to MySQL databases via SSH socket tunnel. It uses the `claude_ro` user with SELECT-only privileges.
-
-**Prerequisites:**
-- `mycli` installed (`brew install mycli` on macOS)
-- SSH access to the server configured
-
-**Setup:**
-
-1. Add SSH host alias to `~/.ssh/config`:
-   ```
-   Host bitrix
-       HostName your-server.example.com
-       User your-username
-       IdentityFile ~/.ssh/your-key
-   ```
-
-2. Add `MYSQL_CLAUDE_RO_PASSWORD` to server's `/web/private/environment/mysql.env`
-
-3. Create the MySQL user on the server:
-   ```sql
-   CREATE USER 'claude_ro'@'localhost' IDENTIFIED BY 'password_from_env';
-   GRANT SELECT ON favor_group_ru.* TO 'claude_ro'@'localhost';
-   GRANT SELECT ON dev_favor_group_ru.* TO 'claude_ro'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
-
-4. Add to your shell profile:
-   ```shell
-   export PATH="/path/to/bitrix.infra/bin:$PATH"
-   export SSH_HOST="bitrix"  # optional, defaults to "bitrix"
-   ```
-
-**Usage:**
-```shell
-fgmysql                     # Interactive session (production)
-fgmysql -e "SELECT ..."     # Run query and exit
-fgmysql dev                 # Connect to dev database
-fgmysql dev -e "SELECT ..." # Query dev database
-```
-
-The tunnel starts automatically and password is fetched from the server (cached for 1 hour).
-
-**Manual tunnel management:**
-```shell
-./mysql-tunnel.sh start   # Start tunnel
-./mysql-tunnel.sh status  # Check status
-./mysql-tunnel.sh stop    # Stop tunnel
-```
-
-</details>
-
-<details>
-<summary>Search engine URL reindexing (search-reindex)</summary>
-
-The `search-reindex` command submits URLs to Yandex and Bing for reindexing. Useful after content updates or fixing 404 errors.
-
-**Setup:**
-
-1. Add `bin/` to your PATH:
-   ```shell
-   export PATH="/path/to/bitrix.infra/bin:$PATH"
-   ```
-
-2. Run setup (it will guide you through OAuth app creation for Yandex and optionally Bing API key):
-   ```shell
-   search-reindex setup
-   ```
-
-The script will auto-detect host IDs for favor-group.ru sites.
-
-**Note:** Yandex uses OAuth (oauth.yandex.ru), Bing uses a simple API key from Bing Webmaster Tools.
-
-**Usage:**
-```shell
-search-reindex list                      # List verified Yandex hosts
-search-reindex submit-url <url>...       # Submit one or more URLs
-search-reindex submit <file>             # Submit URLs from file
-search-reindex submit-regions <file>     # Submit URLs for MSK, SPB, TULA
-search-reindex diagnostics               # Check Yandex site issues
-```
-
-**Example:**
-```shell
-# Create file with URLs to reindex
-cat > urls.txt << EOF
-https://favor-group.ru/catalog/profnastil/1484/
-https://favor-group.ru/catalog/profnastil/1485/
-EOF
-
-# Submit for reindexing (goes to both Yandex and Bing if configured)
-search-reindex submit urls.txt
-```
 
 </details>
