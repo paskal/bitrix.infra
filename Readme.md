@@ -270,7 +270,7 @@ For information about maintenance and utility scripts, see [scripts/README.md](s
     - HTTP to HTTPS redirects
     - stub status page listening on localhost for Zabbix monitoring
 
-- `php` directory contains the build Dockerfiles (e.g., `Dockerfile.8.1`, `Dockerfile.8.2`, `Dockerfile.8.3`, `Dockerfile.8.4`, `Dockerfile.8.5`) and php configuration, applied on top of package-provided one.
+- `php` directory contains the build Dockerfiles (`Dockerfile.8.3`, `Dockerfile.8.4`, `Dockerfile.8.5`) and php configuration, applied on top of package-provided one.
 
 - `logrotate` directory contains rotation configs for nginx and PHP logs, mounted into the `php-cron` container which runs logrotate daily
 
@@ -353,7 +353,7 @@ Here are the available profiles and the services they enable:
 
 ### Switching PHP Versions
 
-This project is configured to support multiple PHP versions. Dockerfiles for different versions (e.g., 8.1, 8.2, 8.3, 8.4, 8.5) are available in the `config/php/` directory.
+This project is configured to support multiple PHP versions. Dockerfiles for 8.3, 8.4 and 8.5 are available in the `config/php/` directory.
 
 To switch the PHP version used by the `php` and `php-cron` services:
 
