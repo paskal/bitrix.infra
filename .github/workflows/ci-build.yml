@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.image }} (${{ matrix.platform }})
+    name: Build ${{ matrix.image.name }} (${{ matrix.arch.platform }})
     permissions:
       contents: read
       packages: write
