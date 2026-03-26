@@ -71,10 +71,10 @@ You bet! Here is a performance on Yandex.Cloud server with Intel Cascade Lake 8 
 
 ### Core
 
-- [Nginx](https://www.nginx.com/) [![Image Size](https://img.shields.io/docker/image-size/paskal/nginx)](https://hub.docker.com/r/paskal/nginx) with [brotli](https://github.com/google/ngx_brotli), HTTP/3 (QUIC) and Lua modules — proxies requests to php-fpm and serves static assets directly
-- [php-fpm](https://www.php.net/manual/en/install.fpm.php) (7 [![Image Size 7](https://img.shields.io/docker/image-size/paskal/bitrix-php/7)](https://hub.docker.com/r/paskal/bitrix-php) 8 [![Image Size 8](https://img.shields.io/docker/image-size/paskal/bitrix-php/8)](https://hub.docker.com/r/paskal/bitrix-php) 8.1 [![Image Size 8.1](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.1)](https://hub.docker.com/r/paskal/bitrix-php) 8.2 [![Image Size 8.2](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.2)](https://hub.docker.com/r/paskal/bitrix-php) 8.3 [![Image Size 8.3](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.3)](https://hub.docker.com/r/paskal/bitrix-php) 8.4 [![Image Size 8.4](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.4)](https://hub.docker.com/r/paskal/bitrix-php) 8.5 [![Image Size 8.5](https://img.shields.io/docker/image-size/paskal/bitrix-php/8.5)](https://hub.docker.com/r/paskal/bitrix-php)) for bitrix with msmtp for mail sending
-- [Percona MySQL](https://www.percona.com/software/mysql-database/percona-server) [![Image Size](https://img.shields.io/docker/image-size/percona/percona-server/8.0)](https://hub.docker.com/r/percona/percona-server) because of its monitoring capabilities
-- [memcached](https://memcached.org/) [![Image Size](https://img.shields.io/docker/image-size/_/memcached/1-alpine)](https://hub.docker.com/r/_/memcached) for bitrix cache and user sessions
+- [Nginx](https://www.nginx.com/) ([ghcr.io/paskal/nginx](https://github.com/paskal/bitrix.infra/pkgs/container/nginx)) with [brotli](https://github.com/google/ngx_brotli), HTTP/3 (QUIC) and Lua modules — proxies requests to php-fpm and serves static assets directly
+- [php-fpm](https://www.php.net/manual/en/install.fpm.php) 8.3 / 8.4 / 8.5 ([ghcr.io/paskal/bitrix-php](https://github.com/paskal/bitrix.infra/pkgs/container/bitrix-php)) for Bitrix with msmtp for mail sending
+- [Percona MySQL 8.0](https://www.percona.com/software/mysql-database/percona-server) because of its monitoring capabilities
+- [memcached](https://memcached.org/) for Bitrix cache and user sessions
 
 ### Multi-region setup
 
@@ -101,10 +101,10 @@ The implementation uses nginx `map` blocks (`config/nginx/conf.d/metrika-cookies
 ### Optional
 
 - PHP cron container (`php-cron`) with same settings as PHP serving web requests
-- [adminer](https://www.adminer.org/) (`adminer`) [![Image Size](https://img.shields.io/docker/image-size/_/adminer)](https://hub.docker.com/r/_/adminer) as phpmyadmin alternative for work with MySQL
-- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) (`ftp`) [![Image Size](https://img.shields.io/docker/image-size/stilliard/pure-ftpd)](https://hub.docker.com/r/stilliard/pure-ftpd) for ftp access
-- [DNSroboCert](https://github.com/adferrand/dnsrobocert) (`certbot`) [![Image Size](https://img.shields.io/docker/image-size/adferrand/dnsrobocert)](https://hub.docker.com/r/adferrand/dnsrobocert) for Let's Encrypt HTTPS certificate generation using the `adferrand/dnsrobocert` image.
-- [zabbix-agent2](https://www.zabbix.com/zabbix_agent) (`zabbix-agent`) [![Image Size](https://img.shields.io/docker/image-size/paskal/zabbix-agent2)](https://hub.docker.com/r/paskal/zabbix-agent2) for monitoring
+- [adminer](https://www.adminer.org/) (`adminer`) as phpMyAdmin alternative for work with MySQL
+- [pure-ftpd](https://www.pureftpd.org/project/pure-ftpd/) (`ftp`) for FTP access
+- [DNSroboCert](https://github.com/adferrand/dnsrobocert) (`certbot`) for Let's Encrypt HTTPS certificate generation
+- [zabbix-agent2](https://www.zabbix.com/zabbix_agent) (`zabbix-agent`, [ghcr.io/paskal/zabbix-agent2](https://github.com/paskal/bitrix.infra/pkgs/container/zabbix-agent2)) for monitoring
 - Webhooks server (`updater`) for automated tasks.
 
 ### Automation (host cron)
