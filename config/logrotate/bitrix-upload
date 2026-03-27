@@ -1,0 +1,14 @@
+/web/web/prod/upload/sprod_integr_log.txt
+/web/web/prod/upload/fs_macros_debug.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	rotate 36500
+	monthly
+	minsize 10M
+	missingok
+	notifempty
+	compress
+	delaycompress
+	copytruncate
+}
