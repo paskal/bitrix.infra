@@ -1,5 +1,6 @@
 /web/web/prod/upload/sprod_integr_log.txt
 /web/web/prod/upload/fs_macros_debug.log
+/web/web/prod/local/cron/*.log
 {
 	dateext
 	dateformat .%Y-%m-%d
