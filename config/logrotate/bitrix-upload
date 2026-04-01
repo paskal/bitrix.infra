@@ -1,4 +1,17 @@
 /web/web/prod/upload/sprod_integr_log.txt
+{
+	dateext
+	dateformat .%Y-%m-%d
+	rotate 80
+	monthly
+	minsize 10M
+	missingok
+	notifempty
+	compress
+	delaycompress
+	copytruncate
+}
+
 /web/web/prod/upload/fs_macros_debug.log
 /web/web/prod/local/cron/*.log
 {
