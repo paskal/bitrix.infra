@@ -106,6 +106,7 @@ services:
       - ./logs/php:/var/log/php
       # configuration
       - ./config/php/90-php.ini:/etc/php/8.4/fpm/conf.d/90-php.ini
+      - ./config/php/91-disable-functions.ini:/etc/php/8.4/fpm/conf.d/91-disable-functions.ini:ro
       - ./config/php/zz-pm.conf:/etc/php/8.4/fpm/pool.d/zz-pm.conf
       - ./config/php/xdebug.ini:/etc/php/8.4/mods-available/xdebug.ini
       # for monitoring purposes
@@ -144,6 +145,7 @@ services:
       - ./logs/php:/var/log/php
       # configuration
       - ./config/php/90-php.ini:/etc/php/8.4/cli/conf.d/90-php.ini
+      - ./config/php/91-disable-functions.ini:/etc/php/8.4/cli/conf.d/91-disable-functions.ini:ro
       # Cronjobs
       - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
       # switch timezone from UTC to Moscow
