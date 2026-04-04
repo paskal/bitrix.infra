@@ -32,10 +32,14 @@
 - File timestamps on server are in UTC
 
 ## Nginx Config Deployment
+- **CRITICAL: NEVER `docker compose restart nginx` without testing config first.** A broken config prevents nginx from starting, causing full site outage. Always:
+  1. `docker exec $(docker ps -qf "name=nginx" | head -1) nginx -t`
+  2. Only if test passes → `docker compose restart nginx` or `docker exec nginx nginx -s reload`
 - File-level Docker bind mounts track inodes; `rsync` creates new inodes invisible to the container
 - Deploy via `tee` to write in-place: `ssh bitrix 'tee /web/config/nginx/file.conf' < config/nginx/file.conf > /dev/null`
 - Always test before reload: `docker exec nginx nginx -t && docker exec nginx nginx -s reload`
 - Directory-level mounts (e.g. `conf.d/`) don't have the inode issue
+- `nginx -V` output from a running container may not match the image used on restart — don't trust module availability without testing in a fresh container
 
 ## Cron File Deployment
 - `/web/config/cron` directory is owned by root; to deploy cron changes:
