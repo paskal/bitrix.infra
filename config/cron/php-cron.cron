@@ -19,6 +19,8 @@
 30 *  *  *  * www-data /usr/bin/php /web/prod/local/cron/find_and_fix_bugs_in_new_url.php 2>&1 >>/web/prod/local/cron/find_and_fix_bugs_in_new_url.log
 # popularity sort from Yandex Metrika — monthly rebuild of SORT column for iblock 17
 35 3 1  *  * www-data /usr/bin/php /web/prod/local/cron/update_popularity_sort.php >>/web/prod/local/cron/update_popularity_sort.log 2>&1
+# TEMPORARY: verification run at 02:50 MSK, will be reverted
+50 2    *  *  * www-data /usr/bin/php /web/prod/local/cron/update_popularity_sort.php >>/web/prod/local/cron/update_popularity_sort.log 2>&1
 # cleanup abandoned baskets
 30 4  *  *  * www-data /usr/bin/php /web/prod/local/cron/deleteOldBaskets.php 2>&1 >>/web/prod/local/cron/deleteOldBaskets.log
 # sitemap generation
