@@ -102,6 +102,8 @@ services:
       - ./private/msmtprc:/etc/msmtprc
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
+      # Yandex Metrika API credentials for popularity sort cron
+      - ./private/environment/metrika.env:/etc/metrika.env:ro
       # Logs
       - ./logs/php:/var/log/php
       # configuration
@@ -141,6 +143,8 @@ services:
       - ./private/msmtprc:/etc/msmtprc
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
+      # Yandex Metrika API credentials for popularity sort cron
+      - ./private/environment/metrika.env:/etc/metrika.env:ro
       # Logs for email sending: msmtp expects to write logs there
       - ./logs/php:/var/log/php
       # configuration
