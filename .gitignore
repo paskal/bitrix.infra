@@ -36,3 +36,21 @@
 
 # beads are not public
 .beads
+
+# keys and certs (defence-in-depth, no known leaks)
+*.pem
+*.key
+*_rsa
+*_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.p12
+*.pfx
+
+# credentials-ish
+.env
+.htpasswd
+.netrc
+
+# OS noise
+.DS_Store
