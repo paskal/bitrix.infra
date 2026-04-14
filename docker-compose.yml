@@ -277,6 +277,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
+      # MySQL client credentials for zbx_monitor — used by system.run items
+      # via mariadb --defaults-extra-file=/etc/mysql/zbx.cnf (file is gitignored,
+      # must exist on the server before starting the container)
+      - ./private/environment/mysql-zbx.cnf:/etc/mysql/zbx.cnf:ro
 
     logging:
       driver: json-file
