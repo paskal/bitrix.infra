@@ -1,0 +1,55 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: b79dc5f60f974e4aa257597e06e2a982
+      template: 'Favor-group www redirect working'
+      name: 'Favor-group www redirect working'
+      groups:
+        - name: Favor-group
+        - name: Templates
+      items:
+        - uuid: 132be08f500b49218a98b4d4c618fda6
+          name: 'SSL expiration check'
+          type: EXTERNAL
+          key: 'ssl_cert_check.sh[expire,"{HOST.HOST}"]'
+          delay: 30m
+          history: 90d
+          units: d
+          tags:
+            - tag: Application
+              value: Web
+        - uuid: 318f48e92c894926a0614520b872216c
+          name: 'SSL validity check'
+          type: EXTERNAL
+          key: 'ssl_cert_check.sh[valid,"{HOST.HOST}"]'
+          delay: 15m
+          history: 90d
+          value_type: FLOAT
+          tags:
+            - tag: Application
+              value: Web
+      httptests:
+        - uuid: a6dec450c82c4d4d8678d72644ac2abb
+          name: 'WWW redirect'
+          delay: 30m
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          steps:
+            - name: 'www redirect'
+              url: 'http://www.{HOST.HOST}'
+              follow_redirects: 'NO'
+              status_codes: '301'
+          tags:
+            - tag: Application
+              value: Web
+  triggers:
+    - uuid: 94f56399a08a4844a4b122275fa1e92d
+      expression: 'length(last(/Favor-group www redirect working/web.test.error[WWW redirect]))>0 and min(/Favor-group www redirect working/web.test.fail[WWW redirect],#3)<>0'
+      name: 'Web scenario "WWW redirect" failed: {ITEM.VALUE}'
+      url: 'http://www.{HOST.HOST}'
+      priority: AVERAGE

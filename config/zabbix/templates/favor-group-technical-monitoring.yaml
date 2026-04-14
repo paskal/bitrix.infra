@@ -1,0 +1,56 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: dead28baa15c463b8a744f9e83580f16
+      template: 'Favor-group technical monitoring'
+      name: 'Favor-group technical monitoring'
+      groups:
+        - name: Favor-group
+      items:
+        - uuid: 35cb7b56dcee4965bb7221e28f154f55
+          name: 'dnsrobocert Yandex Cloud auth key is set'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["echo $AUTH_KEY | grep -qE ''^.+$'' || echo ''./scripts/update-dns-token.sh have not set the auth_key, open https://oauth.yandex.ru/authorize?response_type=token&client_id={$YC.OAUTH_CLIENT_ID} and run yc config set token <token>''"]'
+          delay: 30m
+          history: 3d
+          value_type: TEXT
+          description: 'Renewed by script `scripts/update-dns-token.sh`'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 0843c11266d843cbbb11c5a08aca70e9
+              expression: 'length(last(/Favor-group technical monitoring/system.run["echo $AUTH_KEY | grep -qE ''^.+$'' || echo ''./scripts/update-dns-token.sh have not set the auth_key, open https://oauth.yandex.ru/authorize?response_type=token&client_id={$YC.OAUTH_CLIENT_ID} and run yc config set token <token>''"],#1))<>0'
+              name: 'dnsrobocert Yandex Cloud auth key is set'
+              priority: WARNING
+              description: |
+                Follow the instructions to renew the token; otherwise, the dnsrobocert container won't be able to renew the HTTPS certificate for favor-group.ru and its subdomains.
+                https://yandex.cloud/en/docs/iam/concepts/authorization/oauth-token
+        - uuid: fff6d83790094838998f78ed02853d73
+          name: 'Module redirect to relative path'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select old_url, new_url from favor_group_ru.b_esolredirector_redirects where new_url regexp ''^[^/]'';\""]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          description: |
+            That causes endless redirect loops. new_url should be absolute (start with slash).
+            
+            b24 task 6712
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: c7d4e06b364a4b4f871edfe7d540ab6c
+              expression: 'length(last(/Favor-group technical monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select old_url, new_url from favor_group_ru.b_esolredirector_redirects where new_url regexp ''^[^/]'';\""],#1))<>0'
+              name: 'Redirects module has relative destinations, all links should start with slash'
+              url: '{$BITRIX.ADMIN_URL}/esol_redirector_redirect_list.php?lang=ru'
+              priority: WARNING
+              description: |
+                new_url should be fixed to start with slash, as otherwise we have redirect loop.
+                
+                b24 task 6712
+              manual_close: 'YES'

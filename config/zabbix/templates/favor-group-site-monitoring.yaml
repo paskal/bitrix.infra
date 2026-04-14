@@ -1,0 +1,35 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 1c218e00c1ad4ab9b3d3260a75cd69de
+      template: 'Favor-group site monitoring'
+      name: 'Favor-group site monitoring'
+      templates:
+        - name: 'Favor-group subdomain monitoring'
+        - name: 'Favor-group www redirect working'
+      groups:
+        - name: Favor-group
+        - name: Templates
+      items:
+        - uuid: 72feeab898414fb1a4c652c12f81d352
+          name: 'sitemap.xml newest entry age'
+          type: EXTERNAL
+          key: 'sitemap_check.sh["https://{HOST.HOST}/sitemap.xml"]'
+          delay: 1h
+          history: 90d
+          units: d
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: bd1ec252b16c46518945a221ec572d09
+              expression: 'min(/Favor-group site monitoring/sitemap_check.sh["https://{HOST.HOST}/sitemap.xml"],#3)>3'
+              name: 'Newest entry in sitemap.xml is >3 days old: {ITEM.VALUE}'
+              url: 'https://{HOST.HOST}/sitemap.xml'
+              priority: WARNING
+              description: 'sitemap.xml should be renewed automatically, this alert means that either we have no updates to any page on the site or that automatic renewal is broken.'

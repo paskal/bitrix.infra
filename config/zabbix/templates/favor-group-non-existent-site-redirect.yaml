@@ -1,0 +1,47 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 2e6e8ced45ac4a8d964b92fa8f1ef37a
+      template: 'Favor-group non-existent site redirect'
+      name: 'Favor-group non-existent site redirect'
+      groups:
+        - name: Favor-group
+        - name: Templates
+      httptests:
+        - uuid: 4af6304a5afb48ef9c03a4d39484dcd7
+          name: Redirect
+          delay: 15m
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          steps:
+            - name: 'HTTP redirect'
+              url: 'http://{HOST.HOST}'
+              follow_redirects: 'NO'
+              status_codes: '301'
+            - name: 'HTTPS redirect'
+              url: 'https://{HOST.HOST}'
+              follow_redirects: 'NO'
+              retrieve_mode: HEADERS
+              required: 'location: https://favor-group.ru'
+              status_codes: '301'
+            - name: 'HTTPS sitemap xml'
+              url: 'https://{HOST.HOST}/sitemap.xml'
+              follow_redirects: 'NO'
+              retrieve_mode: HEADERS
+              required: 'location: https://favor-group.ru'
+              status_codes: '301'
+          tags:
+            - tag: Application
+              value: Web
+  triggers:
+    - uuid: 139b717a1a1e46f0ac17e1dc0ef52006
+      expression: 'length(last(/Favor-group non-existent site redirect/web.test.error[Redirect]))>0 and min(/Favor-group non-existent site redirect/web.test.fail[Redirect],#3)<>0'
+      name: 'Web scenario "Redirects" failed'
+      url: 'https://{HOST.HOST}'
+      priority: AVERAGE
+      description: 'Redirect from that site should lead to Moscow site, if it''s not that means that redirect from non-existent domain names is broken.'

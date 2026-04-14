@@ -1,0 +1,16 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: 29645819ea184936a6ff0f3ecd5470f6
+      template: 'Favor-group docker host monitoring'
+      name: 'Favor-group docker host monitoring'
+      templates:
+        - name: 'Favor-group ads monitoring'
+        - name: 'Favor-group content monitoring'
+        - name: 'Favor-group goods monitoring'
+        - name: 'Favor-group technical monitoring'
+      groups:
+        - name: Favor-group

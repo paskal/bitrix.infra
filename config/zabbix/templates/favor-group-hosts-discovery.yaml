@@ -1,0 +1,48 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  host_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: 53a485384d814218961f4a379de004e3
+      template: 'Favor-group hosts discovery'
+      name: 'Favor-group hosts discovery'
+      groups:
+        - name: Favor-group
+        - name: Templates
+      discovery_rules:
+        - uuid: 7fb2346637c84376af4d5a86c1feebd0
+          name: 'Sites discovery'
+          type: ZABBIX_ACTIVE
+          key: 'system.run[find /home/admin/conf/web/ -maxdepth 1 -type f -name ''*apache2.ssl.conf'']'
+          delay: 1h
+          lifetime: 30d
+          enabled_lifetime_type: DISABLE_NEVER
+          host_prototypes:
+            - uuid: 1d324de63e5f4ddbae5b5f50952edaaa
+              host: '{#DOMAIN}'
+              name: '{#DOMAIN}'
+              inventory_mode: AUTOMATIC
+              group_links:
+                - group:
+                    name: Favor-group
+              templates:
+                - name: 'Favor-group site monitoring'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var lld = [];
+                  var lines = value.split("\n");
+                  for (i = 0; i < lines.length; i++)
+                  {
+                    var row = {};
+                    row["{#DOMAIN}"] = lines[i].match(/.+\/(.+)\.apache2\.ssl\.conf/)[1];
+                    lld.push(row);
+                  }
+                  return JSON.stringify(lld);

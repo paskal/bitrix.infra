@@ -1,0 +1,174 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: f12564ae555a48e2be41aa878398a9ed
+      template: 'Favor-group goods monitoring'
+      name: 'Favor-group goods monitoring'
+      groups:
+        - name: Favor-group
+      items:
+        - uuid: 0b1fb3f074c04133a5b5b8deb22f652e
+          name: 'Trade positions without sections attachments'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf --skip-column-names -e \"SELECT CONCAT(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID = {$CATALOG.MAIN_IBLOCK}&type=aspro_max_catalog&lang=ru&find_section_section=0&WF=Y&ID='', el.ID) FROM favor_group_ru.b_iblock_element el LEFT JOIN favor_group_ru.b_iblock_section_element sect ON el.ID = sect.IBLOCK_ELEMENT_ID WHERE el.IBLOCK_ID = {$CATALOG.MAIN_IBLOCK} AND sect.IBLOCK_ELEMENT_ID IS NULL;\""]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: c9a91254fd2b42a3be1c7f9d3b7a38c7
+              expression: 'length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf --skip-column-names -e \"SELECT CONCAT(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID = {$CATALOG.MAIN_IBLOCK}&type=aspro_max_catalog&lang=ru&find_section_section=0&WF=Y&ID='', el.ID) FROM favor_group_ru.b_iblock_element el LEFT JOIN favor_group_ru.b_iblock_section_element sect ON el.ID = sect.IBLOCK_ELEMENT_ID WHERE el.IBLOCK_ID = {$CATALOG.MAIN_IBLOCK} AND sect.IBLOCK_ELEMENT_ID IS NULL;\""],#1))<>0'
+              name: 'Catalog has goods which are not attached to sections, attach or delete them'
+              priority: WARNING
+              description: 'When position has no attachment to section, it won''t be shown on site and will have 301 redirect to some section, but will be exported in the sitemap and Yandex.Market feed.'
+        - uuid: 82b20e2453a843ff8a748d6458f7bbf6
+          name: 'XML_ID duplicates'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT b.ID,b.IBLOCK_ID,b.XML_ID, b.NAME FROM favor_group_ru.b_iblock_element b INNER JOIN (SELECT XML_ID FROM favor_group_ru.b_iblock_element WHERE IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK}) AND XML_ID NOT IN ({$CATALOG.XMLID_DUPES_OK}) GROUP BY XML_ID HAVING COUNT(XML_ID)>1) dt ON b.XML_ID=dt.XML_ID ORDER BY b.XML_ID;\""]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          description: 'b24 task 6034'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: efc334193d7149d48a97d97b3b7d8865
+              expression: |
+                length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT b.ID,b.IBLOCK_ID,b.XML_ID, b.NAME FROM favor_group_ru.b_iblock_element b INNER JOIN (SELECT XML_ID FROM favor_group_ru.b_iblock_element WHERE IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK}) AND XML_ID NOT IN ({$CATALOG.XMLID_DUPES_OK}) GROUP BY XML_ID HAVING COUNT(XML_ID)>1) dt ON b.XML_ID=dt.XML_ID ORDER BY b.XML_ID;\""],#1))<>0
+                and
+                length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT b.ID,b.IBLOCK_ID,b.XML_ID, b.NAME FROM favor_group_ru.b_iblock_element b INNER JOIN (SELECT XML_ID FROM favor_group_ru.b_iblock_element WHERE IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK}) AND XML_ID NOT IN ({$CATALOG.XMLID_DUPES_OK}) GROUP BY XML_ID HAVING COUNT(XML_ID)>1) dt ON b.XML_ID=dt.XML_ID ORDER BY b.XML_ID;\""],#2))<>0
+                and
+                length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT b.ID,b.IBLOCK_ID,b.XML_ID, b.NAME FROM favor_group_ru.b_iblock_element b INNER JOIN (SELECT XML_ID FROM favor_group_ru.b_iblock_element WHERE IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK}) AND XML_ID NOT IN ({$CATALOG.XMLID_DUPES_OK}) GROUP BY XML_ID HAVING COUNT(XML_ID)>1) dt ON b.XML_ID=dt.XML_ID ORDER BY b.XML_ID;\""],#3))<>0
+                and
+                last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT b.ID,b.IBLOCK_ID,b.XML_ID, b.NAME FROM favor_group_ru.b_iblock_element b INNER JOIN (SELECT XML_ID FROM favor_group_ru.b_iblock_element WHERE IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK}) AND XML_ID NOT IN ({$CATALOG.XMLID_DUPES_OK}) GROUP BY XML_ID HAVING COUNT(XML_ID)>1) dt ON b.XML_ID=dt.XML_ID ORDER BY b.XML_ID;\""],#1)=last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT b.ID,b.IBLOCK_ID,b.XML_ID, b.NAME FROM favor_group_ru.b_iblock_element b INNER JOIN (SELECT XML_ID FROM favor_group_ru.b_iblock_element WHERE IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK}) AND XML_ID NOT IN ({$CATALOG.XMLID_DUPES_OK}) GROUP BY XML_ID HAVING COUNT(XML_ID)>1) dt ON b.XML_ID=dt.XML_ID ORDER BY b.XML_ID;\""],#2)
+              name: 'XML_ID duplicates in the catalog'
+              url: '{$BITRIX.ADMIN_URL}/iblock_edit.php?type=aspro_max_catalog&lang=ru&ID=17&admin=Y'
+              priority: WARNING
+              description: 'b24 task 6034'
+        - uuid: 2c22639a43c14a418c027089c3f3b099
+          name: 'Duplicate SEO URLs'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/aspro.smartseo_smartseo.php?route=filter_rule_detail%2Fdetail&id='',b_aspro_smartseo_filter_condition.filter_rule_id) as url, b_aspro_smartseo_filter_url.new_url, b_aspro_smartseo_filter_url.FILTER_CONDITION_ID from favor_group_ru.b_aspro_smartseo_filter_url join favor_group_ru.b_aspro_smartseo_filter_condition on b_aspro_smartseo_filter_condition.id = b_aspro_smartseo_filter_url.filter_condition_id group by b_aspro_smartseo_filter_url.new_url having count(b_aspro_smartseo_filter_url.new_url) > 1 order by 2;\""]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          description: 'b24 task 6508'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 8a0f0a2c1624431a8bae8275a7cb6998
+              expression: 'length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/aspro.smartseo_smartseo.php?route=filter_rule_detail%2Fdetail&id='',b_aspro_smartseo_filter_condition.filter_rule_id) as url, b_aspro_smartseo_filter_url.new_url, b_aspro_smartseo_filter_url.FILTER_CONDITION_ID from favor_group_ru.b_aspro_smartseo_filter_url join favor_group_ru.b_aspro_smartseo_filter_condition on b_aspro_smartseo_filter_condition.id = b_aspro_smartseo_filter_url.filter_condition_id group by b_aspro_smartseo_filter_url.new_url having count(b_aspro_smartseo_filter_url.new_url) > 1 order by 2;\""],#1))<>0'
+              name: 'Duplicate SEO URLs'
+              priority: WARNING
+              description: 'Multiple SEO conditions point to the same URL, they should be unique.'
+        - uuid: 0874cadda492407db9ca8f56fc714142
+          name: 'Russian H instead of X in product name'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID = {$CATALOG.MAIN_IBLOCK}&type=aspro_max_catalog&lang=ru&ID='',ID,''&WF=Y&find_section_section='',IBLOCK_SECTION_ID) as URL, NAME from favor_group_ru.b_iblock_element where IBLOCK_ID = {$CATALOG.MAIN_IBLOCK} and NAME regexp ''[0-9]+([м]|[л]|[к][г]|[г]|[ш][т]|[у][п][а][к]|[р][у][л][о][н]|[п][о][г][.][ ][м])'';\""]'
+          delay: 1h
+          history: 3d
+          value_type: TEXT
+          description: 'b24 task 4042'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 94d8c0d6b41a41df80d2a73b577bdffb
+              expression: 'length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID = {$CATALOG.MAIN_IBLOCK}&type=aspro_max_catalog&lang=ru&ID='',ID,''&WF=Y&find_section_section='',IBLOCK_SECTION_ID) as URL, NAME from favor_group_ru.b_iblock_element where IBLOCK_ID = {$CATALOG.MAIN_IBLOCK} and NAME regexp ''[0-9]+([м]|[л]|[к][г]|[г]|[ш][т]|[у][п][а][к]|[р][у][л][о][н]|[п][о][г][.][ ][м])'';\""],#1))<>0'
+              name: 'Catalog properties has no space before unit: fix the names by the links'
+              priority: WARNING
+              description: 'b24 task 4042'
+              manual_close: 'YES'
+        - uuid: d96630ddb7404a18bcc322ce1f98ccbc
+          name: 'Improper properties values in catalog of goods'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select property_id, value from favor_group_ru.b_iblock_property_enum where (value regexp ''\\\d+\\\.\\\d+'' and value not like ''Уплотнители%'' and id not in ({$CATALOG.PROPENUM_FORMAT_OK})) or value regexp ''\\\d+х\\\d+'' order by property_id, value;\""]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 04494a6a4c994a80815141c98e3e5d33
+              expression: 'length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select property_id, value from favor_group_ru.b_iblock_property_enum where (value regexp ''\\\d+\\\.\\\d+'' and value not like ''Уплотнители%'' and id not in ({$CATALOG.PROPENUM_FORMAT_OK})) or value regexp ''\\\d+х\\\d+'' order by property_id, value;\""],#1))<>0'
+              name: 'Catalog properties has Russian "x" or dot instead of comma as digits separator: open Properties tab, find and fix the offender'
+              url: '{$BITRIX.ADMIN_URL}/iblock_edit.php?type=aspro_max_catalog&lang=ru&ID=17&admin=Y'
+              priority: WARNING
+              description: 'b24 task 2641'
+        - uuid: ea1d03fc0d494aebb47b3c9c560a9991
+          name: 'Goods added to multiple categories'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT s.iblock_element_id, e.NAME FROM favor_group_ru.b_iblock_section_element s JOIN favor_group_ru.b_iblock_element e ON s.iblock_element_id=e.id WHERE e.iblock_id = {$CATALOG.MAIN_IBLOCK} AND s.additional_property_id IS NULL GROUP BY s.iblock_element_id HAVING COUNT(*) > 1;\""]'
+          delay: 1h
+          history: 3d
+          value_type: TEXT
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: e2c7a054a7874d2a9cbffcfca6e3153c
+              expression: 'length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT s.iblock_element_id, e.NAME FROM favor_group_ru.b_iblock_section_element s JOIN favor_group_ru.b_iblock_element e ON s.iblock_element_id=e.id WHERE e.iblock_id = {$CATALOG.MAIN_IBLOCK} AND s.additional_property_id IS NULL GROUP BY s.iblock_element_id HAVING COUNT(*) > 1;\""],#1))<>0'
+              name: 'Goods added to multiple categories'
+              priority: WARNING
+              description: 'Please make sure that each position has only one category, otherwise 404 pages would be present on the website.'
+        - uuid: 9db8ad9a66cf4b24bf325cf51148e294
+          name: 'Canonical URL redirect from non-existing SEO URL'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select URL from favor_group_ru.favor_canonical left join favor_group_ru.b_aspro_smartseo_filter_url on URL=b_aspro_smartseo_filter_url.NEW_URL where NEW_URL is NULL;\""]'
+          delay: 1h
+          history: 3d
+          value_type: TEXT
+          description: 'These links do not exist so no redirect is happening. They are safe to delete or change if the transliteration is changed.'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 1da01fe16aca45f5bbf3392b6add3e1f
+              expression: 'length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select URL from favor_group_ru.favor_canonical left join favor_group_ru.b_aspro_smartseo_filter_url on URL=b_aspro_smartseo_filter_url.NEW_URL where NEW_URL is NULL;\""],#1))<>0 and length(last(/Favor-group goods monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select URL from favor_group_ru.favor_canonical left join favor_group_ru.b_aspro_smartseo_filter_url on URL=b_aspro_smartseo_filter_url.NEW_URL where NEW_URL is NULL;\""],#2))<>0'
+              name: 'Canonical redirects from non-existing URLs'
+              priority: WARNING
+              description: 'Please remove these lines from favor_group_ru.favor_canonical table.'
+        - uuid: 83224efc01ae4b94a895ee3d47456057
+          name: 'Lines between start and finish of export: Yandex'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["tac /web/prod/upload/acrit.export/log/log_1.e63f31938c399df95752fe5013735c65.txt | sed -E ''/Запущен автоматический экспорт|Запущен процесс экспорта./q'' | tac | egrep -v ''Процесс завершен! Затрачено времени:|Ошибочный ответ центра обновлений.|Запущен автоматический экспорт.|Запущен процесс экспорта.''"]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 9b03f0d35d764addac43c45a44d26575
+              expression: |
+                length(last(/Favor-group goods monitoring/system.run["tac /web/prod/upload/acrit.export/log/log_1.e63f31938c399df95752fe5013735c65.txt | sed -E '/Запущен автоматический экспорт|Запущен процесс экспорта./q' | tac | egrep -v 'Процесс завершен! Затрачено времени:|Ошибочный ответ центра обновлений.|Запущен автоматический экспорт.|Запущен процесс экспорта.'"],#1))<>0
+                or
+                length(last(/Favor-group goods monitoring/system.run["tac /web/prod/upload/acrit.export/log/log_1.e63f31938c399df95752fe5013735c65.txt | sed -E '/Запущен автоматический экспорт|Запущен процесс экспорта./q' | tac | egrep -v 'Процесс завершен! Затрачено времени:|Ошибочный ответ центра обновлений.|Запущен автоматический экспорт.|Запущен процесс экспорта.'"],#2))<>0
+              name: 'Yandex export has non-empty output'
+              url: '{$BITRIX.ADMIN_URL}/acrit_export_new_edit.php?ID=1&lang=ru'
+              priority: WARNING
+              manual_close: 'YES'
+        - uuid: 7d9157a54f644af6a8d98cfead86b1f3
+          name: 'Lines between start and finish of export: Google'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["tac /web/prod/upload/acrit.export/log/log_2.e63f31938c399df95752fe5013735c65.txt | sed ''/Запущен автоматический экспорт/q'' | tac | egrep -v ''Процесс завершен! Затрачено времени:|Ошибочный ответ центра обновлений.|Запущен автоматический экспорт.''"]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 62fb51599cc442a299403c9d6c4519d0
+              expression: 'length(last(/Favor-group goods monitoring/system.run["tac /web/prod/upload/acrit.export/log/log_2.e63f31938c399df95752fe5013735c65.txt | sed ''/Запущен автоматический экспорт/q'' | tac | egrep -v ''Процесс завершен! Затрачено времени:|Ошибочный ответ центра обновлений.|Запущен автоматический экспорт.''"],#1))<>0'
+              name: 'Google export has non-empty (error) output'
+              url: '{$BITRIX.ADMIN_URL}/acrit_export_new_edit.php?ID=2&lang=ru'
+              priority: WARNING

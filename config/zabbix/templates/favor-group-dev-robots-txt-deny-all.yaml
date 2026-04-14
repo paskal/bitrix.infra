@@ -1,0 +1,35 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: b9723e3bd56547a0a169b6cbb4fdb0d7
+      template: 'Favor-group dev robots.txt deny all'
+      name: 'Favor-group dev robots.txt deny all'
+      groups:
+        - name: Favor-group
+        - name: Templates
+      httptests:
+        - uuid: 45bc3bd555d84ae3b32a06f6a4c1dadd
+          name: 'robots.txt deny all'
+          delay: 30m
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          steps:
+            - name: 'Deny all in robots.txt'
+              url: 'https://{HOST.HOST}/robots.txt'
+              follow_redirects: 'NO'
+              required: 'User-agent: \*\nDisallow: /'
+              status_codes: '200'
+          tags:
+            - tag: Application
+              value: Web
+  triggers:
+    - uuid: fb40026e54af41318a533de2ee5a26e2
+      expression: 'length(last(/Favor-group dev robots.txt deny all/web.test.error[robots.txt deny all]))>0 and min(/Favor-group dev robots.txt deny all/web.test.fail[robots.txt deny all],#3)<>0'
+      name: 'Web scenario "Google deny for subbdomain" failed: {ITEM.VALUE}'
+      url: 'https://{HOST.HOST}/robots.txt'
+      priority: AVERAGE

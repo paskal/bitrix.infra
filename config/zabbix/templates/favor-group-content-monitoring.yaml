@@ -1,0 +1,114 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: 1e280430ae7f4cd7b8375671a12a5c57
+      template: 'Favor-group content monitoring'
+      name: 'Favor-group content monitoring'
+      groups:
+        - name: Favor-group
+      items:
+        - uuid: 8c3f2a1b5d4e4f7890abcdef12345678
+          name: 'Whitespace issues in reference data'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"SELECT ''catalog_color'' AS source, ID, CONCAT(''['', UF_NAME, '']'') AS value FROM favor_group_ru.b_hlbd_catalog_colors WHERE UF_NAME REGEXP ''^ |  | $'' UNION ALL SELECT ''property_enum'', ID, CONCAT(''['', VALUE, '']'') FROM favor_group_ru.b_iblock_property_enum WHERE VALUE REGEXP ''^ |  | $'' UNION ALL SELECT ''section'', ID, CONCAT(''['', NAME, '']'') FROM favor_group_ru.b_iblock_section WHERE NAME REGEXP ''^ |  | $'' AND IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK});\""]'
+          delay: 6h
+          history: 3d
+          value_type: TEXT
+          description: 'Detects leading/trailing/double whitespace in catalog colors, property enums, and section names.'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 9d4e3b2c1a5f478990a345abcdef6789
+              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"SELECT ''catalog_color'' AS source, ID, CONCAT(''['', UF_NAME, '']'') AS value FROM favor_group_ru.b_hlbd_catalog_colors WHERE UF_NAME REGEXP ''^ |  | $'' UNION ALL SELECT ''property_enum'', ID, CONCAT(''['', VALUE, '']'') FROM favor_group_ru.b_iblock_property_enum WHERE VALUE REGEXP ''^ |  | $'' UNION ALL SELECT ''section'', ID, CONCAT(''['', NAME, '']'') FROM favor_group_ru.b_iblock_section WHERE NAME REGEXP ''^ |  | $'' AND IBLOCK_ID IN ({$CATALOG.MAIN_IBLOCK}, {$CATALOG.SECONDARY_IBLOCK});\""],#1))<>0'
+              name: 'Whitespace issues in reference data'
+              priority: WARNING
+              description: 'Trim extra spaces from the listed values in the database.'
+        - uuid: d141adf140964d4db61860f52b1102d8
+          name: 'Blog articles with empty meta description'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"SELECT CONCAT(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID = {$CONTENT.BLOG_IBLOCK}&type=aspro_max_content&lang=ru&find_section_section=0&WF=Y&ID='',e.ID) AS EDIT_LINK, e.NAME AS ARTICLE_NAME FROM favor_group_ru.b_iblock_element e LEFT JOIN favor_group_ru.b_iblock_iproperty p ON e.ID = p.ENTITY_ID AND p.CODE = ''ELEMENT_META_DESCRIPTION'' AND p.IBLOCK_ID = {$CONTENT.BLOG_IBLOCK} WHERE e.IBLOCK_ID = {$CONTENT.BLOG_IBLOCK} AND p.ENTITY_ID IS NULL ORDER BY e.ID;\""]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          description: 'If the description is empty, the parent category description is used instead.'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: f67286b9786e4768a2b8e3dfa1269c8b
+              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"SELECT CONCAT(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID = {$CONTENT.BLOG_IBLOCK}&type=aspro_max_content&lang=ru&find_section_section=0&WF=Y&ID='',e.ID) AS EDIT_LINK, e.NAME AS ARTICLE_NAME FROM favor_group_ru.b_iblock_element e LEFT JOIN favor_group_ru.b_iblock_iproperty p ON e.ID = p.ENTITY_ID AND p.CODE = ''ELEMENT_META_DESCRIPTION'' AND p.IBLOCK_ID = {$CONTENT.BLOG_IBLOCK} WHERE e.IBLOCK_ID = {$CONTENT.BLOG_IBLOCK} AND p.ENTITY_ID IS NULL ORDER BY e.ID;\""],#1))<>0'
+              name: 'Blog articles with empty meta description'
+              priority: WARNING
+              description: 'Set the description so that it would not duplicate the parent one.'
+        - uuid: fe10864fff0b4d76a09d5a7369a7055b
+          name: 'Absolute links in the blog or object description'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT concat(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?type=aspro_max_content&lang=ru&find_section_section=-1&WF=Y&IBLOCK_ID='', b_iblock_element.iblock_id, ''&ID='',b_iblock_element.id) as url FROM favor_group_ru.b_iblock_element_property JOIN favor_group_ru.b_iblock_element on b_iblock_element_property.iblock_element_id = b_iblock_element.id WHERE (value LIKE ''%http://%'' OR value LIKE ''%https://%'' OR value regexp ''href=\\\\"[^/]'') and b_iblock_element.iblock_id not in ({$CONTENT.ABSLINK_IBLOCK_EXCLUDE}) and b_iblock_element.id not in ({$CONTENT.ABSLINK_OK});\""]'
+          delay: 1h
+          history: 3d
+          value_type: TEXT
+          description: 'b24 task 6814'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 710e8106cefc46d9826ef21fc773b630
+              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT concat(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?type=aspro_max_content&lang=ru&find_section_section=-1&WF=Y&IBLOCK_ID='', b_iblock_element.iblock_id, ''&ID='',b_iblock_element.id) as url FROM favor_group_ru.b_iblock_element_property JOIN favor_group_ru.b_iblock_element on b_iblock_element_property.iblock_element_id = b_iblock_element.id WHERE (value LIKE ''%http://%'' OR value LIKE ''%https://%'' OR value regexp ''href=\\\\"[^/]'') and b_iblock_element.iblock_id not in ({$CONTENT.ABSLINK_IBLOCK_EXCLUDE}) and b_iblock_element.id not in ({$CONTENT.ABSLINK_OK});\""],#1))<>0'
+              name: 'Absolute links in the blog or object description'
+              priority: AVERAGE
+              description: |
+                Please open the link and replace absolute links everywhere with relative ones.
+                The issue might not be on the first page you open. Search for "http" on other tabs, then.
+        - uuid: bad769f1dedb4441903d47a383c65205
+          name: 'Absolute link in category description'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_section_edit.php?type=aspro_max_catalog&lang=ru&IBLOCK_ID='',IBLOCK_ID,''&ID='',ID) AS url FROM favor_group_ru.b_iblock_section WHERE description LIKE ''%http%'' and description NOT LIKE ''%https://www.youtube-nocookie.com/embed/%'';\""]'
+          delay: 3h
+          history: 3d
+          value_type: TEXT
+          description: 'Absolute links are evil, also images CDN is broken for absolute links to images.'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 0c37d783b8d349f2905f67eed68c20f4
+              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_section_edit.php?type=aspro_max_catalog&lang=ru&IBLOCK_ID='',IBLOCK_ID,''&ID='',ID) AS url FROM favor_group_ru.b_iblock_section WHERE description LIKE ''%http%'' and description NOT LIKE ''%https://www.youtube-nocookie.com/embed/%'';\""],#1))<>0'
+              name: 'Absolute link in category description'
+              priority: AVERAGE
+              description: 'Replace absolute URLs with relative ones, as they are breaking CDN and regionality.'
+        - uuid: b764ac27d070484b9efe4e4cc3edcd33
+          name: 'Absolute links in the Aspo Seo page description'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT favor_group_ru.b_aspro_smartseo_filter_url.NEW_URL as new_url_for_search, CONCAT(''{$BITRIX.ADMIN_URL}/aspro.smartseo_smartseo.php?route=filter_rule_detail%2Fdetail&id='', favor_group_ru.b_aspro_smartseo_filter_rule.ID, ''&parent_section_id='', favor_group_ru.b_aspro_smartseo_filter_rule.SECTION_ID, ''&lang=ru&active_tab=filter_rule_url'') as url_to_open FROM favor_group_ru.b_aspro_smartseo_seo_template JOIN favor_group_ru.b_aspro_smartseo_filter_url ON favor_group_ru.b_aspro_smartseo_seo_template.ENTITY_ID = favor_group_ru.b_aspro_smartseo_filter_url.ID JOIN favor_group_ru.b_aspro_smartseo_filter_condition ON favor_group_ru.b_aspro_smartseo_filter_url.FILTER_CONDITION_ID = favor_group_ru.b_aspro_smartseo_filter_condition.ID JOIN favor_group_ru.b_aspro_smartseo_filter_rule ON favor_group_ru.b_aspro_smartseo_filter_condition.FILTER_RULE_ID = favor_group_ru.b_aspro_smartseo_filter_rule.ID WHERE (favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE LIKE ''%http://%'' OR favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE LIKE ''%https://%'' OR favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE REGEXP ''href=\\\\"[^/]'' OR favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE REGEXP ''src=\\\\"[^/]'') AND favor_group_ru.b_aspro_smartseo_seo_template.id != {$CONTENT.SEO_TEMPLATE_EXCLUDE};\""]'
+          delay: 1h
+          history: 3d
+          value_type: TEXT
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: e570dd1476964ec6a58e6b37ad3d1450
+              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"SELECT favor_group_ru.b_aspro_smartseo_filter_url.NEW_URL as new_url_for_search, CONCAT(''{$BITRIX.ADMIN_URL}/aspro.smartseo_smartseo.php?route=filter_rule_detail%2Fdetail&id='', favor_group_ru.b_aspro_smartseo_filter_rule.ID, ''&parent_section_id='', favor_group_ru.b_aspro_smartseo_filter_rule.SECTION_ID, ''&lang=ru&active_tab=filter_rule_url'') as url_to_open FROM favor_group_ru.b_aspro_smartseo_seo_template JOIN favor_group_ru.b_aspro_smartseo_filter_url ON favor_group_ru.b_aspro_smartseo_seo_template.ENTITY_ID = favor_group_ru.b_aspro_smartseo_filter_url.ID JOIN favor_group_ru.b_aspro_smartseo_filter_condition ON favor_group_ru.b_aspro_smartseo_filter_url.FILTER_CONDITION_ID = favor_group_ru.b_aspro_smartseo_filter_condition.ID JOIN favor_group_ru.b_aspro_smartseo_filter_rule ON favor_group_ru.b_aspro_smartseo_filter_condition.FILTER_RULE_ID = favor_group_ru.b_aspro_smartseo_filter_rule.ID WHERE (favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE LIKE ''%http://%'' OR favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE LIKE ''%https://%'' OR favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE REGEXP ''href=\\\\"[^/]'' OR favor_group_ru.b_aspro_smartseo_seo_template.TEMPLATE REGEXP ''src=\\\\"[^/]'') AND favor_group_ru.b_aspro_smartseo_seo_template.id != {$CONTENT.SEO_TEMPLATE_EXCLUDE};\""],#1))<>0'
+              name: 'Absolute links in the Aspo SEO page description'
+              priority: AVERAGE
+              description: 'Please open the link, search for new_url equal to the one in the first column, and replace absolute links everywhere with relative ones.'
+        - uuid: abf6a037683f47188ac01fe88a3a265f
+          name: 'Height or weight is missing from picture in blog'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"WITH RECURSIVE numbers AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM numbers WHERE n < 100), extracted AS (SELECT bep.IBLOCK_ELEMENT_ID, REGEXP_SUBSTR(bep.VALUE, ''<img[^>]+>'', 1, numbers.n) AS img_tag, CONCAT(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID='', be.IBLOCK_ID, ''&type=aspro_max_content&lang=ru&ID='', bep.IBLOCK_ELEMENT_ID, ''&find_section_section=-1&WF=Y'') as edit_link FROM favor_group_ru.b_iblock_element be JOIN favor_group_ru.b_iblock_element_property bep ON be.ID = bep.IBLOCK_ELEMENT_ID CROSS JOIN numbers WHERE bep.VALUE LIKE ''%<img%'') SELECT img_tag, edit_link FROM extracted WHERE img_tag IS NOT NULL AND (img_tag NOT LIKE ''%width=%'' OR img_tag NOT LIKE ''%height=%'' OR img_tag LIKE ''%width=%?%'' OR img_tag LIKE ''%height=%?%'' OR img_tag LIKE ''%width=\"%!%\"%'' ESCAPE ''!'' OR img_tag LIKE ''%height=\"%!%\"%'' ESCAPE ''!'' OR img_tag LIKE ''%width=\\\\\"%%!%\\\\\"%%'' ESCAPE ''!'' OR img_tag LIKE ''%height=\\\\\"%%!%\\\\\"%%'' ESCAPE ''!'') ORDER BY edit_link;\""]'
+          delay: 1h
+          history: 3d
+          value_type: TEXT
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 83505f7e856f467da0e134cc59043a63
+              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e\"WITH RECURSIVE numbers AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM numbers WHERE n < 100), extracted AS (SELECT bep.IBLOCK_ELEMENT_ID, REGEXP_SUBSTR(bep.VALUE, ''<img[^>]+>'', 1, numbers.n) AS img_tag, CONCAT(''{$BITRIX.ADMIN_URL}/iblock_element_edit.php?IBLOCK_ID='', be.IBLOCK_ID, ''&type=aspro_max_content&lang=ru&ID='', bep.IBLOCK_ELEMENT_ID, ''&find_section_section=-1&WF=Y'') as edit_link FROM favor_group_ru.b_iblock_element be JOIN favor_group_ru.b_iblock_element_property bep ON be.ID = bep.IBLOCK_ELEMENT_ID CROSS JOIN numbers WHERE bep.VALUE LIKE ''%<img%'') SELECT img_tag, edit_link FROM extracted WHERE img_tag IS NOT NULL AND (img_tag NOT LIKE ''%width=%'' OR img_tag NOT LIKE ''%height=%'' OR img_tag LIKE ''%width=%?%'' OR img_tag LIKE ''%height=%?%'' OR img_tag LIKE ''%width=\"%!%\"%'' ESCAPE ''!'' OR img_tag LIKE ''%height=\"%!%\"%'' ESCAPE ''!'' OR img_tag LIKE ''%width=\\\\\"%%!%\\\\\"%%'' ESCAPE ''!'' OR img_tag LIKE ''%height=\\\\\"%%!%\\\\\"%%'' ESCAPE ''!'') ORDER BY edit_link;\""],#1))<>0'
+              name: 'Height or width missing in article in blog'
+              priority: AVERAGE
+              description: 'Fix img tags in affected articles so each has both width and height attributes.'

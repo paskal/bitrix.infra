@@ -1,0 +1,113 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 7118485b161e45408e37f4915abbf403
+      template: 'Favor-group subdomain monitoring'
+      name: 'Favor-group subdomain monitoring'
+      groups:
+        - name: Favor-group
+        - name: Templates
+      httptests:
+        - uuid: 4faefaadfd0342d29784b5a1e8b59bc7
+          name: 'Buy staircase'
+          delay: 5m
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          steps:
+            - name: 'main page'
+              url: 'https://{HOST.HOST}/?zabbix'
+              follow_redirects: 'NO'
+              required: 'rel="canonical" href="https://{HOST.HOST}/"'
+              status_codes: '200'
+            - name: 'category: cherdachnye_lestnitsy, canonical'
+              url: 'https://{HOST.HOST}/catalog/cherdachnye_lestnitsy/?PAGEN_1=2&zabbix'
+              headers:
+                - name: Accept-Encoding
+                  value: 'deflate, gzip'
+              follow_redirects: 'NO'
+              required: 'link rel="canonical" href="https://{HOST.HOST}/catalog/cherdachnye_lestnitsy/"'
+              status_codes: '200'
+            - name: 'product page: DӦCKE'
+              url: 'https://{HOST.HOST}/catalog/cherdachnye_lestnitsy/8716/?oid=60x120x280&zabbix'
+              headers:
+                - name: Accept-Encoding
+                  value: 'deflate, gzip'
+              follow_redirects: 'NO'
+              required: DӦCKE
+              status_codes: '200'
+            - name: 'Roof window'
+              url: 'https://{HOST.HOST}/montag/ustanovka-mansardnykh-okon/?zabbix'
+              headers:
+                - name: Accept-Encoding
+                  value: 'deflate, gzip'
+              follow_redirects: 'NO'
+              required: 'Установка мансардных окон'
+              status_codes: '200'
+            - name: bucket
+              url: 'https://{HOST.HOST}/basket/'
+              headers:
+                - name: Accept-Encoding
+                  value: 'deflate, gzip'
+              follow_redirects: 'NO'
+              required: Корзина
+              status_codes: '200'
+          tags:
+            - tag: Application
+              value: Web
+        - uuid: 089aeeffb0a84cf0a2915934f68033f4
+          name: 'HTTPS redirect'
+          delay: 30m
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          steps:
+            - name: 'HTTPS redirect'
+              url: 'http://{HOST.HOST}'
+              follow_redirects: 'NO'
+              status_codes: '301'
+          tags:
+            - tag: Application
+              value: Web
+        - uuid: 91248f944c734b78a531f637ac5964ce
+          name: 'robots.txt and sitemap'
+          delay: 15m
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          steps:
+            - name: 'sitemap in robots.txt'
+              url: 'https://{HOST.HOST}/robots.txt'
+              headers:
+                - name: Accept-Encoding
+                  value: 'deflate, gzip'
+              follow_redirects: 'NO'
+              required: 'Sitemap: https://{HOST.HOST}/sitemap.xml'
+              status_codes: '200'
+          tags:
+            - tag: Application
+              value: Web
+  triggers:
+    - uuid: 6f1ad41a4bd541da8902bba30c48b435
+      expression: 'length(last(/Favor-group subdomain monitoring/web.test.error[Buy staircase]))>0 and min(/Favor-group subdomain monitoring/web.test.fail[Buy staircase],#3)<>0'
+      name: 'Web scenario "Buy staircase" failed: {ITEM.VALUE}'
+      url: 'https://{HOST.HOST}/catalog/cherdachnye_lestnitsy/'
+      priority: AVERAGE
+    - uuid: 33dbc5d94e034f4caaa76096a74b9f8a
+      expression: 'length(last(/Favor-group subdomain monitoring/web.test.error[HTTPS redirect]))>0 and min(/Favor-group subdomain monitoring/web.test.fail[HTTPS redirect],#3)<>0'
+      name: 'Web scenario "HTTPS redirect" failed: {ITEM.VALUE}'
+      url: 'http://www.{HOST.HOST}'
+      priority: AVERAGE
+      dependencies:
+        - name: 'Web scenario "Buy staircase" failed: {ITEM.VALUE}'
+          expression: 'length(last(/Favor-group subdomain monitoring/web.test.error[Buy staircase]))>0 and min(/Favor-group subdomain monitoring/web.test.fail[Buy staircase],#3)<>0'
+    - uuid: 0ae221206ce045658cc1c74f9bf7e7e8
+      expression: 'length(last(/Favor-group subdomain monitoring/web.test.error[robots.txt and sitemap]))>0 and min(/Favor-group subdomain monitoring/web.test.fail[robots.txt and sitemap],#3)<>0'
+      name: 'Web scenario "robots.txt and sitemap" failed: {ITEM.VALUE}'
+      url: 'https://{HOST.HOST}/robots.txt'
+      priority: AVERAGE
+      dependencies:
+        - name: 'Web scenario "Buy staircase" failed: {ITEM.VALUE}'
+          expression: 'length(last(/Favor-group subdomain monitoring/web.test.error[Buy staircase]))>0 and min(/Favor-group subdomain monitoring/web.test.fail[Buy staircase],#3)<>0'

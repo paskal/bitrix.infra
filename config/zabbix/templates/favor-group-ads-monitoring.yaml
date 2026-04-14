@@ -1,0 +1,35 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: c26215d6092447d18ea574e2603e3215
+      template: 'Favor-group ads monitoring'
+      name: 'Favor-group ads monitoring'
+      groups:
+        - name: Favor-group
+      items:
+        - uuid: 22fce64df7434e028ca7f06ae44f219c
+          name: '404 errors with utm_* (from nginx logs)'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["grep -e \"`date +''%d/%b/%Y''`.*utm_.* 404 \" /var/log/nginx/prod.access.log | grep -vE \"{$ADS.UTM_IGNORE_REGEX}\" | grep -v ''HTTP/1\\.1\" 404 [0-9]* \"-\"''"]'
+          delay: 15m
+          history: 3d
+          value_type: TEXT
+          description: '404 on utm_* link means that we likely pay for advertisement click but it resulted in user receiving 404 error'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 22222ddc4bff4dc8924aa21356bfa84b
+              expression: |
+                length(last(/Favor-group ads monitoring/system.run["grep -e \"`date +'%d/%b/%Y'`.*utm_.* 404 \" /var/log/nginx/prod.access.log | grep -vE \"{$ADS.UTM_IGNORE_REGEX}\" | grep -v 'HTTP/1\\.1\" 404 [0-9]* \"-\"'"],#1))<>0
+                and
+                (last(/Favor-group ads monitoring/system.run["grep -e \"`date +'%d/%b/%Y'`.*utm_.* 404 \" /var/log/nginx/prod.access.log | grep -vE \"{$ADS.UTM_IGNORE_REGEX}\" | grep -v 'HTTP/1\\.1\" 404 [0-9]* \"-\"'"],#1) = 
+                last(/Favor-group ads monitoring/system.run["grep -e \"`date +'%d/%b/%Y'`.*utm_.* 404 \" /var/log/nginx/prod.access.log | grep -vE \"{$ADS.UTM_IGNORE_REGEX}\" | grep -v 'HTTP/1\\.1\" 404 [0-9]* \"-\"'"],#2)
+                )
+              name: '404 hits found on URLs with utm_*, info from nginx logs'
+              priority: AVERAGE
+              description: 'Set up redirects and possibly change ads to use new URLs.'
+              manual_close: 'YES'
