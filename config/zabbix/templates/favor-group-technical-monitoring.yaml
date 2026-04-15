@@ -54,3 +54,27 @@ zabbix_export:
                 
                 b24 task 6712
               manual_close: 'YES'
+        - uuid: 045794e372144e6992725142f5e8efa0
+          name: 'Silent 5xx responses on user-facing pages'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["MIN_RE=$(for i in 0 1 2 3 4 5; do date -u -d \"$i minutes ago\" +\"%d/%b/%Y:%H:%M\"; done | paste -sd\"|\" -); grep -E \"\[($MIN_RE)\" /var/log/nginx/prod.access.log | awk ''$9~/^5[0-9][0-9]$/ && $7!~/^\/ajax\// && $7!~/^\/bitrix\// && $7!~/[<>\"\047]/ {print $4, $6, $7, $9}'' | head -10"]'
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          description: |
+            Scans the last ~6 minutes of /var/log/nginx/prod.access.log for 5xx responses on user-facing pages (main page, catalog, info, montag, projects).
+
+            Catches "silent 500" incidents where the page may render partially but nginx returns 500/502/503/504 due to a PHP fatal late in the request - the existing HTTP scenarios only detect this after 3 consecutive failures (~15 min) and miss short bursts.
+
+            Excludes /ajax/, /bitrix/ paths and bot probe URLs containing quote/angle characters.
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: e1ec32f05bd94a7286c87648d6a24265
+              expression: 'find(/Favor-group technical monitoring/system.run["MIN_RE=$(for i in 0 1 2 3 4 5; do date -u -d \"$i minutes ago\" +\"%d/%b/%Y:%H:%M\"; done | paste -sd\"|\" -); grep -E \"\[($MIN_RE)\" /var/log/nginx/prod.access.log | awk ''$9~/^5[0-9][0-9]$/ && $7!~/^\/ajax\// && $7!~/^\/bitrix\// && $7!~/[<>\"\047]/ {print $4, $6, $7, $9}'' | head -10"],30m,"regexp",".")=1'
+              name: 'Silent 5xx responses on user-facing pages: {ITEM.VALUE}'
+              priority: HIGH
+              description: |
+                User-facing page requests returned 5xx in the last ~5 minutes. Check the PHP error log (`tail /web/logs/php/error.log`) and recent deployments.
+              manual_close: 'YES'
