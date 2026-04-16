@@ -78,3 +78,27 @@ zabbix_export:
               description: |
                 User-facing page requests returned 5xx in the last ~5 minutes. Check the PHP error log (`tail /web/logs/php/error.log`) and recent deployments.
               manual_close: 'YES'
+        - uuid: 7aad0960ff9c4f55a7552c059441b1de
+          name: 'Silent 5xx responses on AJAX endpoints'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["MIN_RE=$(for i in 0 1 2 3 4 5; do date -u -d \"$i minutes ago\" +\"%d/%b/%Y:%H:%M\"; done | paste -sd\"|\" -); grep -E \"\[($MIN_RE)\" /var/log/nginx/prod.access.log | awk ''$9~/^5[0-9][0-9]$/ && $7~/^\/ajax\// && $7!~/[<>\"\047]/ {print $4, $6, $7, $9}'' | head -10"]'
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          description: |
+            Scans the last ~6 minutes of /var/log/nginx/prod.access.log for 5xx responses on /ajax/* endpoints (show_basket_fly, show_basket_popup, reload_basket_fly, download_basket, etc.).
+
+            These AJAX fragments are called from already-rendered pages, so when they fail the main HTML looks fine but widgets break (basket counter stops updating, basket popup empty, etc.).
+
+            Tracked separately from page 5xx because the user-visible symptom and the triage path are different.
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: 3ec9f85c474e4e83810355553f641e52
+              expression: 'find(/Favor-group technical monitoring/system.run["MIN_RE=$(for i in 0 1 2 3 4 5; do date -u -d \"$i minutes ago\" +\"%d/%b/%Y:%H:%M\"; done | paste -sd\"|\" -); grep -E \"\[($MIN_RE)\" /var/log/nginx/prod.access.log | awk ''$9~/^5[0-9][0-9]$/ && $7~/^\/ajax\// && $7!~/[<>\"\047]/ {print $4, $6, $7, $9}'' | head -10"],30m,"regexp",".")=1'
+              name: 'Silent 5xx responses on AJAX endpoints: {ITEM.VALUE}'
+              priority: AVERAGE
+              description: |
+                /ajax/* endpoints returned 5xx in the last ~5 minutes. Broken widgets on rendered pages (basket, fly cart, etc.). Check the PHP error log and recent deployments.
+              manual_close: 'YES'
