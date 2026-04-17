@@ -373,6 +373,24 @@ check_yandex_quota() {
 	echo "$response" | jq -r '.quota_remainder // 0'
 }
 
+cmd_quota() {
+	load_config
+	host_id=$YANDEX_HOST_main
+	response=$(api_call GET "/user/$YANDEX_USER_ID/hosts/$host_id/recrawl/quota")
+	daily=$(echo "$response" | jq -r '.daily_quota // 0')
+	remaining=$(echo "$response" | jq -r '.quota_remainder // 0')
+	used=$((daily - remaining))
+	if [ "$daily" -gt 0 ]; then
+		pct=$((used * 100 / daily))
+	else
+		pct=0
+	fi
+	printf "${CYAN}Yandex recrawl quota${NC} (shared across all verified hosts)\n"
+	printf "  Daily limit: %s\n" "$daily"
+	printf "  Used today:  %s (%s%%)\n" "$used" "$pct"
+	printf "  Remaining:   ${GREEN}%s${NC}\n" "$remaining"
+}
+
 submit_url() {
 	url=$1
 	host_id=$(get_host_id_for_url "$url")
@@ -738,12 +756,16 @@ submit-regions)
 diagnostics)
 	cmd_diagnostics
 	;;
+quota)
+	cmd_quota
+	;;
 *)
 	echo "Search Engine URL Reindexing Tool (Yandex + Bing)"
 	echo ""
 	echo "Usage:"
 	echo "  search-reindex setup                 - Interactive setup (OAuth, domains, Bing API)"
 	echo "  search-reindex list                  - List all verified Yandex hosts"
+	echo "  search-reindex quota                 - Show remaining Yandex recrawl quota"
 	echo "  search-reindex submit <file>         - Submit absolute URLs from file"
 	echo "  search-reindex submit-url <url>...   - Submit one or more absolute URLs"
 	echo "  search-reindex submit-regions <file|-> - Submit relative URLs for all regions (use - for stdin)"
