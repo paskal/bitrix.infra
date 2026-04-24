@@ -8,6 +8,13 @@
 #   fgmysql -e "SELECT ..."     # Run query and exit
 #   fgmysql dev                 # Connect to dev database
 #   fgmysql dev -e "SELECT ..." # Query dev database
+#
+# Container/sidecar mode (socket and password file maintained externally):
+#   FGMYSQL_SOCKET=/path/to/mysqld.sock
+#   FGMYSQL_PASS_FILE=/path/to/pass_cache
+#   FGMYSQL_SKIP_TUNNEL=1
+# When SKIP_TUNNEL is set, no SSH or tunnel-management calls are made;
+# the cache file is read regardless of age (refresh is the sidecar's job).
 
 set -eu
 
@@ -15,14 +22,24 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MYCLIRC="$SCRIPT_DIR/.myclirc"
 
 SOCKET_DIR="/tmp/mysql-tunnel"
-LOCAL_SOCKET="$SOCKET_DIR/mysqld.sock"
+LOCAL_SOCKET="${FGMYSQL_SOCKET:-$SOCKET_DIR/mysqld.sock}"
 REMOTE_SOCKET="/web/private/mysqld/mysqld.sock"
 SSH_HOST="${SSH_HOST:-bitrix}"
 PID_FILE="$SOCKET_DIR/tunnel.pid"
 
 # Fetch password from server (cached for 1 hour)
-PASS_CACHE="/tmp/.fgmysql_pass_cache"
+PASS_CACHE="${FGMYSQL_PASS_FILE:-/tmp/.fgmysql_pass_cache}"
 get_password() {
+	# Container mode: trust the externally-maintained cache, ignore mtime
+	if [ -n "${FGMYSQL_SKIP_TUNNEL:-}" ]; then
+		if [ -s "$PASS_CACHE" ]; then
+			cat "$PASS_CACHE"
+			return
+		fi
+		echo "FGMYSQL_SKIP_TUNNEL set but $PASS_CACHE missing or empty" >&2
+		exit 1
+	fi
+
 	# Use cached password if less than 1 hour old
 	if [ -f "$PASS_CACHE" ] && [ "$(find "$PASS_CACHE" -mmin -60 2>/dev/null)" ]; then
 		cat "$PASS_CACHE"
@@ -78,7 +95,9 @@ ensure_tunnel() {
 	return 1
 }
 
-ensure_tunnel || exit 1
+if [ -z "${FGMYSQL_SKIP_TUNNEL:-}" ]; then
+	ensure_tunnel || exit 1
+fi
 
 # Check if first arg is 'dev' to use dev database
 DB="favor_group_ru"
