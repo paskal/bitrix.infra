@@ -35,6 +35,9 @@ NC='\033[0m'
 # Timing constants
 URL_DELAY=0.2
 
+# Bing API limits SubmitUrlbatch to 500 URLs per request
+BING_BATCH_SIZE=500
+
 # Format seconds as human-readable duration (e.g., "1m 30s" or "45s")
 format_duration() {
 	seconds=$1
@@ -105,7 +108,30 @@ api_call() {
 	fi
 }
 
-# Submit multiple URLs to Bing in a single batch request
+# Submit a single chunk of up to BING_BATCH_SIZE URLs to Bing.
+# Caller must ensure the chunk does not exceed the API limit.
+bing_submit_chunk() {
+	chunk_urls=$1
+	chunk_count=$(echo "$chunk_urls" | wc -l | tr -d ' ')
+
+	url_json=$(echo "$chunk_urls" | jq -R . | jq -s .)
+	payload=$(jq -n --arg site "$BING_SITE_URL" --argjson urls "$url_json" \
+		'{siteUrl: $site, urlList: $urls}')
+
+	response=$(curl -s -X POST "${BING_API_BASE}/SubmitUrlbatch?apikey=${BING_API_KEY}" \
+		-H "Content-Type: application/json" \
+		-d "$payload")
+
+	# Bing returns {"d":null} on success
+	if echo "$response" | grep -q '"d":null'; then
+		printf "${GREEN}✓${NC} Bing: %s URLs submitted successfully\n" "$chunk_count"
+	else
+		error_msg=$(echo "$response" | jq -r '.Message // .ErrorCode // "Unknown error"' 2>/dev/null || echo "$response")
+		printf "${RED}✗${NC} Bing batch failed: %s\n" "$error_msg"
+	fi
+}
+
+# Submit multiple URLs to Bing, splitting into chunks of BING_BATCH_SIZE.
 # Usage: bing_submit_batch url1 url2 url3 ...
 #    or: echo -e "url1\nurl2" | bing_submit_batch
 bing_submit_batch() {
@@ -125,25 +151,27 @@ bing_submit_batch() {
 
 	url_count=$(echo "$urls" | wc -l | tr -d ' ')
 
-	# Build JSON array of URLs using jq
-	url_json=$(echo "$urls" | jq -R . | jq -s .)
-
-	payload=$(jq -n --arg site "$BING_SITE_URL" --argjson urls "$url_json" \
-		'{siteUrl: $site, urlList: $urls}')
-
-	printf "${CYAN}Submitting %s URLs to Bing...${NC}\n" "$url_count"
-
-	response=$(curl -s -X POST "${BING_API_BASE}/SubmitUrlbatch?apikey=${BING_API_KEY}" \
-		-H "Content-Type: application/json" \
-		-d "$payload")
-
-	# Bing returns {"d":null} on success
-	if echo "$response" | grep -q '"d":null'; then
-		printf "${GREEN}✓${NC} Bing: %s URLs submitted successfully\n" "$url_count"
-	else
-		error_msg=$(echo "$response" | jq -r '.Message // .ErrorCode // "Unknown error"' 2>/dev/null || echo "$response")
-		printf "${RED}✗${NC} Bing batch failed: %s\n" "$error_msg"
+	if [ "$url_count" -le "$BING_BATCH_SIZE" ]; then
+		printf "${CYAN}Submitting %s URLs to Bing...${NC}\n" "$url_count"
+		bing_submit_chunk "$urls"
+		return
 	fi
+
+	chunk_dir=$(mktemp -d)
+	echo "$urls" | split -l "$BING_BATCH_SIZE" - "$chunk_dir/chunk_"
+	total_batches=$(find "$chunk_dir" -name 'chunk_*' | wc -l | tr -d ' ')
+
+	printf "${CYAN}Submitting %s URLs to Bing in %s batches of up to %s...${NC}\n" \
+		"$url_count" "$total_batches" "$BING_BATCH_SIZE"
+
+	batch_num=0
+	for chunk_file in "$chunk_dir"/chunk_*; do
+		batch_num=$((batch_num + 1))
+		printf "${CYAN}  Batch %d/%d:${NC} " "$batch_num" "$total_batches"
+		bing_submit_chunk "$(cat "$chunk_file")"
+	done
+
+	rm -rf "$chunk_dir"
 }
 
 cmd_setup() {
