@@ -4,15 +4,18 @@
 # Usage:
 #   search-reindex setup                - Interactive setup (OAuth, select domains, Bing API)
 #   search-reindex list                 - List all verified Yandex hosts
-#   search-reindex submit <file>        - Submit absolute URLs from file
-#   search-reindex submit-url <url>...  - Submit one or more absolute URLs
-#   search-reindex submit-regions <file|-> - Submit relative URLs for all regions
+#   search-reindex submit [--bing-only] <file>        - Submit absolute URLs from file
+#   search-reindex submit-url [--bing-only] <url>...  - Submit one or more absolute URLs
+#   search-reindex submit-regions [--bing-only] <file|-> - Submit relative URLs for all regions
 #   search-reindex diagnostics           - Check Yandex site issues (exit 1 if errors)
+#
+# Pass --bing-only to skip Yandex submission (useful when Yandex quota is exhausted).
 #
 # Examples:
 #   search-reindex submit-url https://example.com/page/
 #   search-reindex submit-regions urls.txt  # file contains /catalog/section/
 #   echo "/" | search-reindex submit-regions -  # read from stdin
+#   search-reindex submit --bing-only urls.txt  # only submit to Bing
 #
 # Config: $SCRIPT_DIR/.search-reindex (gitignored)
 # Run 'search-reindex setup' to configure - it will guide you through OAuth setup.
@@ -446,23 +449,40 @@ submit_url() {
 cmd_submit_url() {
 	load_config
 
-	if [ -z "${YANDEX_USER_ID:-}" ]; then
+	bing_only=0
+	if [ "${1:-}" = "--bing-only" ]; then
+		bing_only=1
+		shift
+	fi
+
+	if [ "$bing_only" -eq 1 ]; then
+		if [ -z "${BING_API_KEY:-}" ]; then
+			printf "${RED}--bing-only requires Bing to be configured. Run 'search-reindex setup'.${NC}\n"
+			exit 1
+		fi
+	elif [ -z "${YANDEX_USER_ID:-}" ]; then
 		printf "${RED}Run 'search-reindex setup' first${NC}\n"
 		exit 1
 	fi
 
 	if [ $# -eq 0 ]; then
-		echo "Usage: search-reindex submit-url <url> [<url>...]"
+		echo "Usage: search-reindex submit-url [--bing-only] <url> [<url>...]"
 		exit 1
 	fi
 
-	# Check quota
-	quota=$(check_yandex_quota)
-	printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions)\n" "$quota"
+	if [ "$bing_only" -eq 0 ]; then
+		# Check quota
+		quota=$(check_yandex_quota)
+		printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions)\n" "$quota"
+	fi
 
 	# Submit all URLs to Bing first (batch)
 	bing_submit_batch "$@"
 	echo ""
+
+	if [ "$bing_only" -eq 1 ]; then
+		return 0
+	fi
 
 	# Then submit to Yandex one by one
 	printf "${YELLOW}Submitting to Yandex...${NC}\n"
@@ -478,44 +498,67 @@ cmd_submit_url() {
 cmd_submit() {
 	load_config
 
-	if [ -z "${YANDEX_USER_ID:-}" ]; then
+	bing_only=0
+	if [ "${1:-}" = "--bing-only" ]; then
+		bing_only=1
+		shift
+	fi
+
+	if [ "$bing_only" -eq 1 ]; then
+		if [ -z "${BING_API_KEY:-}" ]; then
+			printf "${RED}--bing-only requires Bing to be configured. Run 'search-reindex setup'.${NC}\n"
+			exit 1
+		fi
+	elif [ -z "${YANDEX_USER_ID:-}" ]; then
 		printf "${RED}Run 'search-reindex setup' first${NC}\n"
 		exit 1
 	fi
 
 	file=${1:-}
 	if [ -z "$file" ] || [ ! -f "$file" ]; then
-		echo "Usage: search-reindex submit <file_with_urls>"
+		echo "Usage: search-reindex submit [--bing-only] <file_with_urls>"
 		exit 1
 	fi
 
 	# Count actual URLs (excluding empty lines and comments)
 	total=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
 	count=0
-
-	# Check Yandex quota before starting
-	quota=$(check_yandex_quota)
-	usable=$((quota > 0 ? quota - 1 : 0))
-	printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions, keeping 1 reserve)\n" "$quota"
-	if [ "$total" -gt "$usable" ]; then
-		printf "${YELLOW}⚠${NC}  Can submit %s of %s URLs to Yandex (quota limit)\n" "$usable" "$total"
-	fi
-
-	# Calculate timing (Yandex only, Bing is instant batch)
-	yandex_total=$((total < usable ? total : usable))
 	start_time=$(date +%s)
-	est_seconds=$(echo "$yandex_total 0.7" | awk '{printf "%.0f", $1 * $2}')
-	end_time=$((start_time + est_seconds))
 
-	printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
-	printf "${CYAN}Started:${NC}   %s\n" "$(format_time "$start_time")"
-	printf "${CYAN}Duration:${NC}  ~%s\n" "$(format_duration "$est_seconds")"
-	printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
-	echo ""
+	if [ "$bing_only" -eq 0 ]; then
+		# Check Yandex quota before starting
+		quota=$(check_yandex_quota)
+		usable=$((quota > 0 ? quota - 1 : 0))
+		printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions, keeping 1 reserve)\n" "$quota"
+		if [ "$total" -gt "$usable" ]; then
+			printf "${YELLOW}⚠${NC}  Can submit %s of %s URLs to Yandex (quota limit)\n" "$usable" "$total"
+		fi
+
+		# Calculate timing (Yandex only, Bing is instant batch)
+		yandex_total=$((total < usable ? total : usable))
+		est_seconds=$(echo "$yandex_total 0.7" | awk '{printf "%.0f", $1 * $2}')
+		end_time=$((start_time + est_seconds))
+
+		printf "${YELLOW}Submitting %s URLs for reindexing...${NC}\n" "$total"
+		printf "${CYAN}Started:${NC}   %s\n" "$(format_time "$start_time")"
+		printf "${CYAN}Duration:${NC}  ~%s\n" "$(format_duration "$est_seconds")"
+		printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
+		echo ""
+	else
+		printf "${YELLOW}Submitting %s URLs to Bing only...${NC}\n" "$total"
+		echo ""
+	fi
 
 	# Submit all URLs to Bing first (single batch request)
 	grep -v '^\s*$\|^\s*#' "$file" | bing_submit_batch
 	echo ""
+
+	if [ "$bing_only" -eq 1 ]; then
+		actual_end=$(date +%s)
+		actual_duration=$((actual_end - start_time))
+		printf "${GREEN}Done!${NC} Submitted %s URLs to Bing in %s\n" "$total" "$(format_duration "$actual_duration")"
+		return 0
+	fi
 
 	# Then submit to Yandex one by one
 	printf "${YELLOW}Submitting to Yandex...${NC}\n"
@@ -552,6 +595,17 @@ cmd_submit() {
 cmd_submit_regions() {
 	load_config
 
+	bing_only=0
+	if [ "${1:-}" = "--bing-only" ]; then
+		bing_only=1
+		shift
+	fi
+
+	if [ "$bing_only" -eq 1 ] && [ -z "${BING_API_KEY:-}" ]; then
+		printf "${RED}--bing-only requires Bing to be configured. Run 'search-reindex setup'.${NC}\n"
+		exit 1
+	fi
+
 	if [ -z "${YANDEX_USER_ID:-}" ]; then
 		printf "${RED}Run 'search-reindex setup' first${NC}\n"
 		exit 1
@@ -570,8 +624,8 @@ cmd_submit_regions() {
 		cat >"$stdin_temp"
 		file="$stdin_temp"
 	elif [ -z "$file" ] || [ ! -f "$file" ]; then
-		echo "Usage: search-reindex submit-regions <file_with_relative_urls>"
-		echo "       search-reindex submit-regions -  # read from stdin"
+		echo "Usage: search-reindex submit-regions [--bing-only] <file_with_relative_urls>"
+		echo "       search-reindex submit-regions [--bing-only] -  # read from stdin"
 		echo "       echo '/catalog/' | search-reindex submit-regions -"
 		echo "Will submit URLs for all configured regions: $YANDEX_REGIONS"
 		echo "File must contain relative URLs starting with / (e.g., /catalog/section/)"
@@ -588,26 +642,32 @@ cmd_submit_regions() {
 	# Count actual URLs (excluding empty lines and comments)
 	url_count=$(grep -v '^\s*$\|^\s*#' "$file" | wc -l | tr -d ' ')
 	total_submissions=$((url_count * region_count))
-
-	# Check Yandex quota before starting
-	quota=$(check_yandex_quota)
-	usable=$((quota > 0 ? quota - 1 : 0))
-	printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions, keeping 1 reserve)\n" "$quota"
-	if [ "$total_submissions" -gt "$usable" ]; then
-		printf "${YELLOW}⚠${NC}  Can submit %s of %s URLs to Yandex (quota limit)\n" "$usable" "$total_submissions"
-	fi
-
-	# Calculate timing (Yandex only, Bing is instant batch)
-	yandex_total=$((total_submissions < usable ? total_submissions : usable))
 	start_time=$(date +%s)
-	est_seconds=$(echo "$yandex_total 0.7" | awk '{printf "%.0f", $1 * $2}')
-	end_time=$((start_time + est_seconds))
+	usable=0
 
-	printf "${YELLOW}Submitting %s URLs × %s regions = %s total submissions${NC}\n" "$url_count" "$region_count" "$total_submissions"
-	printf "${CYAN}Started:${NC}   %s\n" "$(format_time "$start_time")"
-	printf "${CYAN}Duration:${NC}  ~%s\n" "$(format_duration "$est_seconds")"
-	printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
-	echo ""
+	if [ "$bing_only" -eq 0 ]; then
+		# Check Yandex quota before starting
+		quota=$(check_yandex_quota)
+		usable=$((quota > 0 ? quota - 1 : 0))
+		printf "${CYAN}Yandex quota:${NC} %s remaining (shared across all regions, keeping 1 reserve)\n" "$quota"
+		if [ "$total_submissions" -gt "$usable" ]; then
+			printf "${YELLOW}⚠${NC}  Can submit %s of %s URLs to Yandex (quota limit)\n" "$usable" "$total_submissions"
+		fi
+
+		# Calculate timing (Yandex only, Bing is instant batch)
+		yandex_total=$((total_submissions < usable ? total_submissions : usable))
+		est_seconds=$(echo "$yandex_total 0.7" | awk '{printf "%.0f", $1 * $2}')
+		end_time=$((start_time + est_seconds))
+
+		printf "${YELLOW}Submitting %s URLs × %s regions = %s total submissions${NC}\n" "$url_count" "$region_count" "$total_submissions"
+		printf "${CYAN}Started:${NC}   %s\n" "$(format_time "$start_time")"
+		printf "${CYAN}Duration:${NC}  ~%s\n" "$(format_duration "$est_seconds")"
+		printf "${CYAN}ETA:${NC}       %s\n" "$(format_time "$end_time")"
+		echo ""
+	else
+		printf "${YELLOW}Submitting %s URLs × %s regions = %s total to Bing only${NC}\n" "$url_count" "$region_count" "$total_submissions"
+		echo ""
+	fi
 
 	# Build list of all absolute URLs for Bing batch submission
 	bing_urls_file=$(mktemp)
@@ -625,6 +685,14 @@ cmd_submit_regions() {
 	bing_submit_batch <"$bing_urls_file"
 	rm -f "$bing_urls_file"
 	echo ""
+
+	if [ "$bing_only" -eq 1 ]; then
+		actual_end=$(date +%s)
+		actual_duration=$((actual_end - start_time))
+		printf "${GREEN}Done!${NC} Submitted %s URLs to Bing in %s\n" "$total_submissions" "$(format_duration "$actual_duration")"
+		[ -n "$stdin_temp" ] && rm -f "$stdin_temp"
+		return 0
+	fi
 
 	# Then submit to Yandex one by one per region
 	submitted=0
@@ -794,15 +862,18 @@ quota)
 	echo "  search-reindex setup                 - Interactive setup (OAuth, domains, Bing API)"
 	echo "  search-reindex list                  - List all verified Yandex hosts"
 	echo "  search-reindex quota                 - Show remaining Yandex recrawl quota"
-	echo "  search-reindex submit <file>         - Submit absolute URLs from file"
-	echo "  search-reindex submit-url <url>...   - Submit one or more absolute URLs"
-	echo "  search-reindex submit-regions <file|-> - Submit relative URLs for all regions (use - for stdin)"
+	echo "  search-reindex submit [--bing-only] <file>         - Submit absolute URLs from file"
+	echo "  search-reindex submit-url [--bing-only] <url>...   - Submit one or more absolute URLs"
+	echo "  search-reindex submit-regions [--bing-only] <file|-> - Submit relative URLs for all regions (use - for stdin)"
 	echo "  search-reindex diagnostics           - Check Yandex site issues (exit 1 if FATAL/CRITICAL)"
+	echo ""
+	echo "Pass --bing-only to skip Yandex submission (e.g. when Yandex quota is exhausted)."
 	echo ""
 	echo "Examples:"
 	echo "  search-reindex submit-url https://example.com/page/"
 	echo "  search-reindex submit-regions urls.txt  # contains /catalog/section/"
 	echo "  echo '/' | search-reindex submit-regions -  # read from stdin"
+	echo "  search-reindex submit --bing-only urls.txt  # only submit to Bing"
 	echo "  search-reindex diagnostics && echo 'All OK'"
 	echo ""
 	echo "Config: \$SCRIPT_DIR/.search-reindex"
