@@ -840,14 +840,16 @@ list)
 	cmd_list
 	;;
 submit)
-	cmd_submit "${2:-}"
+	shift
+	cmd_submit "$@"
 	;;
 submit-url)
 	shift
 	cmd_submit_url "$@"
 	;;
 submit-regions)
-	cmd_submit_regions "${2:-}"
+	shift
+	cmd_submit_regions "$@"
 	;;
 diagnostics)
 	cmd_diagnostics
