@@ -44,6 +44,10 @@
 ## Cron File Deployment
 - `/web/config/cron` directory is owned by root; to deploy cron changes:
   `sudo chown admin:admin /web/config/cron && git pull && sudo chown root:root /web/config/cron && sudo chown root:root /web/config/cron/*.cron && sudo chmod 0644 /web/config/cron/*.cron`
+- On the live host `/etc/cron.d/bitrix_infra` is currently a regular file (not a symlink to `/web/config/cron/host.cron` as `disaster-recovery.sh` expects), so a `git pull` alone doesn't propagate cron changes -- after the chown dance also `sudo cp /web/config/cron/host.cron /etc/cron.d/bitrix_infra && sudo chown root:root /etc/cron.d/bitrix_infra && sudo chmod 644 /etc/cron.d/bitrix_infra`. Restoring the symlink would remove this manual step.
+
+## SEO Reindex Cron
+- `scripts/seo-reindex.sh` (daily 21:15 UTC = 00:15 MSK as `admin`) drains URLs from `/web/private/seo-reindex/queue.txt` into Yandex Webmaster recrawl, up to ~960/day account-wide quota. Token: `/web/private/environment/seo-reindex.env`. Logs: `/web/logs/seo-reindex/YYYY-MM-DD.log`. Bing is sent manually via `bin/search-reindex submit --bing-only <file>`.
 
 ## Export Profiles (acrit.export)
 - Run single export: `docker exec -u www-data php-cron bash -c "/usr/bin/php -f /web/prod/bitrix/modules/acrit.export/cli/export.php profile=ID auto=Y site=s1 >> /web/prod/upload/acrit.export/log/log_ID.e63f31938c399df95752fe5013735c65.txt 2>&1"`
