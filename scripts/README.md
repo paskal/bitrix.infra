@@ -169,12 +169,15 @@ The script auto-detects host IDs for favor-group.ru sites. Yandex uses OAuth (oa
 
 **Usage:**
 ```shell
-search-reindex list                      # List verified Yandex hosts
-search-reindex submit-url <url>...       # Submit one or more URLs
-search-reindex submit <file>             # Submit URLs from file
-search-reindex submit-regions <file>     # Submit URLs for MSK, SPB, TULA
-search-reindex diagnostics               # Check Yandex site issues
+search-reindex list                                   # List verified Yandex hosts
+search-reindex quota                                  # Show remaining Yandex daily quota
+search-reindex submit-url [--bing-only] <url>...      # Submit one or more URLs
+search-reindex submit [--bing-only] <file>            # Submit URLs from file
+search-reindex submit-regions [--bing-only] <file>    # Submit URLs for MSK, SPB, TULA
+search-reindex diagnostics                            # Check Yandex site issues
 ```
+
+`--bing-only` skips Yandex submission (e.g. when its daily quota is exhausted but Bing's separate quota still has headroom).
 
 **Examples:**
 ```shell
@@ -187,7 +190,12 @@ search-reindex submit-regions /tmp/urls.txt
 # Read relative URLs from stdin
 echo "/catalog/new-page/" | search-reindex submit-regions -
 
+# Push to Bing only (e.g. Yandex quota already drained)
+search-reindex submit --bing-only /tmp/urls.txt
+
 # Check for site issues (exit 1 if FATAL/CRITICAL — Zabbix-friendly)
 search-reindex diagnostics && echo 'All OK'
 ```
+
+**Routine reindexing via the server-side cron:** for bulk Yandex submissions that exceed the ~960/day quota, append absolute URLs to `/web/private/seo-reindex/queue.txt` on the server. The `seo-reindex.sh` cron (00:15 MSK daily, runs as `admin`) drains the queue top-down up to remaining quota and removes attempted lines. Bing has a separate 10 000/day quota and is sent manually with `--bing-only` from a workstation.
 
