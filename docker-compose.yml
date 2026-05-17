@@ -104,6 +104,10 @@ services:
       - ./private/mysqld:/var/run/mysqld
       # Yandex Metrika API credentials for popularity sort cron
       - ./private/environment/metrika.env:/etc/metrika.env:ro
+      # PHPStan neon configs (phpstan-scan.sh runs `php /phpstan/phpstan.phar`)
+      - ./private/phpstan:/phpstan:ro
+      # PHPStan output (JSON + count file consumed by Zabbix via zabbix-agent)
+      - ./logs/phpstan:/var/log/phpstan
       # Logs
       - ./logs/php:/var/log/php
       # configuration
@@ -145,6 +149,10 @@ services:
       - ./private/mysqld:/var/run/mysqld
       # Yandex Metrika API credentials for popularity sort cron
       - ./private/environment/metrika.env:/etc/metrika.env:ro
+      # PHPStan neon configs (phpstan-scan.sh runs `php /phpstan/phpstan.phar`)
+      - ./private/phpstan:/phpstan:ro
+      # PHPStan output (JSON + count file consumed by Zabbix via zabbix-agent)
+      - ./logs/phpstan:/var/log/phpstan
       # Logs for email sending: msmtp expects to write logs there
       - ./logs/php:/var/log/php
       # configuration
@@ -285,6 +293,8 @@ services:
       # via mariadb --defaults-extra-file=/etc/mysql/zbx.cnf (file is gitignored,
       # must exist on the server before starting the container)
       - ./private/environment/mysql-zbx.cnf:/etc/mysql/zbx.cnf:ro
+      # PHPStan output (read-only): system.run["cat /var/log/phpstan/owned_errors_count.txt"]
+      - ./logs/phpstan:/var/log/phpstan:ro
 
     logging:
       driver: json-file

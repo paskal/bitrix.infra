@@ -115,6 +115,71 @@ These run on the host machine outside Docker, scheduled via `config/cron/host.cr
 - **Image optimisation** — runs weekly (Saturday night) via `scripts/optimise-images.sh`, processing PNG ([optipng](http://optipng.sourceforge.net/) + [advpng](https://www.advancemame.it/comp-readme)), JPEG ([jpegoptim](https://github.com/tjko/jpegoptim)), WebP ([cwebp](https://developers.google.com/speed/webp/docs/cwebp)) and GIF ([gifsicle](https://www.lcdf.org/gifsicle/)) in `web/prod/upload`. Uses a SQLite database to track already-processed files and avoid redundant work
 - **Log rotation** — configured in `config/logrotate/` for nginx (weekly for production access logs at 100 MB minimum, monthly for others) and PHP (monthly for error, cron and msmtp logs). Nginx logs are reopened via `nginx -s reopen`, PHP-FPM via `USR1` signal
 
+### PHPStan static analysis monitoring
+
+Bitrix sites accumulate type-strictness bugs that PHP 8.x will tolerate at parse time but blow up at runtime — methods like `mysqli::real_escape_string()` started rejecting non-string arguments in 8.x, and a Bitrix codebase that worked for years on 7.x can have dozens of latent `TypeError`s waiting for a specific code path to fire. PHPStan catches them, but only if it's run regularly against the *deployed* code (not your local working copy).
+
+This infrastructure runs PHPStan weekly against the prod Bitrix tree, counts the findings in code you own, writes the count to a file, and lets the Zabbix agent read it via `system.run` — so a non-zero count becomes a regular monitoring alert instead of being discovered six months later in Sentry.
+
+```mermaid
+flowchart LR
+    Cron["Host cron<br>Mon 04:30 UTC"] -->|"flock-guarded"| Script["scripts/<br>phpstan-scan.sh"]
+    Script -->|"curl -sLz<br>(self-updating)"| Phar["phpstan.phar"]
+    Script -->|"docker exec php"| PHPStan["PHPStan analyse<br>--error-format=checkstyle"]
+    PHPStan -->|"parse XML,<br>emit JSON + count"| Files["logs/phpstan/<br>owned-latest.json<br>owned_errors_count.txt"]
+    Files -->|"system.run cat"| Agent["zabbix-agent2<br>(read-only mount)"]
+    Agent -->|"item delay 5m"| Trigger["Zabbix trigger:<br>last() &lt;&gt; 0"]
+```
+
+**Design — drive to zero, no baseline file.** The metric is *the number of errors in code you wrote*, and the target is zero. There is no baseline JSON, no fingerprint diff, no rebaseline ritual. If a PHPStan upgrade adds a new rule that surfaces new findings, you fix them or add a scoped `ignoreErrors` entry to the neon — the same workflow as a regression caught the normal way. This is why the PHAR is allowed to auto-update on every run (`curl -sLz` does a conditional GET, zero traffic when unchanged).
+
+**Two scopes:**
+- **Owned** (`phpstan-owned.neon`, alerted): code you wrote — `local/`, `bitrix/php_interface/init.php`, `bitrix/php_interface/include`. This is what Zabbix watches.
+- **Diagnostic** (`phpstan-diagnostic.neon`, manual): broader sweep including Bitrix-injected scaffold. Run on-demand with `./scripts/phpstan-scan.sh --diagnostic` when the owned count jumps weirdly and you want to check whether a path change accidentally scoped in vendor code. Never alerted on.
+
+Both scopes use `scanDirectories` against the live `/web/prod/bitrix/modules` tree for symbol resolution — no Bitrix stubs to maintain, always in sync with the deployed version.
+
+**File locations:**
+
+| Path | Purpose |
+|---|---|
+| `scripts/phpstan-scan.sh` | Entrypoint script (flock-guarded, self-updates the PHAR, runs in `php` container) |
+| `private/phpstan/phpstan-owned.neon` | Scope + rule config for the alerted scan |
+| `private/phpstan/phpstan-diagnostic.neon` | Broader scope for manual troubleshooting |
+| `config/zabbix/templates/phpstan-monitoring.yaml` | Zabbix 7.4 template (three items, three triggers — count + freshness + failure-marker) |
+| `logs/phpstan/owned_errors_count.txt` | Single integer the Zabbix agent reads |
+| `logs/phpstan/owned-latest.json` | Full findings, file + line + identifier — open this when the trigger fires |
+
+**How to enable in your own fork:**
+
+1. **Mount the neon configs and log directory.** `docker-compose.yml` already wires this up — `private/phpstan` is mounted read-only into the `php` and `php-cron` containers at `/phpstan`, and `logs/phpstan` is mounted read-write into both PHP containers and read-only into `zabbix-agent`. Create the host log directory before first start, matching the UID/GID used by your `php` container's `www-data` user: `mkdir -p logs/phpstan && sudo chown $(docker exec php id -u www-data):$(docker exec php id -g www-data) logs/phpstan && sudo chmod 2775 logs/phpstan`. In this repo's base image that's UID 1000; verify with `docker exec php id www-data` if you've swapped to a different image. The setgid bit keeps group inheritance for files PHPStan writes. **If your PHP container is not named `php` / `php-cron`,** also edit the two `docker exec -u www-data … php` lines in `scripts/phpstan-scan.sh` to match your container names.
+2. **Adapt the neon paths to your tree.** Both neons reference `/web/prod/local`, `/web/prod/bitrix/php_interface/...` — fine for the layout this repo assumes, but change them if your `web/prod` lives elsewhere. The `excludePaths` list is curated to skip third-party module trees that ship inside `php_interface/include/` on this codebase; review and prune for yours.
+3. **Wire the cron entry.** Already present in `config/cron/host.cron`: `30 4 * * 1 root cd $INFRA_DIR && ./scripts/phpstan-scan.sh >>/web/logs/phpstan/cron.log 2>&1`. Weekly Monday 04:30 UTC. Adjust to suit your low-traffic window. Cron stdout/stderr is appended to `logs/phpstan/cron.log` so the diagnostic prints around a failed run survive for post-mortem (the script writes sentinels for Zabbix, but the cron-log line tells you *which* run died and how far it got).
+4. **Import the Zabbix template.** Via the Zabbix API (recommended — repeatable, no manual UI clicks):
+   ```python
+   from zabbix_utils import ZabbixAPI
+   import os
+   api = ZabbixAPI(url=os.environ["ZABBIX_URL"])
+   api.login(token=os.environ["ZABBIX_TOKEN"])
+   with open("config/zabbix/templates/phpstan-monitoring.yaml") as f:
+       api.configuration.import_(
+           source=f.read(), format="yaml",
+           rules={
+               "templates":       {"createMissing": True, "updateExisting": True},
+               "items":           {"createMissing": True, "updateExisting": True},
+               "triggers":        {"createMissing": True, "updateExisting": True},
+               "template_groups": {"createMissing": True},
+           },
+       )
+   ```
+   Then link the `PHPStan monitoring` template to the host running your zabbix-agent (`host.update` with the existing templates list preserved, plus the new templateid appended — `host.update` *replaces* the list rather than appending).
+5. **Stabilise before linking the template to a host.** All three triggers ship `status: ENABLED` so re-imports stay healthy without an extra re-arm step. The flip-side is that linking the template before the system has scanned once will fire the count/freshness triggers immediately. Order of operations on a fresh install:
+   1. Run a manual scan (`./scripts/phpstan-scan.sh`), fix what surfaces in `logs/phpstan/owned-latest.json`, repeat until `logs/phpstan/owned_errors_count.txt` reads `0` — this makes the count trigger silent and the XML file fresh enough to silence the freshness trigger.
+   2. *Then* link the template to your zabbix-agent host. If you can't get the count to zero on day one, link the template anyway and silence the count trigger per-host via the Zabbix UI (Hosts → host → Triggers → check, mass-update) or temporarily flip it to DISABLED at template level via `api.trigger.update(triggerid=<id>, status=1)`. Re-imports of the YAML will re-enable it.
+   3. The failure-marker trigger only fires when the script writes a sentinel — it is silent on a healthy fresh install regardless of order.
+
+The single weekly scan takes ~2–4 minutes on a Cascade Lake 8-vCPU host (cold cache; warm re-run is ~1 minute). `flock` prevents the cron run from colliding with a manual invocation.
+
 ### Bitrix configuration
 
 These are the relevant Bitrix config files that connect the CMS to the dockerised services (memcached for sessions/cache, MySQL via socket, cron agents). Documentation: sessions [1](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24868) [2](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&LESSON_ID=24870) (ru [1](https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=14026&LESSON_PATH=3913.3435.4816.14028.14026), [2](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=32&LESSON_ID=9421)), [cache](https://training.bitrix24.com/support/training/course/?COURSE_ID=68&CHAPTER_ID=05962&LESSON_PATH=5936.5959.5962) ([ru](https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=43&LESSON_ID=2795))

@@ -1,0 +1,87 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: a8f7edb3a9804f558f67b728caea71fd
+      name: PHPStan
+  templates:
+    - uuid: f244ec2f094545c095d9eab4a4dbfc35
+      template: 'PHPStan monitoring'
+      name: 'PHPStan monitoring'
+      description: |
+        Reads the integer count of PHPStan owned-scope errors from /var/log/phpstan/owned_errors_count.txt (written weekly by bitrix.infra/scripts/phpstan-scan.sh) and alerts when the count is not zero.
+        
+        Downstream forks may want to rename the "PHPStan" template group to something matching their existing grouping. See bitrix.infra README and CLAUDE.md "PHPStan monitoring" sections for the full pipeline (cron → scan script → count file → Zabbix agent system.run).
+      groups:
+        - name: PHPStan
+      items:
+        - uuid: ae156c0f41e04544a4510291f7c8a8d2
+          name: 'PHPStan owned errors count'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["cat /var/log/phpstan/owned_errors_count.txt 2>/dev/null || echo 99999"]'
+          delay: 5m
+          history: 30d
+          description: |
+            Number of PHPStan findings in code we own (local/ + bitrix/php_interface/init.php + bitrix/php_interface/include) after the latest scan. Source of truth: /var/log/phpstan/owned_errors_count.txt on the host, written by scripts/phpstan-scan.sh.
+            
+            Sentinel: when the count file is missing or unreadable (operator rm, disk corruption, permission drift), the shell falls back to `echo 99999`. That value is intentionally far outside any plausible real finding count so the count trigger fires loudly instead of silently green-ing on 0. Real failures usually also raise the failure-marker and 8d freshness triggers, but the 99999 sentinel covers the corner case where the XML is fresh but the count file alone got deleted.
+            
+            See bitrix.infra README + CLAUDE.md "PHPStan monitoring" for the full pipeline and how to run a manual scan or switch to the diagnostic scope.
+          tags:
+            - tag: Application
+              value: PHPStan
+          triggers:
+            - uuid: 8207df91f362422b8e23529b13655659
+              expression: 'last(/PHPStan monitoring/system.run["cat /var/log/phpstan/owned_errors_count.txt 2>/dev/null || echo 99999"])<>0'
+              name: 'PHPStan: {ITEM.LASTVALUE} owned-code errors found'
+              priority: WARNING
+              description: |
+                PHPStan reported more than zero findings in owned code. Open /web/logs/phpstan/owned-latest.json on the server for the full list grouped by file. Either fix the offending file(s), or — if the finding is a legitimate Bitrix-API quirk that PHPStan misreads — add an ignoreErrors entry to bitrix.infra/private/phpstan/phpstan-owned.neon with a why-comment.
+                
+                Ships enabled. On a fresh install, drive the owned count to zero before linking the template to a host (run `./scripts/phpstan-scan.sh` manually, fix what surfaces in owned-latest.json, repeat); otherwise this trigger will fire from the first polling cycle. Once count=0 the trigger is silent until a real regression.
+        - uuid: f366ecd91a4f4264b85cc69ef6c98db3
+          name: 'PHPStan owned-scan failure marker'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.exists[/var/log/phpstan/owned_last_failure.txt]'
+          delay: 5m
+          history: 30d
+          description: |
+            Existence flag for /var/log/phpstan/owned_last_failure.txt. The scan script writes this sentinel on any failure path (empty XML capture, truncated XML, simplexml parse failure, post-processing failure) and removes it on the next successful run.
+            
+            Fires within one polling cycle (~5 min) of a failure — much faster than the 8-day freshness trigger, which is the long-tail backstop.
+          tags:
+            - tag: Application
+              value: PHPStan
+          triggers:
+            - uuid: 6c683cb09c3041c19deb62f4a757e3f1
+              expression: 'last(/PHPStan monitoring/vfs.file.exists[/var/log/phpstan/owned_last_failure.txt])=1'
+              name: 'PHPStan: scan failed (see /var/log/phpstan/owned_last_failure.txt)'
+              priority: HIGH
+              description: |
+                The scan script wrote a failure sentinel at /var/log/phpstan/owned_last_failure.txt — the latest run did not complete successfully. Read the sentinel for the failure category, then look at /web/logs/phpstan/stderr.log for stderr output and re-run manually with `ssh favor-group 'cd /web && ./scripts/phpstan-scan.sh'`. The sentinel is auto-cleared by the next successful run.
+                
+                Ships enabled. The sentinel only exists after a real failure (the script clears it on success), so on a fresh install this trigger stays silent until something genuinely breaks.
+        - uuid: c3d68f7b1e9846a3a4c1d4f4eb5d7a91
+          name: 'PHPStan owned-scan XML age'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.time[/var/log/phpstan/owned-latest.xml,modify]'
+          delay: 5m
+          history: 30d
+          units: unixtime
+          description: |
+            Unix mtime of /var/log/phpstan/owned-latest.xml. Paired with a freshness trigger so a silently-failing scan (PHAR corruption, container down, OOM kill, malformed neon) is caught even when the count value itself stayed unchanged.
+            
+            Watched file is the XML (not the count file) because the XML is only rewritten when PHPStan actually completed a scan, while the count file could in principle be touched manually (echo 0 > count.txt) and silently re-arm the freshness trigger. The script writes XML first under an atomic-write pattern, so XML mtime is the most reliable "scan really ran" signal.
+            
+            Cron writes the file once a week; the trigger fires at >8 days, giving a one-day grace for slipped weekly runs.
+          tags:
+            - tag: Application
+              value: PHPStan
+          triggers:
+            - uuid: e4b5827c9d2f4ea1bd8f6a1e2c4d5e6f
+              expression: 'fuzzytime(/PHPStan monitoring/vfs.file.time[/var/log/phpstan/owned-latest.xml,modify],8d)=0'
+              name: 'PHPStan: owned-scope scan has not completed in 8 days'
+              priority: WARNING
+              description: |
+                The XML file at /var/log/phpstan/owned-latest.xml hasn't been rewritten in more than 8 days — the weekly scan probably failed silently. Check /web/logs/phpstan/stderr.log and any sentinel at /web/logs/phpstan/owned_last_failure.txt for the cause, then re-run manually with `ssh favor-group 'cd /web && ./scripts/phpstan-scan.sh'`.
+                
+                Ships enabled. On a fresh install run the script once before linking the template so the XML file exists; otherwise this trigger fires until the first scheduled scan completes. After that it stays silent until a real failure persists for more than 8 days.

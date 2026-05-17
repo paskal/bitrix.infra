@@ -1,0 +1,5 @@
+phpstan.phar
+*-latest.json
+*_errors_count.txt
+stderr.log
+tmp-*/

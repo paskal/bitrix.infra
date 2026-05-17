@@ -17,6 +17,11 @@ INFRA_DIR=/web
 # once a week optimise images
 0  23  *  *  6 root cd $INFRA_DIR && ./scripts/optimise-images.sh >/dev/null 2>&1
 
+# weekly: phpstan static analysis scan of prod code, results read by zabbix-agent
+# stdout/stderr land in /web/logs/phpstan/cron.log for post-mortem forensics
+# (the script's own diagnostic prints are the trail when sentinels fire)
+30 4 * * 1 root cd $INFRA_DIR && ./scripts/phpstan-scan.sh >>/web/logs/phpstan/cron.log 2>&1
+
 # once a day make backup of production files
 25  1  *  *  * root cd $INFRA_DIR && ./scripts/file-backup.sh >/dev/null 2>&1
 

@@ -22,11 +22,15 @@
 # web files folder
 /web
 
-# private folder (except .env.example templates)
+# private folder (except .env.example templates and phpstan configs)
 /private/*
 !/private/environment
 /private/environment/*
 !/private/environment/*.env.example
+!/private/phpstan
+/private/phpstan/*
+!/private/phpstan/.gitignore
+!/private/phpstan/*.neon
 
 # default directory in linux mount
 /lost+found/

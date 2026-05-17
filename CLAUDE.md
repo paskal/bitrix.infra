@@ -46,6 +46,76 @@
   `sudo chown admin:admin /web/config/cron && git pull && sudo chown root:root /web/config/cron && sudo chown root:root /web/config/cron/*.cron && sudo chmod 0644 /web/config/cron/*.cron`
 - `/etc/cron.d/bitrix_infra` is a symlink to `/web/config/cron/host.cron` (per `disaster-recovery.sh`), so the chown dance + `git pull` is the whole deploy.
 
+## PHPStan Monitoring
+
+Weekly PHPStan scan against the prod Bitrix tree; count of owned-code findings is read by zabbix-agent via `system.run`, trigger alerts when count ≠ 0.
+
+**File locations:**
+- `scripts/phpstan-scan.sh` — entrypoint (flock-guarded, self-updates PHAR)
+- `private/phpstan/phpstan-owned.neon` — alerted scope (target = 0)
+- `private/phpstan/phpstan-diagnostic.neon` — manual broader sweep
+- `private/phpstan/phpstan.phar` — auto-updated PHAR (gitignored)
+- `config/zabbix/templates/phpstan-monitoring.yaml` — template (three items, three triggers — count + freshness + failure-marker)
+- `logs/phpstan/owned-latest.json` + `owned_errors_count.txt` — output, also kept for `diagnostic-*`
+- `logs/phpstan/stderr.log` — open_basedir noise + any real PHP warnings
+- Cron line in `config/cron/host.cron`: `30 4 * * 1 root cd $INFRA_DIR && ./scripts/phpstan-scan.sh >>/web/logs/phpstan/cron.log 2>&1` (script's diagnostic prints preserved for forensics)
+
+**Manual scans:**
+```bash
+# Owned scope (what Zabbix watches) — ~2 min cold, ~1 min warm
+ssh favor-group 'cd /web && ./scripts/phpstan-scan.sh'
+
+# Diagnostic scope (broader, manual-only) — ~5 min cold
+ssh favor-group 'cd /web && ./scripts/phpstan-scan.sh --diagnostic'
+
+# Read result
+ssh favor-group 'cat /web/logs/phpstan/owned_errors_count.txt'
+```
+
+**When to use diagnostic scope:** the owned count jumped and the obvious recent commit doesn't explain it. Run diagnostic, diff the file lists against `owned-latest.json`, see if a path change accidentally scoped in vendor code (the answer is usually yes — fix via `excludePaths` in the owned neon).
+
+**Re-import the Zabbix template after edits:**
+```python
+from zabbix_utils import ZabbixAPI
+import os
+api = ZabbixAPI(url=os.environ['ZABBIX_URL'])
+api.login(token=os.environ['ZABBIX_TOKEN'])
+with open('config/zabbix/templates/phpstan-monitoring.yaml') as f:
+    api.configuration.import_(
+        source=f.read(), format='yaml',
+        rules={
+            'templates':       {'createMissing': True, 'updateExisting': True},
+            'items':           {'createMissing': True, 'updateExisting': True},
+            'triggers':        {'createMissing': True, 'updateExisting': True},
+            'template_groups': {'createMissing': True},
+        },
+    )
+```
+Zabbix canonicalises the YAML on export (strips `value_type: UNSIGNED` since that's the default, normalises block-scalar whitespace). The committed file is the canonical export form — diffs after edits should be small and stable.
+
+**Linking the template to a host** (`host.update` REPLACES the templates list, so preserve existing first):
+```python
+h = api.host.get(hostids='<HOSTID>', selectParentTemplates=['templateid'], output=['hostid'])[0]
+existing = [{'templateid': t['templateid']} for t in h['parentTemplates']]
+api.host.update(hostid='<HOSTID>', templates=existing + [{'templateid': '<TEMPLATEID>'}])
+```
+On favor-group: template 10655 linked to host 10350 (`favor-group.ru_yandex.cloud.host`).
+
+After linking, the agent picks up the new active-check list on its next config refresh. Force it immediately with `docker compose restart zabbix-agent` (or `docker compose --profile monitoring restart zabbix-agent` if started under that profile) — otherwise the first item value lands ~5 minutes later via the agent's automatic refresh.
+
+**Triggers in the template:**
+- `system.run[... owned_errors_count.txt]<>0` — fires when owned-error count drifts above zero (severity WARNING).
+- `fuzzytime(... vfs.file.time[owned-latest.xml,modify], 8d)=0` — long-tail backstop. Fires when the XML file hasn't been rewritten in 8 days. We watch the XML mtime rather than count.txt because the XML is only ever written when PHPStan actually completed a scan; the count file could in principle be touched manually and silently re-arm freshness. One-day grace over the 7-day cron interval. Severity WARNING.
+- `last(... vfs.file.exists[owned_last_failure.txt])=1` — fast-path. Fires within ~5 min (one polling cycle) when the scan script writes a failure sentinel (empty/truncated XML, PHPStan exit ≠ 0|1, simplexml parse failure, post-processing failure). The sentinel is auto-cleared on the next successful run. Severity HIGH.
+
+All three ship `status: ENABLED` in the YAML — re-imports stay armed without an extra step. Trade-off: a fresh install must stabilise (run the scan once → count=0 → XML file fresh) *before* linking the template to a host, otherwise the count and freshness triggers fire on first poll. See Readme.md "How to enable" step 5 for the linking order.
+
+**PHAR auto-update note:** no version pin. `curl -sLz` does a conditional GET; zero traffic when unchanged. Acceptable because the metric is *zero owned errors* — a new PHPStan release that adds a rule simply produces fixable findings on the next run, not a baseline-drift false alarm.
+
+**Historical scans:** previous runs aren't archived (only `*-latest.json` is kept). For trend data, look at the Zabbix item history (retention 30 d by default in the shipped template).
+
+**Full design rationale** (D1–D7, all task post-mortems, ignoreErrors taxonomy, synthetic-regression test transcript): `favor-group.ru/docs/plans/completed/20260517-phpstan-prod-monitoring.md`.
+
 ## SEO Reindex Cron
 - `scripts/seo-reindex.sh` (daily 21:15 UTC = 00:15 MSK as `admin`) drains URLs from `/web/private/seo-reindex/queue.txt` into Yandex Webmaster recrawl, up to ~960/day account-wide quota. Token: `/web/private/environment/seo-reindex.env`. Logs: `/web/logs/seo-reindex/YYYY-MM-DD.log`. Bing is sent manually via `bin/search-reindex submit --bing-only <file>`.
 
