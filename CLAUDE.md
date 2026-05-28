@@ -35,9 +35,10 @@
 - **CRITICAL: NEVER `docker compose restart nginx` without testing config first.** A broken config prevents nginx from starting, causing full site outage. Always:
   1. `docker exec $(docker ps -qf "name=nginx" | head -1) nginx -t`
   2. Only if test passes → `docker compose restart nginx` or `docker exec nginx nginx -s reload`
-- File-level Docker bind mounts track inodes; `rsync` creates new inodes invisible to the container
+- File-level Docker bind mounts track inodes; **anything that replaces the file — `rsync`, `git pull`, `git checkout`, `git stash` — swaps the inode and the running container keeps reading the OLD content.** `nginx -t`/`-s reload` then operate on the stale inode and silently confirm the old config (verify with `docker exec nginx grep <new-marker> /etc/nginx/file.conf` — not just `nginx -t`).
 - Deploy via `tee` to write in-place: `ssh bitrix 'tee /web/config/nginx/file.conf' < config/nginx/file.conf > /dev/null`
 - Always test before reload: `docker exec nginx nginx -t && docker exec nginx nginx -s reload`
+- **If the inode was already swapped (e.g. you deployed via `git pull`), reload is not enough — re-bind with `docker restart nginx`** (plain docker; it re-resolves bind mounts from the stored host path on start). `docker compose up/restart nginx` currently errors `no such service: adminer` (compose-file depends_on inconsistency), so use plain `docker restart`. Validate the new file first WITHOUT touching the live container via an ephemeral run on the compose network: `docker run --rm --entrypoint nginx --network web_default -v /web/config/nginx/<each>.conf:/etc/nginx/<each>.conf:ro -v /web/private/nginx:/etc/nginx/private.conf.d:ro -v /web/private/letsencrypt:/etc/nginx/letsencrypt:ro ghcr.io/paskal/nginx:latest -t`
 - Directory-level mounts (e.g. `conf.d/`) don't have the inode issue
 - `nginx -V` output from a running container may not match the image used on restart — don't trust module availability without testing in a fresh container
 
