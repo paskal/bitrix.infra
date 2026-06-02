@@ -66,7 +66,7 @@ zabbix_export:
         - uuid: bad769f1dedb4441903d47a383c65205
           name: 'Absolute link in category description'
           type: ZABBIX_ACTIVE
-          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_section_edit.php?type=aspro_max_catalog&lang=ru&IBLOCK_ID='',IBLOCK_ID,''&ID='',ID) AS url FROM favor_group_ru.b_iblock_section WHERE description LIKE ''%http%'' and description NOT LIKE ''%https://www.youtube-nocookie.com/embed/%'';\""]'
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_section_edit.php?type=aspro_max_catalog&lang=ru&IBLOCK_ID='',IBLOCK_ID,''&ID='',ID) AS url FROM favor_group_ru.b_iblock_section WHERE REPLACE(description, ''https://schema.org'', '''') LIKE ''%http%'' and description NOT LIKE ''%https://www.youtube-nocookie.com/embed/%'';\""]'
           delay: 3h
           history: 3d
           value_type: TEXT
@@ -76,7 +76,7 @@ zabbix_export:
               value: Web
           triggers:
             - uuid: 0c37d783b8d349f2905f67eed68c20f4
-              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_section_edit.php?type=aspro_max_catalog&lang=ru&IBLOCK_ID='',IBLOCK_ID,''&ID='',ID) AS url FROM favor_group_ru.b_iblock_section WHERE description LIKE ''%http%'' and description NOT LIKE ''%https://www.youtube-nocookie.com/embed/%'';\""],#1))<>0'
+              expression: 'length(last(/Favor-group content monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -e \"select concat(''{$BITRIX.ADMIN_URL}/iblock_section_edit.php?type=aspro_max_catalog&lang=ru&IBLOCK_ID='',IBLOCK_ID,''&ID='',ID) AS url FROM favor_group_ru.b_iblock_section WHERE REPLACE(description, ''https://schema.org'', '''') LIKE ''%http%'' and description NOT LIKE ''%https://www.youtube-nocookie.com/embed/%'';\""],#1))<>0'
               name: 'Absolute link in category description'
               priority: AVERAGE
               description: 'Replace absolute URLs with relative ones, as they are breaking CDN and regionality.'
