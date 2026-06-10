@@ -1,16 +1,16 @@
-# Yandex.Cloud external IP with DDoS Protection enabled has a requirement of MTU of 1450
-# according to https://github.com/moby/moby/issues/22297#issuecomment-242934050 that's the only way to set it inside docker-compose
+# Set DOCKER_MTU in .env if your network requires a non-standard MTU
+# (e.g. Yandex.Cloud DDoS-protected IPs need 1450;
+# see https://github.com/moby/moby/issues/22297#issuecomment-242934050)
 networks:
   default:
     driver: bridge
     driver_opts:
-      com.docker.network.driver.mtu: 1450
+      com.docker.network.driver.mtu: "${DOCKER_MTU:-1500}"
 
 services:
   certbot:
     image: adferrand/dnsrobocert
     hostname: certbot
-    container_name: certbot
     profiles:
       - certs
     volumes:
@@ -28,9 +28,9 @@ services:
     env_file: private/environment/dnsrobocert.env
     # used in config/dnsrobocert.yml
     environment:
-      - PROVIDER=yandexcloud
-      - EMAIL=tech@favor-group.ru
-      - DOMAIN=favor-group.ru
+      - PROVIDER=${CERTBOT_PROVIDER:-yandexcloud}
+      - EMAIL=${CERTBOT_EMAIL:-admin@example.com}
+      - DOMAIN=${DOMAIN:-example.com}
 
     logging:
       driver: json-file
@@ -43,16 +43,15 @@ services:
   nginx:
     build: ./config/nginx
     hostname: nginx
-    container_name: nginx
     image: ghcr.io/paskal/nginx:latest
     depends_on:
       - adminer
       - php
       - updater
     ports:
-      - "80:80"
-      - "443:443/tcp"
-      - "443:443/udp"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443/tcp"
+      - "${HTTPS_PORT:-443}:443/udp"
     expose:
       - "8084"
     volumes:
@@ -70,7 +69,7 @@ services:
       # Logs
       - ./logs/nginx:/var/log/nginx
     environment:
-      - TZ=Europe/Moscow
+      - TZ=${TZ:-UTC}
 
     logging:
       driver: json-file
@@ -86,7 +85,6 @@ services:
       dockerfile: Dockerfile.8.4
     image: ghcr.io/paskal/bitrix-php:8.4
     hostname: php
-    container_name: php
     depends_on:
       - memcached
       - memcached-sessions
@@ -102,8 +100,6 @@ services:
       - ./private/msmtprc:/etc/msmtprc
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
-      # Yandex Metrika API credentials for popularity sort cron
-      - ./private/environment/metrika.env:/etc/metrika.env:ro
       # PHPStan neon configs (phpstan-scan.sh runs `php /phpstan/phpstan.phar`)
       - ./private/phpstan:/phpstan:ro
       # PHPStan output (JSON + count file consumed by Zabbix via zabbix-agent)
@@ -133,7 +129,6 @@ services:
     command: cron -f
     image: ghcr.io/paskal/bitrix-php:8.4
     hostname: php-cron
-    container_name: php-cron
     depends_on:
       - memcached
       - memcached-sessions
@@ -147,8 +142,6 @@ services:
       - ./private/msmtprc:/etc/msmtprc
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
-      # Yandex Metrika API credentials for popularity sort cron
-      - ./private/environment/metrika.env:/etc/metrika.env:ro
       # PHPStan neon configs (phpstan-scan.sh runs `php /phpstan/phpstan.phar`)
       - ./private/phpstan:/phpstan:ro
       # PHPStan output (JSON + count file consumed by Zabbix via zabbix-agent)
@@ -175,7 +168,6 @@ services:
   mysql:
     image: percona/percona-server:8.4
     hostname: mysql
-    container_name: mysql
     # MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD
     env_file: private/environment/mysql.env
     volumes:
@@ -189,8 +181,8 @@ services:
       # Logs
       - ./logs/mysql:/var/log/mysql
     environment:
-      MYSQL_DATABASE: favor_group_ru
-      TZ: Europe/Moscow
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bitrix}
+      TZ: ${TZ:-UTC}
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE
 
@@ -205,7 +197,6 @@ services:
   memcached:
     image: memcached:1-alpine
     hostname: memcached
-    container_name: memcached
     restart: unless-stopped
     command: ["-m", "2048", "-c", "32768"]
     expose:
@@ -219,7 +210,6 @@ services:
   memcached-sessions:
     image: memcached:1-alpine
     hostname: memcached-sessions
-    container_name: memcached-sessions
     restart: unless-stopped
     command: ["-m", "128"]
     expose:
@@ -233,7 +223,6 @@ services:
   adminer:
     image: adminer
     hostname: adminer
-    container_name: adminer
     profiles:
       - dbadmin
     expose:
@@ -264,7 +253,6 @@ services:
   zabbix-agent:
     build: ./config/zabbix
     image: ghcr.io/paskal/zabbix-agent2:latest
-    container_name: zabbix-agent
     profiles:
       - monitoring
     privileged: true
@@ -289,10 +277,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld
-      # MySQL client credentials for zbx_monitor — used by system.run items
-      # via mariadb --defaults-extra-file=/etc/mysql/zbx.cnf (file is gitignored,
-      # must exist on the server before starting the container)
-      - ./private/environment/mysql-zbx.cnf:/etc/mysql/zbx.cnf:ro
       # PHPStan output (read-only): system.run["cat /var/log/phpstan/owned_errors_count.txt"]
       - ./logs/phpstan:/var/log/phpstan:ro
 
@@ -306,7 +290,6 @@ services:
   # webhooks server
   updater:
     image: ghcr.io/umputun/updater:master
-    container_name: updater
     hostname: updater
     profiles:
       - hooks
@@ -332,7 +315,6 @@ services:
 
   ftp:
     image: stilliard/pure-ftpd
-    container_name: ftp
     # FTP_USER_NAME, FTP_USER_PASS
     env_file: private/environment/ftp.env
     ports:
@@ -341,7 +323,7 @@ services:
     volumes:
       - ./web/dev:/home/web
     environment:
-      PUBLICHOST: favor-group.ru
+      PUBLICHOST: ${DOMAIN:-localhost}
       FTP_USER_HOME: /home/web
       FTP_PASSIVE_PORTS: 30000:30009
     profiles:

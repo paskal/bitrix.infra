@@ -1,0 +1,16 @@
+# msmtp configuration for PHP mail sending.
+# Copy to private/msmtprc (without the .example suffix) and fill in your values.
+# Documentation: https://wiki.archlinux.org/index.php/Msmtp
+
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/php/msmtp.log
+
+account        default
+host           smtp.example.com
+port           587
+from           noreply@example.com
+user           noreply@example.com
+password       YOUR_SMTP_PASSWORD
