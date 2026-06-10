@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
+# Compare two backups from S3 storage.
+# Configuration is read from private/environment/backup.env.
+# Required variables: BACKUP_S3_BUCKET, S3_ENDPOINT_URL
 set -e -u
 
-# Compare two backups from S3 storage
-# This script allows user to choose two backups from a list,
-# restore them to separate directories, and create a diff between them
+BACKUP_ENV="./private/environment/backup.env"
+if [ ! -f "${BACKUP_ENV}" ]; then
+  echo "ERROR: ${BACKUP_ENV} is missing. Copy backup.env.example and fill in values." >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+. "${BACKUP_ENV}"
+: "${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET must be set in ${BACKUP_ENV}}"
+: "${S3_ENDPOINT_URL:?S3_ENDPOINT_URL must be set in ${BACKUP_ENV}}"
 
 # Configuration
 BACKUP_DIR="./backup/restore"
-DEST="boto3+s3://favor-group-backup/duplicity_web_$(hostname)"
-S3_ENDPOINT="https://storage.yandexcloud.net"
+DEST="boto3+s3://${BACKUP_S3_BUCKET}/duplicity_web_$(hostname)"
 HOME_DIR="/home/admin" # Duplicity needs HOME to read AWS credentials
 LOGFILE="/web/logs/compare-backups.log"
 CACHE_DIR="/web/backup/.duplicity-cache" # Match location in file-backup.sh
@@ -28,7 +36,7 @@ list_backups() {
   HOME="${HOME_DIR}" duplicity \
     collection-status \
     --no-encryption \
-    --s3-endpoint-url "${S3_ENDPOINT}" \
+    --s3-endpoint-url "${S3_ENDPOINT_URL}" \
     --log-file "${LOGFILE}" \
     --archive-dir "${CACHE_DIR}" \
     "${DEST}" | grep -E "^Full|^Incremental" | sort -r
@@ -89,7 +97,7 @@ restore_backup() {
     restore \
     --no-encryption \
     --time "${backup_time}" \
-    --s3-endpoint-url "${S3_ENDPOINT}" \
+    --s3-endpoint-url "${S3_ENDPOINT_URL}" \
     --log-file "${LOGFILE}" \
     --archive-dir "${CACHE_DIR}" \
     --force \
@@ -111,7 +119,7 @@ compare_backups() {
 
   # Count number of differences
   local diff_count
-  diff_count=$(grep -E "^(\+\+\+|---)" "${diff_file}" | wc -l)
+  diff_count=$(grep -cE "^(\+\+\+|---)" "${diff_file}" || true)
 
   echo "Comparison completed. Found approximately $((diff_count / 2)) differences."
   echo "Diff file created at: ${diff_file}"

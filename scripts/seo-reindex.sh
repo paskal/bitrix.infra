@@ -30,6 +30,7 @@ fi
 . "$ENV_FILE"
 : "${YANDEX_WEBMASTER_TOKEN:?missing YANDEX_WEBMASTER_TOKEN in $ENV_FILE}"
 : "${YANDEX_WEBMASTER_USER_ID:?missing YANDEX_WEBMASTER_USER_ID in $ENV_FILE}"
+: "${QUOTA_HOST:?missing QUOTA_HOST in $ENV_FILE}"
 
 if [ ! -s "$QUEUE" ]; then
   echo "queue empty -- nothing to do"
@@ -37,7 +38,6 @@ if [ ! -s "$QUEUE" ]; then
 fi
 
 # Quota is account-wide (shared across all verified hosts) -- pick any verified host.
-QUOTA_HOST="https:favor-group.ru:443"
 QUOTA_JSON=$(curl -fsS --max-time 30 \
   -H "Authorization: OAuth $YANDEX_WEBMASTER_TOKEN" \
   "https://api.webmaster.yandex.net/v4/user/$YANDEX_WEBMASTER_USER_ID/hosts/$QUOTA_HOST/recrawl/quota/")
