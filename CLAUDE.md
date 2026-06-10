@@ -48,14 +48,24 @@
   `sudo chown admin:admin /web/config/cron && git pull && sudo chown root:root /web/config/cron && sudo chown root:root /web/config/cron/*.cron && sudo chmod 0644 /web/config/cron/*.cron`
 - `/etc/cron.d/bitrix_infra` is a symlink to `/web/config/cron/host.cron` (per `disaster-recovery.sh`), so the chown dance + `git pull` is the whole deploy.
 
+## Private overlay
+
+Production identity (TLS certs, site vhosts, site-specific cron jobs, CSP snippets, Yandex Metrika maps, my.cnf overrides, container_name pins) lives in a **separate private repo** — `bitrix.infra-private` — checked out on the server.  A `docker-compose.override.yml` in that private repo is symlinked next to `docker-compose.yml` on the server so Compose merges them automatically.  The public repo boots a localhost demo on a fresh clone; prod re-attaches its identity via the overlay.
+
+- Private overlay nginx site vhosts: `private/nginx/sites/*.conf` (glob included by `nginx.conf`)
+- Private overlay cron: second `/etc/cron.d` entry mounted by the override
+- Container names: not in the public compose; overlay adds `container_name:` to pin prod names
+- `config/updater.yaml`: public file has a generic example; overlay remaps the volume to the private tasks file
+
 ## PHPStan Monitoring
 
 Weekly PHPStan scan against the prod Bitrix tree; count of owned-code findings is read by zabbix-agent via `system.run`, trigger alerts when count ≠ 0.
 
 **File locations:**
 - `scripts/phpstan-scan.sh` — entrypoint (flock-guarded, self-updates PHAR)
-- `private/phpstan/phpstan-owned.neon` — alerted scope (target = 0)
-- `private/phpstan/phpstan-diagnostic.neon` — manual broader sweep
+- `private/phpstan/phpstan-owned.neon` — alerted scope (target = 0); lives in private repo; copy from `phpstan-owned.neon.example` as a starting point
+- `private/phpstan/phpstan-owned.neon.example` — generic public template
+- `private/phpstan/phpstan-diagnostic.neon` — manual broader sweep; lives in private repo
 - `private/phpstan/phpstan.phar` — auto-updated PHAR (gitignored)
 - `config/zabbix/templates/phpstan-monitoring.yaml` — template (three items, three triggers — count + freshness + failure-marker)
 - `logs/phpstan/owned-latest.json` + `owned_errors_count.txt` — output, also kept for `diagnostic-*`

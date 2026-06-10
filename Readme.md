@@ -144,8 +144,9 @@ Both scopes use `scanDirectories` against the live `/web/prod/bitrix/modules` tr
 | Path | Purpose |
 |---|---|
 | `scripts/phpstan-scan.sh` | Entrypoint script (flock-guarded, self-updates the PHAR, runs in `php` container) |
-| `private/phpstan/phpstan-owned.neon` | Scope + rule config for the alerted scan |
-| `private/phpstan/phpstan-diagnostic.neon` | Broader scope for manual troubleshooting |
+| `private/phpstan/phpstan-owned.neon` | Scope + rule config for the alerted scan (copy from `phpstan-owned.neon.example` and adapt) |
+| `private/phpstan/phpstan-owned.neon.example` | Generic starting point — copy to `phpstan-owned.neon` and adapt paths |
+| `private/phpstan/phpstan-diagnostic.neon` | Broader scope for manual troubleshooting (site-specific; lives in private repo) |
 | `config/zabbix/templates/phpstan-monitoring.yaml` | Zabbix 7.4 template (three items, three triggers — count + freshness + failure-marker) |
 | `logs/phpstan/owned_errors_count.txt` | Single integer the Zabbix agent reads |
 | `logs/phpstan/owned-latest.json` | Full findings, file + line + identifier — open this when the trigger fires |
@@ -304,8 +305,13 @@ return array(
     ```
     Edit each `.env` file — the examples contain comments explaining every variable. At minimum you need `mysql.env`; the others are for optional services (FTP, monitoring, certificates, webhooks).
 
-3.  **Set file permissions:**
-    MySQL uses UID/GID 1001, PHP and Nginx use UID/GID 1000. Run the provided script to set ownership correctly:
+    Optionally copy `.env.example` to `.env` to override ports or other compose variables (e.g. if port 80 is taken on the host):
+    ```bash
+    cp .env.example .env
+    ```
+
+3.  **Set file permissions and create required directories:**
+    MySQL uses UID/GID 1001, PHP and Nginx use UID/GID 1000. Run the provided script — it also creates all directories that docker file-mounts need:
     ```bash
     sudo ./scripts/fix-rights.sh
     ```
@@ -316,26 +322,60 @@ return array(
     ```
     Pre-built images are pulled from GHCR automatically. You only need `--build` if you've modified the Dockerfiles locally. To enable optional services, see [Managing Optional Services with Profiles](#managing-optional-services-with-profiles).
 
-    > **Note:** bare `docker compose up -d` requires a modern compose v2 that silently drops profile-gated `depends_on` entries; on compose 2.6.0 (as used on the original production host) it will error. Additionally, nginx will not start until TLS certificates exist in `private/letsencrypt/` (populated by the `certs` profile — run the `certbot` service first, or provide certificates manually), and `config/nginx/conf.d/adminer.conf` and `hooks.conf` reference upstreams for the `adminer` and `updater` services respectively — nginx resolves these at startup, so those profiles (`dbadmin`, `hooks`) must be enabled or the conf files disabled. A full local-demo path that addresses these prerequisites will be documented in a future release.
+    > **Note:** bare `docker compose up -d` requires a modern compose v2 that silently drops profile-gated `depends_on` entries; on compose 2.6.0 (as used on the original production host) it will error. Optional services (`adminer`, `updater`, etc.) are behind profiles — pass `--profile dbadmin --profile hooks ...` or use `COMPOSE_PROFILES`.
 
 For information about maintenance and utility scripts, see [scripts/README.md](scripts/README.md).
+
+## Local demo
+
+A fresh clone boots a working Bitrix installer at `http://localhost` with no modifications:
+
+1. Clone and create env files (steps 1–2 above).
+2. `sudo ./scripts/fix-rights.sh`
+3. `docker compose up -d`
+4. Download the Bitrix trial package (~313 MB) and extract it into `web/prod/`:
+   ```bash
+   curl -L https://www.1c-bitrix.ru/download/start_encode.tar.gz | tar -xz -C web/prod/
+   ```
+   Alternatively, place `bitrixsetup.php` there for a minimal bootstrap.
+5. Open `http://localhost` (or `http://localhost:${HTTP_PORT}` if you changed the port in `.env`).
+6. In the Bitrix wizard, use `localhost` as the database host (MySQL communicates via Unix socket), database name from `mysql.env` (`MYSQL_DATABASE`), and the user credentials from the same file.
+
+> **Note:** The Bitrix installer sets `session.cookie_secure = On` by default. For an HTTP-only wizard run you need `session.cookie_secure = Off` in `config/php/90-php.ini`. Revert this setting after enabling TLS.
+
+## Production overlay (private repo)
+
+Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP headers, Yandex Metrika cookie maps, etc.) is kept in a separate private repository and attached to this base via a `docker-compose.override.yml`. The mechanism:
+
+1. The private repo is checked out alongside the public one (e.g. at `/web/private/` on the server).
+2. A `docker-compose.override.yml` in the private repo is symlinked next to `docker-compose.yml`. Docker Compose merges them automatically on every `docker compose` invocation.
+3. The override re-adds `container_name:` for all services (so scripts that reference containers by name keep working), mounts the production `my.cnf`, re-maps `config/updater.yaml` to the private tasks file, and sets production environment variables.
+4. Site vhosts live in `private/nginx/sites/*.conf` — the public `nginx.conf` already includes that glob; an empty directory is a no-op on a fresh clone.
+5. A second `/etc/cron.d` file (mounted by the override) carries site-specific host cron jobs (seo-reindex, robots.txt patching, etc.).
+
+To start the full production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d`.
 
 ## File structure
 
 ### /config
 
-- `cron/php-cron.cron` is a list of cron tasks to run in php-cron container, only `cron_events.php` is required for Bitrix and others are specific to this site,
-  [must](https://manpages.ubuntu.com/manpages/jammy/man8/cron.8.html) be owned by root:root and have access rights 0644 - fixable by running `scripts/fix-rights.sh`
+- `cron/php-cron.cron` — cron tasks for the php-cron container. Only the standard `cron_events.php` Bitrix runner is kept here; site-specific jobs belong in a private overlay cron.d file. [Must](https://manpages.ubuntu.com/manpages/jammy/man8/cron.8.html) be owned by root:root with mode 0644 — run `scripts/fix-rights.sh` to fix.
 
-- `cron/host.cron` is a list of cron tasks to run on the host machine
+- `cron/host.cron` — cron tasks for the host machine (backups, image optimisation, JS/CSS minification, DNS token renewal). Site-specific jobs (seo-reindex, robots.txt patching) live in the private overlay.
 
-- `mysql/my.cnf` is a MySQL configuration, applied on top of package-provided my.cnf
+- `mysql/my.cnf` — MySQL configuration, applied on top of the package-provided defaults. `innodb_buffer_pool_size` is set to a laptop-friendly 512 MB; override via private overlay mount for production.
 
-- `nginx` directory contains the build Dockerfile, as well as following (HTTPS) configuration:
-    - bitrix proxy, separate for dev and prod
-    - adminer proxy
-    - HTTP to HTTPS redirects
-    - stub status page listening on localhost for Zabbix monitoring
+- `nginx` directory — build Dockerfile and shared nginx configuration:
+    - `nginx.conf` — main http block (brotli, gzip, SSL, logging)
+    - `bitrix.conf` — Bitrix-specific location rules (dot-path deny, static serving, FastCGI)
+    - `fastcgi.conf` — FastCGI params including HTTP/3-safe `HTTP_HOST`
+    - `security_headers.conf` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+    - `static-cdn.conf` — CDN vhost include (static-only, hotlink protection)
+    - `bots.conf` — bot detection logic
+    - `conf.d/localhost.conf` — HTTP-only demo server on port 80 for a fresh clone
+    - `conf.d/host-map.conf` — `$bitrix_host` map (preserves `:port` for local demos, falls back to `$host` for QUIC)
+    - `conf.d/upstream.conf`, `bad_ips.conf`, `status.conf`, `useragents.conf` — generic infrastructure
+    - Site vhosts live in the private overlay (`private.conf.d/sites/*.conf`)
 
 - `php` directory contains the build Dockerfiles (`Dockerfile.8.3`, `Dockerfile.8.4`, `Dockerfile.8.5`) and php configuration, applied on top of package-provided one.
 
@@ -365,11 +405,10 @@ Site files in directories `web/prod` and `web/dev`.
     - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, key restrictions) (`monitoring` profile)
     - `updater.env` — webhook server shared secret (`hooks` profile)
     - `ftp.env` — Pure-FTPD credentials (`ftp` profile)
-    - `seo-reindex.env` — Yandex Webmaster OAuth token for the daily SEO reindex cron; example file exists at `seo-reindex.env.example`
-    - `metrika.env` — Yandex Metrika API credentials for the popularity-sort cron; no example file exists — create the file manually (it may be empty if that cron is unused)
-    - `mysql-zbx.cnf` — MySQL client credentials for Zabbix Agent `system.run` monitoring items; required by the `monitoring` profile
+    - `seo-reindex.env` — Yandex Webmaster OAuth token and quota host for the daily SEO reindex cron
+    - `backup.env` — S3 bucket, endpoint URL, and domain for backup scripts
 
-- `private/nginx/` — nginx include snippets mounted as `private.conf.d`: at minimum `bitrix_csp_headers.conf` and `static_csp_headers.conf` must exist for nginx to start (empty files are acceptable if CSP headers are not needed)
+- `private/nginx/` — nginx include snippets mounted as `private.conf.d`. CSP include globs (`bitrix_csp_headers*.conf`, `static_csp_headers*.conf`) match nothing if the directory is empty, so nginx starts on a fresh clone without any stubs. Drop your CSP files here on production.
 
 - `private/updater_ssh_key` — SSH private key mounted into the `updater` container; required by the `hooks` profile
 

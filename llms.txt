@@ -1,0 +1,11 @@
+# bitrix.infra
+
+Generic Docker Compose stack for a Bitrix CMS site (nginx + PHP-FPM + MySQL + Memcached).
+Production identity attaches via a private docker-compose.override.yml.
+
+- Architecture and service overview: Readme.md (Architecture section)
+- Local demo (6 commands): Readme.md (Local demo section) or AGENTS.md
+- Production overlay mechanism: Readme.md (Production overlay section)
+- Getting started / environment setup: Readme.md (Getting Started section)
+- AI agent quick reference and gotchas: AGENTS.md
+- Script documentation: scripts/README.md
