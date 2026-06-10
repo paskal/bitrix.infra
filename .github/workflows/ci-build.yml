@@ -142,7 +142,7 @@ jobs:
             $(printf '${{ matrix.image.registry-image }}@sha256:%s ' *)
 
       - name: Remote update of zabbix agent after rebuild
-        if: matrix.image.name == 'zabbix-agent2'
+        if: matrix.image.name == 'zabbix-agent2' && github.repository == 'paskal/bitrix.infra'
         env:
           UPDATER_KEY: ${{ secrets.UPDATER_KEY }}
         run: curl -sf "https://hooks.favor-group.ru/update/zabbix/${UPDATER_KEY}" > /dev/null || echo "Update hook failed"

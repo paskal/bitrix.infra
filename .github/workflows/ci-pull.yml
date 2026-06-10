@@ -8,6 +8,7 @@ on:
 jobs:
   build-images:
     name: Pull code from master to favor-group.ru
+    if: github.repository == 'paskal/bitrix.infra'
     runs-on: ubuntu-latest
     permissions:
       contents: read
