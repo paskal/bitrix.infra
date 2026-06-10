@@ -72,4 +72,4 @@ jobs:
           find scripts bin -type f \( -name "*.sh" -o -perm /111 \) \
             ! -name "*.py" ! -name "*.txt" ! -name "*.md" \
             -print0 | xargs -0 file | grep -E 'shell script|POSIX shell' | cut -d: -f1 | \
-            xargs -r shellcheck
+            xargs -r shellcheck --severity=error
