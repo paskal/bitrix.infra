@@ -94,7 +94,9 @@ Safari's [Intelligent Tracking Prevention](https://webkit.org/blog/category/priv
 
 <details><summary>Implementation details</summary>
 
-The implementation uses nginx `map` blocks (`config/nginx/conf.d/metrika-cookies.conf`) rather than `if` directives to avoid the ["if is evil"](https://www.nginx.com/resources/wiki/start/topics/depth/ifisevil/) problem — using `add_header` inside an `if` block replaces all parent-level headers, which would drop `Cache-Control`, security headers and CSP from static file responses. When the cookie is absent the map resolves to an empty string and no header is emitted.
+The implementation uses nginx `map` blocks (`config/nginx/conf.d/metrika-cookies.conf`) rather than `if` directives to avoid the ["if is evil"](https://www.nginx.com/resources/wiki/start/topics/depth/ifisevil/) problem — using `add_header` inside an `if` block replaces all parent-level headers, which would drop `Cache-Control`, security headers and CSP from static file responses. When the cookie is absent the map resolves to an empty string and no header is emitted. The headers are emitted only on document responses (the PHP location), never on static assets — Safari refuses to disk-cache any response carrying `Set-Cookie`.
+
+The feature is off by default: it activates when an overlay maps your hosts to a cookie domain via a `private/nginx/metrika-domain.map` file, e.g. `"~(^|\.)example\.com$" ".example.com";`.
 
 </details>
 
@@ -345,7 +347,7 @@ A fresh clone boots a working Bitrix installer at `http://localhost` with no mod
 
 ## Production overlay (private repo)
 
-Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP headers, Yandex Metrika cookie maps, etc.) is kept in a separate private repository and attached to this base via a `docker-compose.override.yml`. The mechanism:
+Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP headers, etc.) is kept in a separate private repository and attached to this base via a `docker-compose.override.yml`. The mechanism:
 
 1. The private repo is checked out alongside the public one (e.g. at `/web/private/` on the server).
 2. A `docker-compose.override.yml` in the private repo is symlinked next to `docker-compose.yml`. Docker Compose merges them automatically on every `docker compose` invocation.
