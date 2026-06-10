@@ -1,9 +1,6 @@
 tasks:
-  - name: zabbix
+  - name: example
     command: |
-      echo "update Zabbix agent after image rebuild"
-      ssh admin@favor-group.ru "cd /web && docker compose pull zabbix-agent && docker compose up -d zabbix-agent"
-  - name: pull-code
-    command: |
-      echo "update bitrix.infra code"
-      eval "$(ssh-agent -s)" && ssh-add -k && ssh -A admin@favor-group.ru "cd /web && git pull --ff-only"
+      echo "replace with your tasks; see umputun/updater docs"
+      # Example real task:
+      # ssh admin@your-server "cd /web && git pull --ff-only"
