@@ -352,6 +352,7 @@ Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP
 3. The override re-adds `container_name:` for all services (so scripts that reference containers by name keep working), mounts the production `my.cnf`, re-maps `config/updater.yaml` to the private tasks file, and sets production environment variables.
 4. Site vhosts live in `private/nginx/sites/*.conf` — the public `nginx.conf` already includes that glob; an empty directory is a no-op on a fresh clone.
 5. A second `/etc/cron.d` file (mounted by the override) carries site-specific host cron jobs (seo-reindex, robots.txt patching, etc.).
+6. Behavioural knobs in the shared nginx files (hotlink protection, the `X-Frame-Options` value, admin-page `frame-ancestors`/CORS) are driven by maps in `config/nginx/conf.d/overlay-maps.conf`; the overlay extends them by dropping `*.map` files into `private/nginx/` — see the comments in that file for the expected entries.
 
 To start the full production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d`.
 
