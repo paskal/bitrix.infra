@@ -86,6 +86,16 @@ Below is a list of scripts and relevant files found in this directory:
     *   **Type:** Python packaging script (`.py`)
     *   **Purpose:** Standard Python project setup script, likely used for packaging any Python utilities or scripts in this directory if they were to be distributed or installed as a package.
 
+*   **`phpstan-scan.sh`**
+    *   **Type:** Shell script (`.sh`)
+    *   **Purpose:** Weekly PHPStan static-analysis scan of the prod Bitrix tree; writes the owned-code error count to `logs/phpstan/owned_errors_count.txt` for Zabbix to read via `system.run`. Self-updates the PHPStan PHAR on each run.
+    *   **Notes:** See the PHPStan static analysis monitoring section in the main Readme for setup instructions, Zabbix template import, and the two scan scopes (owned vs diagnostic).
+
+*   **`seo-reindex.sh`**
+    *   **Type:** Shell script (`.sh`)
+    *   **Purpose:** Drains `/web/private/seo-reindex/queue.txt` into the Yandex Webmaster recrawl API, up to the account-wide daily quota (~960 URLs/day). Runs daily at 00:15 MSK as the `admin` user.
+    *   **Notes:** Requires `private/environment/seo-reindex.env` with a valid Yandex Webmaster OAuth token. Logs go to `logs/seo-reindex/YYYY-MM-DD.log`. Bing reindexing is handled separately via `bin/search-reindex submit --bing-only`.
+
 *   **`update-dns-token.sh`**
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Updates Yandex Cloud DNS authentication token for automatic certificate renewal.
@@ -198,4 +208,8 @@ search-reindex diagnostics && echo 'All OK'
 ```
 
 **Routine reindexing via the server-side cron:** for bulk Yandex submissions that exceed the ~960/day quota, append absolute URLs to `/web/private/seo-reindex/queue.txt` on the server. The `seo-reindex.sh` cron (00:15 MSK daily, runs as `admin`) drains the queue top-down up to remaining quota and removes attempted lines. Bing has a separate 10 000/day quota and is sent manually with `--bing-only` from a workstation.
+
+### yandex-reviews — Yandex Maps organisation review sync
+
+Fetches reviews for configured Yandex Maps organisation IDs and updates the corresponding Bitrix region properties. Organisation IDs are configured inside the script. Useful for keeping on-site review content in sync with the Yandex Maps listing without manual copy-paste.
 

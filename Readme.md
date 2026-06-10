@@ -16,7 +16,7 @@ flowchart TB
         Nginx -->|"FastCGI :9000"| PHP["PHP-FPM 8.4"]
         Nginx -->|"static files"| Web["Web Files<br>prod / dev"]
 
-        PHP -->|"Unix socket"| MySQL[("Percona MySQL 8.0<br>(socket-only, no TCP)")]
+        PHP -->|"Unix socket"| MySQL[("Percona MySQL 8.4<br>(socket-only, no TCP)")]
         PHP --> Memcached["Memcached<br>Cache (2 GB)"]
         PHP --> MemSessions["Memcached<br>Sessions (128 MB)"]
         PHP --> Web
@@ -73,7 +73,7 @@ You bet! Here is a performance on Yandex.Cloud server with Intel Cascade Lake 8 
 
 - [Nginx](https://www.nginx.com/) ([ghcr.io/paskal/nginx](https://github.com/paskal/bitrix.infra/pkgs/container/nginx)) with [brotli](https://github.com/google/ngx_brotli), HTTP/3 (QUIC) and Lua modules — proxies requests to php-fpm and serves static assets directly
 - [php-fpm](https://www.php.net/manual/en/install.fpm.php) 8.3 / 8.4 / 8.5 ([ghcr.io/paskal/bitrix-php](https://github.com/paskal/bitrix.infra/pkgs/container/bitrix-php)) for Bitrix with msmtp for mail sending
-- [Percona MySQL 8.0](https://www.percona.com/software/mysql-database/percona-server) because of its monitoring capabilities
+- [Percona MySQL 8.4](https://www.percona.com/software/mysql-database/percona-server) because of its monitoring capabilities
 - [memcached](https://memcached.org/) for Bitrix cache and user sessions
 
 ### Multi-region setup
@@ -316,6 +316,8 @@ return array(
     ```
     Pre-built images are pulled from GHCR automatically. You only need `--build` if you've modified the Dockerfiles locally. To enable optional services, see [Managing Optional Services with Profiles](#managing-optional-services-with-profiles).
 
+    > **Note:** bare `docker compose up -d` requires a modern compose v2 that silently drops profile-gated `depends_on` entries; on compose 2.6.0 (as used on the original production host) it will error. Additionally, nginx will not start until TLS certificates exist in `private/letsencrypt/` (populated by the `certs` profile — run the `certbot` service first, or provide certificates manually), and `config/nginx/conf.d/adminer.conf` and `hooks.conf` reference upstreams for the `adminer` and `updater` services respectively — nginx resolves these at startup, so those profiles (`dbadmin`, `hooks`) must be enabled or the conf files disabled. A full local-demo path that addresses these prerequisites will be documented in a future release.
+
 For information about maintenance and utility scripts, see [scripts/README.md](scripts/README.md).
 
 ## File structure
@@ -337,7 +339,7 @@ For information about maintenance and utility scripts, see [scripts/README.md](s
 
 - `php` directory contains the build Dockerfiles (`Dockerfile.8.3`, `Dockerfile.8.4`, `Dockerfile.8.5`) and php configuration, applied on top of package-provided one.
 
-- `logrotate` directory contains rotation configs for nginx and PHP logs, mounted into the `php-cron` container which runs logrotate daily
+- `logrotate` directory contains rotation configs for nginx and PHP logs, applied on the host via symlinks in `/etc/logrotate.d/` pointing to `config/logrotate/*`. The symlinks are created by `scripts/disaster-recovery.sh`; on a fresh manual setup, run `ln -sf /web/config/logrotate/* /etc/logrotate.d/` once.
 
 ### /logs
 
@@ -359,10 +361,17 @@ Site files in directories `web/prod` and `web/dev`.
 
 - `private/environment/` — environment files for docker-compose services. Copy `.env.example` files to `.env` and fill in your values. Each example file is commented with descriptions of every variable:
     - `mysql.env` — Percona MySQL credentials (root, application user, read-only agent user)
-    - `dnsrobocert.env` — Yandex Cloud DNS credentials for Let's Encrypt wildcard certificates
-    - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, key restrictions)
-    - `updater.env` — webhook server shared secret
-    - `ftp.env` — Pure-FTPD credentials
+    - `dnsrobocert.env` — Yandex Cloud DNS credentials for Let's Encrypt wildcard certificates (`certs` profile)
+    - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, key restrictions) (`monitoring` profile)
+    - `updater.env` — webhook server shared secret (`hooks` profile)
+    - `ftp.env` — Pure-FTPD credentials (`ftp` profile)
+    - `seo-reindex.env` — Yandex Webmaster OAuth token for the daily SEO reindex cron; example file exists at `seo-reindex.env.example`
+    - `metrika.env` — Yandex Metrika API credentials for the popularity-sort cron; no example file exists — create the file manually (it may be empty if that cron is unused)
+    - `mysql-zbx.cnf` — MySQL client credentials for Zabbix Agent `system.run` monitoring items; required by the `monitoring` profile
+
+- `private/nginx/` — nginx include snippets mounted as `private.conf.d`: at minimum `bitrix_csp_headers.conf` and `static_csp_headers.conf` must exist for nginx to start (empty files are acceptable if CSP headers are not needed)
+
+- `private/updater_ssh_key` — SSH private key mounted into the `updater` container; required by the `hooks` profile
 
 - `private/letsencrypt/` — filled with certificates after the `certbot` service runs
 
@@ -410,9 +419,9 @@ Here are the available profiles and the services they enable:
 
 *   To run all services, including all defined profiles:
     ```bash
-    docker-compose --profile "*" up -d
+    COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d
     ```
-    As mentioned in "Getting Started," this project uses pre-built images. If you've made custom changes to Dockerfiles or need to ensure you have the absolute latest build not yet reflected in the pre-built images, you can add the `--build` flag (e.g., `docker-compose --profile "*" up --build -d`).
+    Note: the `--profile "*"` wildcard syntax is only available in newer compose versions and is not supported on compose 2.6.0. Use the explicit `COMPOSE_PROFILES` list above for compatibility. As mentioned in "Getting Started," this project uses pre-built images. If you've made custom changes to Dockerfiles or need to ensure you have the absolute latest build not yet reflected in the pre-built images, you can add the `--build` flag.
 
 ## Advanced Usage
 
@@ -458,7 +467,7 @@ For a more dynamic approach to switching PHP versions, you could consider:
 <details>
 <summary>Disaster recovery</summary>
 
-To start the recovery you should have a machine with the latest Ubuntu with static external IP with DDoS protection attached to it, created [in the Yandex.Cloud](https://console.cloud.yandex.ru/folders/b1gm2f812hg4h5s5jsgn/compute). It should be created with 100Gb of disk space, 12Gb of RAM and 8 cores.
+To start the recovery you should have a machine with the latest Ubuntu with static external IP with DDoS protection attached to it, created [in Yandex Cloud](https://console.yandex.cloud/) (your folder → Compute Cloud). It should be created with 100Gb of disk space, 12Gb of RAM and 8 cores.
 
 SSH to the machine you want to set up as a new server and then execute the following, then follow the instructions of the script:
 
