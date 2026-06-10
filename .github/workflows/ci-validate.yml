@@ -22,8 +22,7 @@ jobs:
           done
 
       - name: Validate compose config (bare)
-        run: docker compose config -q || true
-        # bare run errors on profile-gated depends_on (pre-existing); not a failure
+        run: docker compose config -q
 
       - name: Validate compose config (all profiles)
         run: COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose config -q

@@ -324,7 +324,7 @@ return array(
     ```
     Pre-built images are pulled from GHCR automatically. You only need `--build` if you've modified the Dockerfiles locally. To enable optional services, see [Managing Optional Services with Profiles](#managing-optional-services-with-profiles).
 
-    > **Note:** bare `docker compose up -d` requires a modern compose v2 that silently drops profile-gated `depends_on` entries; on compose 2.6.0 (as used on the original production host) it will error. Optional services (`adminer`, `updater`, etc.) are behind profiles — pass `--profile dbadmin --profile hooks ...` or use `COMPOSE_PROFILES`.
+    > **Note:** bare `docker compose up -d` starts the core stack (nginx, php, php-cron, mysql, both memcached). Optional services (`adminer`, `updater`, `certbot`, `zabbix-agent`, `ftp`) are behind profiles — enable them with `COMPOSE_PROFILES` or `--profile` when needed.
 
 For information about maintenance and utility scripts, see [scripts/README.md](scripts/README.md).
 
@@ -343,7 +343,7 @@ A fresh clone boots a working Bitrix installer at `http://localhost` with no mod
 5. Open `http://localhost` (or `http://localhost:${HTTP_PORT}` if you changed the port in `.env`).
 6. In the Bitrix wizard, use `localhost` as the database host (MySQL communicates via Unix socket), database name from `mysql.env` (`MYSQL_DATABASE`), and the user credentials from the same file.
 
-> **Note:** The Bitrix installer sets `session.cookie_secure = On` by default. For an HTTP-only wizard run you need `session.cookie_secure = Off` in `config/php/90-php.ini`. Revert this setting after enabling TLS.
+> **Note:** `config/php/90-php.ini` ships with `session.cookie_secure = On`. Chromium-based browsers treat `localhost` as a secure context, so the HTTP-only install wizard works as is; Firefox and curl-driven flows discard the Secure session cookie over plain HTTP, which silently freezes the wizard on the licence step — set `session.cookie_secure = Off` for the install and revert after enabling TLS.
 
 ## Production overlay (private repo)
 
