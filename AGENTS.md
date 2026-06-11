@@ -23,12 +23,24 @@ In the Bitrix wizard: DB host = `localhost`, DB name / user / password from `pri
 |--------|-----|
 | Port 80/443 in use | Set `HTTP_PORT=8080` / `HTTPS_PORT=8443` in `.env` |
 | Running two stacks side by side | Set a unique `COMPOSE_PROJECT_NAME` in each stack's `.env` |
-| Bitrix HTTP wizard rejects sessions | Set `session.cookie_secure = Off` in `config/php/90-php.ini` (revert after enabling TLS) |
+| Bitrix HTTP wizard rejects sessions (Firefox/curl) | `session.cookie_secure = Off` via a gitignored local override (see "Local overrides" in Readme.md) — do not edit the tracked ini |
+| 502s + php-fpm SIGSEGV after install on arm64 | PHP 8.4 opcache JIT crash — `opcache.jit = disable` in the same local override |
+| `fix-rights.sh` needs interactive sudo | On macOS Docker Desktop only the `mkdir` part matters; run without sudo and ignore chown failures. The chowns matter on Linux hosts |
 | Adding TLS | Provide a dhparam file ≥2048 bits (`openssl dhparam -out private/letsencrypt/dhparams.pem 2048`) and declare `ssl_dhparam` per vhost in the private overlay |
 | macOS bind-mount changes invisible | Docker Desktop bind mounts sometimes need `docker compose restart` → force-recreate to pick up inode changes |
 | File-level mounts track inodes | Deploy config changes with `tee` (write in-place) rather than `rsync`/`git pull`; see Readme.md nginx deploy notes |
-| `my.cnf` is sized for a dedicated server | `innodb_buffer_pool_size = 4G`; shrink to e.g. 512M for laptop demos |
+| `my.cnf` is sized for a dedicated server | `innodb_buffer_pool_size = 4G`; shrink via a gitignored compose override mounting your own cnf (see "Local overrides" in Readme.md) — keeps the tree clean |
 | Optional services missing | `adminer`, `updater`, `certbot`, `zabbix-agent`, `ftp` sit behind compose profiles — enable with `COMPOSE_PROFILES` when needed; the core stack needs none |
+
+## Automating the Bitrix installer
+
+The install wizard predates modern web conventions; if you drive it programmatically:
+
+- State is 100% session-based with no URL checkpointing — keep one `curl` cookie jar for the whole flow; losing the session restarts from step 1. Browser automation is fragile here (any tab navigation kills it); `curl` is the reliable path.
+- The module-installation step is AJAX-only: each `GET /?CurrentStepID=create_modules&__wiz_nextStep=X&__wiz_nextStepStage=Y` returns `[response]...Post({'nextStep': ..., 'nextStepStage': ...})[/response]` — loop until it stops advancing (~38 iterations for the Start edition).
+- The licence step embeds an iframe from `www.1c-bitrix.ru` that may issue a top-frame JS redirect in real browsers; curl is immune.
+- One installer redirect drops a non-standard port from the URL — reopen `http://localhost:${HTTP_PORT}/` and the wizard continues.
+- Selecting the blank `@` template requires a Bitrix cloud licence; the bundled demo solutions install from local files without one.
 
 ## Verify
 

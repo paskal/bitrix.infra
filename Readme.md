@@ -333,7 +333,7 @@ For information about maintenance and utility scripts, see [scripts/README.md](s
 A fresh clone boots a working Bitrix installer at `http://localhost` without changing any tracked file (only the documented setup commands below):
 
 1. Clone and create env files (steps 1–2 above).
-2. `sudo ./scripts/fix-rights.sh`
+2. `sudo ./scripts/fix-rights.sh` — on Linux hosts the `chown` calls matter (container UIDs 1000/1001); on macOS Docker Desktop (VirtioFS) only the directory creation does, so if passwordless `sudo` is unavailable you can run it without `sudo` and ignore the chown failures.
 3. `docker compose up -d`
 4. Download the Bitrix trial package (~313 MB) and extract it into `web/prod/`:
    ```bash
@@ -343,7 +343,19 @@ A fresh clone boots a working Bitrix installer at `http://localhost` without cha
 5. Open `http://localhost` (or `http://localhost:${HTTP_PORT}` if you changed the port in `.env`).
 6. In the Bitrix wizard, use `localhost` as the database host (MySQL communicates via Unix socket), database name from `mysql.env` (`MYSQL_DATABASE`), and the user credentials from the same file.
 
-> **Note:** `config/php/90-php.ini` ships with `session.cookie_secure = On`. Chromium-based browsers treat `localhost` as a secure context, so the HTTP-only install wizard works as is; Firefox and curl-driven flows discard the Secure session cookie over plain HTTP, which silently freezes the wizard on the licence step — set `session.cookie_secure = Off` for the install and revert after enabling TLS.
+> **Local overrides without touching tracked files:** `docker-compose.override.yml` is gitignored, so laptop-specific tweaks belong in your own override next to `docker-compose.yml` rather than in edits to tracked configs:
+>
+> ```yaml
+> services:
+>   mysql:
+>     volumes:
+>       - ./private/my-local.cnf:/etc/my.cnf.d/zz-local.cnf:ro   # e.g. innodb_buffer_pool_size = 512M
+>   php:
+>     volumes:
+>       - ./private/php-local.ini:/etc/php/8.4/fpm/conf.d/99-local.ini:ro
+> ```
+>
+> Typical `private/php-local.ini` for a demo: `session.cookie_secure = Off` (Chromium treats `localhost` as a secure context, but Firefox and curl-driven wizard runs discard the Secure session cookie over plain HTTP and silently freeze on the licence step) and `opcache.jit = disable` (PHP 8.4 JIT has been observed to segfault php-fpm workers on arm64 hosts, surfacing as 502s after the install). The shipped `config/mysql/my.cnf` is sized for a dedicated server (4 GB buffer pool) — shrink it in `my-local.cnf` for an 8 GB Docker Desktop VM.
 
 ## Production overlay (private repo)
 
