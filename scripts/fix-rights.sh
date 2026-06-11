@@ -13,6 +13,15 @@ mkdir -p logs/nginx logs/php logs/mysql logs/phpstan \
   web/prod web/dev
 [ -f private/msmtprc ] || touch private/msmtprc
 
+# Everything below changes ownership and needs root. Without it the
+# directories above are still created, which is all that matters on macOS
+# Docker Desktop (VirtioFS); on Linux hosts re-run with sudo.
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Not root: directories created, ownership fixes skipped (fine on macOS;"
+  echo "on Linux hosts re-run with sudo so container UIDs can write)."
+  exit 0
+fi
+
 # cron tasks should be owned by root, otherwise they won't run
 # and will be silently ignored
 echo "Fixing cron permissions..."

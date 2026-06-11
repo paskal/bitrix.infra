@@ -333,7 +333,7 @@ For information about maintenance and utility scripts, see [scripts/README.md](s
 A fresh clone boots a working Bitrix installer at `http://localhost` without changing any tracked file (only the documented setup commands below):
 
 1. Clone and create env files (steps 1–2 above).
-2. `sudo ./scripts/fix-rights.sh` — on Linux hosts the `chown` calls matter (container UIDs 1000/1001); on macOS Docker Desktop (VirtioFS) only the directory creation does, so if passwordless `sudo` is unavailable you can run it without `sudo` and ignore the chown failures.
+2. `sudo ./scripts/fix-rights.sh` — on Linux hosts the `chown` calls matter (container UIDs 1000/1001); on macOS Docker Desktop (VirtioFS) only the directory creation does, and the script run without `sudo` creates the directories and cleanly skips the ownership fixes.
 3. `docker compose up -d`
 4. Download the Bitrix trial package (~313 MB) and extract it into `web/prod/`:
    ```bash
