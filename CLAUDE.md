@@ -1,5 +1,7 @@
 # Bitrix.infra - Infrastructure Guidelines
 
+Local-demo quickstart (for newcomers and coding agents): see [AGENTS.md](AGENTS.md).
+
 ## Build/Service Commands
 - Start services: `docker-compose up --build -d`
 - Stop services: `docker-compose down`

@@ -27,7 +27,7 @@ In the Bitrix wizard: DB host = `localhost`, DB name / user / password from `pri
 | Adding TLS | Provide a dhparam file ≥2048 bits and declare `ssl_dhparam` per vhost in the private overlay |
 | macOS bind-mount changes invisible | Docker Desktop bind mounts sometimes need `docker compose restart` → force-recreate to pick up inode changes |
 | File-level mounts track inodes | Deploy config changes with `tee` (write in-place) rather than `rsync`/`git pull`; see Readme.md nginx deploy notes |
-| `my.cnf` is sized for a laptop | `innodb_buffer_pool_size = 512M`; override via private overlay mount for production |
+| `my.cnf` is sized for a dedicated server | `innodb_buffer_pool_size = 4G`; shrink to e.g. 512M for laptop demos |
 | `docker compose config -q` without profiles | Errors on `nginx depends_on updater` (updater is behind `hooks` profile) — use `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose config -q` |
 
 ## Verify

@@ -351,7 +351,7 @@ Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP
 
 1. The private repo is checked out alongside the public one (e.g. at `/web/private/` on the server).
 2. A `docker-compose.override.yml` in the private repo is symlinked next to `docker-compose.yml`. Docker Compose merges them automatically on every `docker compose` invocation.
-3. The override re-adds `container_name:` for all services (so scripts that reference containers by name keep working), mounts the production `my.cnf`, re-maps `config/updater.yaml` to the private tasks file, and sets production environment variables.
+3. The override re-adds `container_name:` for all services (so scripts that reference containers by name keep working), re-maps `config/updater.yaml` to the private tasks file, and sets production environment variables.
 4. Site vhosts live in `private/nginx/sites/*.conf` — the public `nginx.conf` already includes that glob; an empty directory is a no-op on a fresh clone.
 5. A second `/etc/cron.d` file (mounted by the override) carries site-specific host cron jobs (seo-reindex, robots.txt patching, etc.).
 6. Behavioural knobs in the shared nginx files (hotlink protection, the `X-Frame-Options` value, admin-page `frame-ancestors`/CORS) are driven by maps in `config/nginx/conf.d/overlay-maps.conf`; the overlay extends them by dropping `*.map` files into `private/nginx/` — see the comments in that file for the expected entries.
@@ -366,7 +366,7 @@ To start the full production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,h
 
 - `cron/host.cron` — cron tasks for the host machine (backups, image optimisation, JS/CSS minification, DNS token renewal). Site-specific jobs (seo-reindex, robots.txt patching) live in the private overlay.
 
-- `mysql/my.cnf` — MySQL configuration, applied on top of the package-provided defaults. `innodb_buffer_pool_size` is set to a laptop-friendly 512 MB; override via private overlay mount for production.
+- `mysql/my.cnf` — MySQL configuration, applied on top of the package-provided defaults. Sized for a dedicated server (`innodb_buffer_pool_size = 4G`); shrink for local demos on laptops.
 
 - `nginx` directory — build Dockerfile and shared nginx configuration:
     - `nginx.conf` — main http block (brotli, gzip, SSL, logging)
