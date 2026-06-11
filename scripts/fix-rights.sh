@@ -18,6 +18,11 @@ mkdir -p logs/nginx logs/php logs/mysql logs/phpstan \
 echo "Fixing cron permissions..."
 chown -R 0:0 ./config/cron
 chmod 0644 ./config/cron/*
+# overlay cron files are bind-mounted into /etc/cron.d and must be root-owned too
+if [ -d ./private/cron ]; then
+  chown -R 0:0 ./private/cron
+  chmod 0644 ./private/cron/*.cron
+fi
 
 # logrotate configuration should be owned by root,
 # otherwise it will be ignored

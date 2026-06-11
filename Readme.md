@@ -82,9 +82,9 @@ The site serves three cities — Moscow (`favor-group.ru`), Saint Petersburg (`s
 
 <details><summary>How multi-region SEO works</summary>
 
-- **robots.txt** — nginx rewrites `/robots.txt` to `/aspro_regions/robots/robots_$host.txt`, so each subdomain gets its own file. A cron script (`alter-robots-txt.sh`, every 10 minutes) patches these files after Bitrix regenerates them: Moscow indexes everything, SPb blocks `/info/blog/` (centralised on Moscow to avoid duplicate content), Tula additionally blocks `/montag/` and `/projects/` which don't exist for that region.
+- **robots.txt** — nginx rewrites `/robots.txt` to `/aspro_regions/robots/robots_$host.txt`, so each subdomain gets its own file. A cron script (`alter-robots-txt.sh`, every 10 minutes, lives in the private overlay) patches these files after Bitrix regenerates them: Moscow indexes everything, SPb blocks `/info/blog/` (centralised on Moscow to avoid duplicate content), Tula additionally blocks `/montag/` and `/projects/` which don't exist for that region.
 - **sitemaps** — nginx rewrites `/sitemap*.xml` to `/aspro_regions/sitemap/sitemap*_$host.xml`. Four cron jobs generate them nightly: `sitemap.bitrix.php`, `sitemap.aspro.php`, `sitemap.offers.php` and `sitemap.regions.php`.
-- **redirect maps** — `config/nginx/conf.d/redirects-map.conf` contains four `map` blocks: one per region (`$new_uri_msk`, `$new_uri_spb`, `$new_uri_tula`) for region-specific redirects (e.g. Tula bounces all `/montag/` and `/projects/` URLs to Moscow), plus a global `$new_uri` map for site-wide URL cleanup.
+- **redirect maps** — `nginx/sites/redirects-map.conf` in the private overlay contains four `map` blocks: one per region (`$new_uri_msk`, `$new_uri_spb`, `$new_uri_tula`) for region-specific redirects (e.g. Tula bounces all `/montag/` and `/projects/` URLs to Moscow), plus a global `$new_uri` map for site-wide URL cleanup.
 
 </details>
 
@@ -96,7 +96,7 @@ Safari's [Intelligent Tracking Prevention](https://webkit.org/blog/category/priv
 
 The implementation uses nginx `map` blocks (`config/nginx/conf.d/metrika-cookies.conf`) rather than `if` directives to avoid the ["if is evil"](https://www.nginx.com/resources/wiki/start/topics/depth/ifisevil/) problem — using `add_header` inside an `if` block replaces all parent-level headers, which would drop `Cache-Control`, security headers and CSP from static file responses. When the cookie is absent the map resolves to an empty string and no header is emitted. The headers are emitted only on document responses (the PHP location), never on static assets — Safari refuses to disk-cache any response carrying `Set-Cookie`.
 
-The feature is off by default: it activates when an overlay maps your hosts to a cookie domain via a `private/nginx/metrika-domain.map` file, e.g. `"~(^|\.)example\.com$" ".example.com";`.
+The feature is on by default: the cookie domain is auto-derived from the host (last two labels), and the headers are only emitted for visitors that already carry a `_ym_uid` cookie, so sites without Metrika are unaffected. Sites on multi-level public suffixes (`.co.uk`, `.com.tr`) should pin the domain via a `private/nginx/metrika-domain.map` entry.
 
 </details>
 
@@ -330,7 +330,7 @@ For information about maintenance and utility scripts, see [scripts/README.md](s
 
 ## Local demo
 
-A fresh clone boots a working Bitrix installer at `http://localhost` with no modifications:
+A fresh clone boots a working Bitrix installer at `http://localhost` without changing any tracked file (only the documented setup commands below):
 
 1. Clone and create env files (steps 1–2 above).
 2. `sudo ./scripts/fix-rights.sh`
@@ -355,6 +355,8 @@ Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP
 4. Site vhosts live in `private/nginx/sites/*.conf` — the public `nginx.conf` already includes that glob; an empty directory is a no-op on a fresh clone.
 5. A second `/etc/cron.d` file (mounted by the override) carries site-specific host cron jobs (seo-reindex, robots.txt patching, etc.).
 6. Behavioural knobs in the shared nginx files (hotlink protection, the `X-Frame-Options` value, admin-page `frame-ancestors`/CORS) are driven by maps in `config/nginx/conf.d/overlay-maps.conf`; the overlay extends them by dropping `*.map` files into `private/nginx/` — see the comments in that file for the expected entries.
+
+> **Security note:** a fresh public clone serves **no `Content-Security-Policy`** — the CSP includes are globs that match nothing until an overlay supplies `private/nginx/bitrix_csp_headers.conf` / `static_csp_headers.conf` (deliberate: a copy-pasted CSP is worse than none). Before pointing a real domain at this stack, create those files; a minimal starting point is `add_header Content-Security-Policy "default-src 'self';" always;`.
 
 To start the full production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d`.
 

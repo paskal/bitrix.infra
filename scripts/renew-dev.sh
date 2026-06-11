@@ -29,6 +29,8 @@ if [ $# -eq 1 ] && [ "$1" = "--date" ]; then
 fi
 
 # Domain names
+# SITE-SPECIFIC operational script (favor-group.ru): adjust DOMAIN and the
+# admin user IDs below before using on another site.
 DOMAIN=favor-group.ru
 DEV_SUBDOMAIN=dev
 DEV_DOMAIN="${DEV_SUBDOMAIN}.${DOMAIN}"

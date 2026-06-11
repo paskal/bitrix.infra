@@ -9,7 +9,8 @@ from lxml.html import fromstring
 
 import requests
 
-_redirects_map_path = '../config/nginx/conf.d/redirects-map.conf'
+# the redirect map lives in the private overlay; override via REDIRECTS_MAP env
+_redirects_map_path = os.environ.get('REDIRECTS_MAP', '../private/nginx/sites/redirects-map.conf')
 
 
 class RunTypes(Enum):

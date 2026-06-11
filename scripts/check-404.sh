@@ -3,9 +3,9 @@ set -u
 
 # Print 404s from the nginx access log for redirects troubleshooting.
 # Usage: check-404.sh [log-file]
-# The log file defaults to logs/nginx/access.log or can be set via CHECK_404_LOG.
+# The log file defaults to logs/nginx/prod.access.log or can be set via CHECK_404_LOG.
 
-LOG_FILE="${1:-${CHECK_404_LOG:-logs/nginx/access.log}}"
+LOG_FILE="${1:-${CHECK_404_LOG:-logs/nginx/prod.access.log}}"
 
 if [ ! -f "${LOG_FILE}" ]; then
   echo "ERROR: log file not found: ${LOG_FILE}" >&2

@@ -21,11 +21,6 @@ pip3 install -r requirements.txt
 
 Below is a list of scripts and relevant files found in this directory:
 
-*   **`alter-robots-txt.sh`**
-    *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Updates robots.txt files for regional subdomains, blocking specific sections based on region.
-    *   **Notes:** May take arguments to specify the environment (e.g., dev/prod).
-
 *   **`check-404.sh`**
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Analyzes nginx logs to find 404 errors from search engine bots for redirect troubleshooting.
@@ -211,5 +206,5 @@ search-reindex diagnostics && echo 'All OK'
 
 ### yandex-reviews — Yandex Maps organisation review sync
 
-Fetches reviews for configured Yandex Maps organisation IDs and updates the corresponding Bitrix region properties. Organisation IDs are configured inside the script. Useful for keeping on-site review content in sync with the Yandex Maps listing without manual copy-paste.
+Moved to the private overlay repository (`bin/yandex-reviews` there): the organisation IDs and Bitrix iblock bindings are site-specific.
 
