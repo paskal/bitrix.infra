@@ -1,0 +1,74 @@
+name: validate
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  compose:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create stub environment files
+        run: |
+          for f in private/environment/*.env.example; do
+            cp "$f" "${f%.example}"
+          done
+
+      - name: Validate compose config (bare)
+        run: docker compose config -q
+
+      - name: Validate compose config (all profiles)
+        run: COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose config -q
+
+  nginx:
+    name: nginx -t
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create empty overlay directories (no certs, no CSP stubs)
+        run: |
+          mkdir -p /tmp/nginx-private/sites
+          mkdir -p /tmp/nginx-letsencrypt
+
+      - name: Run nginx -t in ephemeral container
+        run: |
+          docker run --rm \
+            --add-host php:127.0.0.1 \
+            -v "${{ github.workspace }}/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            -v "${{ github.workspace }}/config/nginx/bitrix.conf:/etc/nginx/bitrix.conf:ro" \
+            -v "${{ github.workspace }}/config/nginx/fastcgi.conf:/etc/nginx/fastcgi.conf:ro" \
+            -v "${{ github.workspace }}/config/nginx/bots.conf:/etc/nginx/bots.conf:ro" \
+            -v "${{ github.workspace }}/config/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro" \
+            -v "${{ github.workspace }}/config/nginx/static-cdn.conf:/etc/nginx/static-cdn.conf:ro" \
+            -v "${{ github.workspace }}/config/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "/tmp/nginx-private:/etc/nginx/private.conf.d:ro" \
+            -v "/tmp/nginx-letsencrypt:/etc/nginx/letsencrypt:ro" \
+            ghcr.io/paskal/nginx:latest nginx -t
+
+  shell:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck on shell scripts
+        run: |
+          find scripts bin -type f \( -name "*.sh" -o -perm /111 \) \
+            ! -name "*.py" ! -name "*.txt" ! -name "*.md" \
+            -print0 | xargs -0 file | grep -E 'shell script|POSIX shell' | cut -d: -f1 | \
+            xargs -r shellcheck --severity=error

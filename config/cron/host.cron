@@ -38,11 +38,3 @@ INFRA_DIR=/web
 # cleanup docker runs after 60*24=1440 runs of docker a day in the minimify command
 10 3 * * * root docker system prune -f
 
-# every 10 minutes check block for blog articles for non-main domains
-# using robots.txt, so that these domains won't fight for place under
-# the sun with main one. better to keep blog texts belong to single domain.
-*/10  *  *  *  * root cd $INFRA_DIR && ./scripts/alter-robots-txt.sh >/dev/null 2>&1
-
-# daily at 00:15 Moscow time (21:15 UTC) submit URLs from /web/private/seo-reindex/queue.txt
-# to Yandex Webmaster recrawl, up to remaining daily quota; remove submitted URLs from queue
-15 21  *  *  * admin cd $INFRA_DIR && ./scripts/seo-reindex.sh >/dev/null 2>&1

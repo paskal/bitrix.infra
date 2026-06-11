@@ -1,0 +1,21 @@
+parameters:
+    level: 5
+    paths:
+        - /web/prod/local
+        - /web/prod/bitrix/php_interface/init.php
+        - /web/prod/bitrix/php_interface/include
+    excludePaths:
+        analyseAndScan:
+            # 3rd-party modules injected under php_interface/include — not your code:
+            # - /web/prod/bitrix/php_interface/include/vendor.module.name
+    scanDirectories:
+        - /web/prod/bitrix/modules
+    reportUnmatchedIgnoredErrors: false
+    tmpDir: /var/log/phpstan/tmp-owned
+    ignoreErrors:
+        # Example: suppress a known Bitrix framework false-positive.
+        # Uncomment and adapt as needed:
+        # -
+        #     message: '#^Variable \$APPLICATION might not be defined\.$#'
+        #     paths:
+        #         - /web/prod/local/templates/*

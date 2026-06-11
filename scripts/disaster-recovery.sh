@@ -4,6 +4,8 @@ set -e -u
 # This script sets up clean Ubuntu host machine for bitrix.infra
 # and recovers site files and the DB content from the backup.
 
+# SITE-SPECIFIC operational script: every value below is for favor-group.ru.
+# Forks must replace the variables in this block before use.
 domain="favor-group.ru"
 backup_s3_directory=favor-group-backup
 duplicity_backup_location="boto3+s3://${backup_s3_directory}/duplicity_web_favor-group"
@@ -106,10 +108,18 @@ EOF
 }
 
 create_host_cronjob_if_not_exist() {
-  [ -f "/etc/cron.d/bitrix_infra" ] && return
-  echo "creating /etc/cron.d/bitrix_infra from ./config/cron/host.cron..."
-  ln -s "${PWD}/config/cron/host.cron" /etc/cron.d/bitrix_infra
-  echo "created /etc/cron.d/bitrix_infra"
+  if [ ! -f "/etc/cron.d/bitrix_infra" ]; then
+    echo "creating /etc/cron.d/bitrix_infra from ./config/cron/host.cron..."
+    ln -s "${PWD}/config/cron/host.cron" /etc/cron.d/bitrix_infra
+    echo "created /etc/cron.d/bitrix_infra"
+  fi
+  # site-specific host cron from the private overlay, if checked out
+  if [ -f "${PWD}/private/cron/host-site.cron" ] && [ ! -f "/etc/cron.d/bitrix_site" ]; then
+    chown root:root "${PWD}/private/cron/host-site.cron"
+    chmod 0644 "${PWD}/private/cron/host-site.cron"
+    ln -s "${PWD}/private/cron/host-site.cron" /etc/cron.d/bitrix_site
+    echo "created /etc/cron.d/bitrix_site"
+  fi
 }
 
 zabbix_setup() {

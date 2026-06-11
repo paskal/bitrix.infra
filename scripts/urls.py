@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import os
+import sys
 from argparse import ArgumentParser
 from enum import Enum
 from typing import Optional
@@ -7,8 +9,8 @@ from lxml.html import fromstring
 
 import requests
 
-_redirects_map_path = '../config/nginx/conf.d/redirects-map.conf'
-_default_site = 'https://favor-group.ru'
+# the redirect map lives in the private overlay; override via REDIRECTS_MAP env
+_redirects_map_path = os.environ.get('REDIRECTS_MAP', '../private/nginx/sites/redirects-map.conf')
 
 
 class RunTypes(Enum):
@@ -97,7 +99,7 @@ def main(run_type: str, site: str, urls_file: str, update_redirects: bool):
                 continue
             if run_type == "titles":
                 title = fromstring(resp.content).findtext('.//title')
-                url = resp.url.removeprefix("https://favor-group.ru")
+                url = resp.url.removeprefix(site.rstrip('/'))
                 print(f"{url};{title}")
             if run_type == "redirects":
                 url_checker.check_redirect(resp, absolute_url)
@@ -111,9 +113,10 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--site',
                         dest="site",
-                        default=_default_site,
+                        default=None,
                         type=str,
-                        help='Site URL, needed only if relative links are provided')
+                        help='Site URL, needed only if relative links are provided '
+                             '(also reads SITE_URL env var)')
     parser.add_argument('--file',
                         dest="urls_file",
                         default="urls.txt",
@@ -132,5 +135,10 @@ if __name__ == '__main__':
              " or only pages which are not redirects with wrong status codes."
     )
     opts = parser.parse_args()
-    main(str(opts.run_type), opts.site, opts.urls_file, opts.update_redirects)
+    site = opts.site or os.environ.get('SITE_URL')
+    if site is None:
+        print('ERROR: --site or SITE_URL env var is required', file=sys.stderr)
+        parser.print_usage(sys.stderr)
+        sys.exit(1)
+    main(str(opts.run_type), site, opts.urls_file, opts.update_redirects)
 

@@ -57,7 +57,7 @@ zabbix_export:
               name: 'PHPStan: scan failed (see /var/log/phpstan/owned_last_failure.txt)'
               priority: HIGH
               description: |
-                The scan script wrote a failure sentinel at /var/log/phpstan/owned_last_failure.txt — the latest run did not complete successfully. Read the sentinel for the failure category, then look at /web/logs/phpstan/stderr.log for stderr output and re-run manually with `ssh favor-group 'cd /web && ./scripts/phpstan-scan.sh'`. The sentinel is auto-cleared by the next successful run.
+                The scan script wrote a failure sentinel at /var/log/phpstan/owned_last_failure.txt — the latest run did not complete successfully. Read the sentinel for the failure category, then look at /web/logs/phpstan/stderr.log for stderr output and re-run manually with `ssh your-server 'cd /web && ./scripts/phpstan-scan.sh'`. The sentinel is auto-cleared by the next successful run.
                 
                 Ships enabled. The sentinel only exists after a real failure (the script clears it on success), so on a fresh install this trigger stays silent until something genuinely breaks.
         - uuid: c3d68f7b1e9846a3a4c1d4f4eb5d7a91
@@ -82,6 +82,6 @@ zabbix_export:
               name: 'PHPStan: owned-scope scan has not completed in 8 days'
               priority: WARNING
               description: |
-                The XML file at /var/log/phpstan/owned-latest.xml hasn't been rewritten in more than 8 days — the weekly scan probably failed silently. Check /web/logs/phpstan/stderr.log and any sentinel at /web/logs/phpstan/owned_last_failure.txt for the cause, then re-run manually with `ssh favor-group 'cd /web && ./scripts/phpstan-scan.sh'`.
+                The XML file at /var/log/phpstan/owned-latest.xml hasn't been rewritten in more than 8 days — the weekly scan probably failed silently. Check /web/logs/phpstan/stderr.log and any sentinel at /web/logs/phpstan/owned_last_failure.txt for the cause, then re-run manually with `ssh your-server 'cd /web && ./scripts/phpstan-scan.sh'`.
                 
                 Ships enabled. On a fresh install run the script once before linking the template so the XML file exists; otherwise this trigger fires until the first scheduled scan completes. After that it stays silent until a real failure persists for more than 8 days.
