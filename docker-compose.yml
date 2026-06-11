@@ -70,7 +70,7 @@ services:
       # Logs
       - ./logs/nginx:/var/log/nginx
     environment:
-      - TZ=${TZ:-UTC}
+      - TZ=${TZ:-Europe/Moscow}
 
     logging:
       driver: json-file
@@ -183,7 +183,7 @@ services:
       - ./logs/mysql:/var/log/mysql
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-bitrix}
-      TZ: ${TZ:-UTC}
+      TZ: ${TZ:-Europe/Moscow}
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE
 
