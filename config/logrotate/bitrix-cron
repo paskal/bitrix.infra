@@ -1,0 +1,26 @@
+# Application cron logs written into the webroot by the site's PHP crons
+# (local/cron/*.php — context enrichment, cid-context purge, sitemaps, price
+# update, popularity sort, basket cleanup, URL fixer, …). They live under the
+# docroot, not /web/logs, so the php/nginx rules never matched them and they
+# grew unbounded (cron_events.log reached multiple MB).
+#
+# copytruncate: the host cron appends to these as www-data while it runs and
+# there is no process to signal — truncating in place keeps the open fd valid.
+# The *[!0-9].log glob matches the live logs (…context.log) but not the
+# dated-rotated copies (…context.2026-06-13.log), so rotated files are not
+# re-rotated. Same dateext/keep-forever convention as config/logrotate/php.
+/web/web/prod/local/cron/*[!0-9].log
+/web/web/dev/local/cron/*[!0-9].log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 36500
+	monthly
+	minsize 1M
+	missingok
+	notifempty
+	compress
+	delaycompress
+	copytruncate
+}
