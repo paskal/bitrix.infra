@@ -343,9 +343,26 @@ and run 'docker-compose up -d' to prevent having two hosts sending data to same 
   fi
 }
 
+wait_for_apt_lock() {
+  # Fresh Ubuntu cloud images run unattended-upgrades at boot, which holds the dpkg lock
+  # for ~1-2 min. Without waiting, the first apt-get install (docker) fails and aborts the
+  # whole unattended run. Poll until the lock clears (cap 5 min). No-op if fuser is absent.
+  command -v fuser >/dev/null 2>&1 || return 0
+  i=0
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+    [ "${i}" -eq 0 ] && echo -n "waiting for dpkg lock (unattended-upgrades) to clear..."
+    i=$((i + 1))
+    if [ "${i}" -gt 60 ]; then echo " timeout after 300s" && exit 51; fi
+    sleep 5
+  done
+  [ "${i}" -ne 0 ] && echo " cleared"
+  return 0
+}
+
 ### Main script logic
 
 # Pre-setup
+wait_for_apt_lock
 set_mtu_1450_if_not_set
 install_docker_if_not_installed
 install_docker_compose_if_not_installed
