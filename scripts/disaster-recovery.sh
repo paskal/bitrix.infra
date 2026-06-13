@@ -221,14 +221,24 @@ restore_mysql() {
   backup_directory_path="./backup/"
 
   # retrieving last backup from the S3
+  # Select the most-recent DATED daily dump that is large enough to be real:
+  #  - grep keeps only keys under a /YYYY-MM-DD/ folder, excluding ad-hoc dumps like
+  #    pre-8.4-upgrade/ (which otherwise sorts LAST lexically and would be picked by a
+  #    naive `tail -1`, restoring a months-old DB).
+  #  - awk '$3 > 1000000' drops empty/broken dumps (a failed mysqldump yields a ~20-byte
+  #    gzip; see the size guard in scripts/mysql-dump.sh).
+  #  - sort -k1,2 orders by the object's upload date+time so tail -1 is the newest good one.
   echo -n "looking for the last mysql backup in S3..."
   HOME="/home/$(logname)" backup_filepath=$(/usr/local/bin/aws \
     --endpoint-url=https://storage.yandexcloud.net \
     --recursive \
     s3 ls "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/" |
-    grep .gz |
+    grep -E "/[0-9]{4}-[0-9]{2}-[0-9]{2}/.*-mysqldump\.sql\.gz$" |
+    awk '$3 > 1000000' |
+    sort -k1,2 |
     tail -1 |
     cut -d '/' -f 2-)
+  [ -n "${backup_filepath}" ] || { echo " no valid (>1MB, dated) mysql dump found in S3!" && exit 48; }
   echo " found s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}"
   backup_dir=$(echo "${backup_filepath}" | cut -d "/" -f -1)
   if [ ! -f "${backup_directory_path}${backup_filepath}" ]; then

@@ -51,12 +51,26 @@ echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >"${mysql_config
 
 echo "Backing up MySQL to ${backup_directory}/${backup_file}"
 
-"${mysql_binary_path}"/mysqldump --defaults-extra-file="${mysql_config_inside_container}" --routines --single-transaction --flush-logs --no-tablespaces --ignore-table="${prod_db}.b_user_session" "${prod_db}" | pigz -c >"${backup_directory}/${backup_file}"
+# mysql_binary_path is an intentional multi-word command prefix ("docker exec -u0 mysql /bin");
+# it MUST stay unquoted so the shell word-splits it into argv. Quoting it makes the shell look
+# for a single executable literally named "docker exec -u0 mysql /bin/mysqldump" and fail with
+# "not found", producing an empty (20-byte) gzip that uploads as a silently-broken backup.
+# shellcheck disable=SC2086
+${mysql_binary_path}/mysqldump --defaults-extra-file="${mysql_config_inside_container}" --routines --single-transaction --flush-logs --no-tablespaces --ignore-table="${prod_db}.b_user_session" "${prod_db}" | pigz -c >"${backup_directory}/${backup_file}"
 chmod 0640 "${backup_directory}/${backup_file}"
 chown 1000:1000 "${backup_directory}/${backup_file}"
 
 # clean up tmp file with credentials
 rm -f -- "${mysql_config_file}"
+
+# Sanity guard: a real dump is ~100 MB. mysqldump failures land mid-pipe (before pigz),
+# so `set -e` never fires and pigz emits a valid ~20-byte empty gzip. Refuse to sync a
+# suspiciously small dump so a broken backup can never masquerade as success again.
+backup_size=$(stat -c %s "${backup_directory}/${backup_file}")
+if [ "${backup_size}" -lt 1000000 ]; then
+  echo "ERROR: ${backup_file} is only ${backup_size} bytes (<1 MB); mysqldump likely failed. NOT syncing to S3." >&2
+  exit 1
+fi
 
 echo "Syncing backups to s3://${BACKUP_S3_BUCKET}"
 # sync with S3; also ignore duplicity cache in the backup volume
