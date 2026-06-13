@@ -372,6 +372,8 @@ Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP
 
 To start the full production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d`.
 
+> **Required for ALL ongoing ops, not just startup:** once the overlay is active, `nginx` `depends_on` the profile-gated `adminer`/`updater`, so *every* `docker compose` command — including `ps`, `logs`, `restart`, `down` — fails with `service "nginx" depends on undefined service "updater"` unless `COMPOSE_PROFILES` is set. Export it for the session (`export COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp`) or prefix each invocation. `scripts/disaster-recovery.sh` sets this default itself.
+
 ## File structure
 
 ### /config
