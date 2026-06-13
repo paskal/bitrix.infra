@@ -7,7 +7,7 @@ set -e -u
 # Create directories that docker file-mounts require to exist as files, not dirs.
 # Without this, docker creates them as directories on first mount, breaking the container.
 echo "Creating required directories..."
-mkdir -p logs/nginx logs/php logs/mysql logs/phpstan \
+mkdir -p logs/nginx logs/php logs/mysql logs/phpstan logs/backup \
   private/mysqld private/mysql-data private/nginx \
   private/letsencrypt \
   web/prod web/dev

@@ -280,6 +280,9 @@ services:
       - ./private/mysqld:/var/run/mysqld
       # PHPStan output (read-only): system.run["cat /var/log/phpstan/owned_errors_count.txt"]
       - ./logs/phpstan:/var/log/phpstan:ro
+      # backup status files (read-only): mysql-last-size.txt / files-last.txt, written by
+      # scripts/mysql-dump.sh + file-backup.sh on success — feeds the "Backup monitoring" template
+      - ./logs/backup:/var/log/backup:ro
 
     logging:
       driver: json-file

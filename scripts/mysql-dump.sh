@@ -76,4 +76,12 @@ echo "Syncing backups to s3://${BACKUP_S3_BUCKET}"
 # sync with S3; also ignore duplicity cache in the backup volume
 HOME=/home/admin /usr/local/bin/aws --endpoint-url="${S3_ENDPOINT_URL}" s3 sync "${backup_directory_path}" "s3://${BACKUP_S3_BUCKET}/mysql_$(hostname)/" --exclude '.duplicity-cache/*'
 
+# Monitoring status file — written ONLY on a fully successful run (guard passed + sync done).
+# The zabbix-agent reads it read-only via ./logs/backup:/var/log/backup; a stale mtime means
+# the dump has been failing, and the size value is a secondary guard. See the "Backup monitoring"
+# Zabbix template (config/zabbix/templates/backup-monitoring.yaml).
+mkdir -p ./logs/backup
+echo "${backup_size}" > ./logs/backup/mysql-last-size.txt
+chown -R 1000:1000 ./logs/backup 2>/dev/null || true
+
 echo "Backup is complete"

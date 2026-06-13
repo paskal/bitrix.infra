@@ -1,0 +1,86 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 0487efa252e54a088a8177631b601213
+      name: Backups
+  templates:
+    - uuid: 54b25a8974af431289635b15beecc0b0
+      template: 'Backup monitoring'
+      name: 'Backup monitoring'
+      description: |
+        Watches the S3 backup pipeline by reading status files that scripts/mysql-dump.sh and
+        scripts/file-backup.sh write ONLY on a fully successful run, into ./logs/backup (mounted
+        read-only into the zabbix-agent at /var/log/backup).
+
+        Key design: the status files are written on success only, so a failing backup leaves the
+        file STALE — the freshness triggers catch a silently-broken pipeline that an
+        "is there a file" check would miss. Caught 2026-06-13: six consecutive MySQL dumps were
+        20-byte empty gzips for ~44h with no alert. See bitrix.infra README/CLAUDE.md.
+      groups:
+        - name: Backups
+      items:
+        - uuid: 6772ecceefed46b6bc5e01aad9a78d61
+          name: 'MySQL dump: last good size (bytes)'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["cat /var/log/backup/mysql-last-size.txt 2>/dev/null || echo 0"]'
+          delay: 10m
+          history: 90d
+          units: B
+          description: |
+            Byte size of the most recent SUCCESSFUL mysqldump (written by scripts/mysql-dump.sh after
+            the >1MB guard passed and the S3 sync completed). Falls back to 0 if the file is missing.
+          tags:
+            - tag: Application
+              value: Backups
+          triggers:
+            - uuid: 53f9ec5532094314af028d36bb733a7d
+              expression: 'last(/Backup monitoring/system.run["cat /var/log/backup/mysql-last-size.txt 2>/dev/null || echo 0"])<1000000'
+              name: 'Backup: MySQL dump is empty/tiny (<1MB) or missing'
+              priority: HIGH
+              description: |
+                The last recorded MySQL dump is under 1 MB (a healthy dump is ~100 MB). Either mysqldump
+                failed (the script's guard now refuses to sync such a dump) or the status file is gone.
+                Check `ssh favor-group 'cd /web && ./scripts/mysql-dump.sh'` output and /web/logs/php.
+        - uuid: 74889e0dda8b4ad983641a16d3840e41
+          name: 'MySQL dump: time since last good dump'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.time[/var/log/backup/mysql-last-size.txt,modify]'
+          delay: 10m
+          history: 90d
+          value_type: UNSIGNED
+          description: |
+            Modify time (epoch) of the MySQL dump status file. Updated only on a successful dump, so a
+            growing age means the dump has been failing. Dumps run twice daily (01:05 + 15:05 MSK).
+          tags:
+            - tag: Application
+              value: Backups
+          triggers:
+            - uuid: b616410ab07c422d931996111feb88d8
+              expression: '(now()-last(/Backup monitoring/vfs.file.time[/var/log/backup/mysql-last-size.txt,modify]))>93600'
+              name: 'Backup: no successful MySQL dump in >26h'
+              priority: HIGH
+              description: |
+                No successful MySQL dump for over 26 hours (dumps run twice daily, so this means at least
+                two consecutive runs failed or cron is not firing). This is the trigger that would have
+                caught the 2026-06-13 empty-dump outage. Investigate scripts/mysql-dump.sh / host cron.
+        - uuid: fa50a1d49e6b42eea5f857c44b9fe298
+          name: 'File backup: time since last good duplicity run'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.time[/var/log/backup/files-last.txt,modify]'
+          delay: 10m
+          history: 90d
+          value_type: UNSIGNED
+          description: |
+            Modify time (epoch) of the duplicity file-backup status file, written only after duplicity
+            exits 0 (it prints no completion summary of its own). File backup runs daily at 01:25 MSK.
+          tags:
+            - tag: Application
+              value: Backups
+          triggers:
+            - uuid: fdcf7c86fe9f41028eec65c289bfaae8
+              expression: '(now()-last(/Backup monitoring/vfs.file.time[/var/log/backup/files-last.txt,modify]))>108000'
+              name: 'Backup: no successful file (duplicity) backup in >30h'
+              priority: HIGH
+              description: |
+                No successful duplicity file backup for over 30 hours (it runs daily, so this means a
+                run was missed or is failing). Check scripts/file-backup.sh output and /web/logs/duplicity.log.

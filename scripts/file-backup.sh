@@ -43,3 +43,10 @@ HOME="/home/admin" duplicity \
   --exclude '**/.cache' \
   --exclude '**/.idea' \
   "${src}" "${dest}"
+
+# Monitoring status file — written only after duplicity exits 0 (set -e aborts otherwise).
+# duplicity 3.x prints no completion summary, so this mtime is the freshness signal the
+# zabbix-agent reads via ./logs/backup:/var/log/backup. See backup-monitoring Zabbix template.
+mkdir -p /web/logs/backup
+date +%s > /web/logs/backup/files-last.txt
+chown -R 1000:1000 /web/logs/backup 2>/dev/null || true
