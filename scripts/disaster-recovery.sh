@@ -198,19 +198,41 @@ https://connect.yandex.ru/portal/services/webmaster/resources/${domain} \
 }
 
 backup_restore() {
-  if [ -d "./private" ]; then
-    echo "${PWD}/private folder already exist, delete it if you want to restore files from backup"
+  # Idempotency marker: gate on a flag the restore itself writes, NOT on the mere
+  # existence of ./private — that directory is tracked in git (ships *.env.example,
+  # phpstan/), so it is ALWAYS present on a fresh clone and a `[ -d ./private ]` check
+  # silently skips the entire S3 restore on every run.
+  restore_marker="${PWD}/.dr-file-restore-done"
+  if [ -f "${restore_marker}" ]; then
+    echo "file restore already completed (${restore_marker} present); skipping. Delete it to re-restore."
     return
   fi
-  echo "Restoring file backup..."
+  # duplicity 3.x (Ubuntu 24.04) REFUSES to restore into a non-empty target ("--force"
+  # no longer covers restore as it did in 0.8.x), and the clone already populated ${PWD}.
+  # So restore into an empty staging dir, then merge over the clone — the real private/
+  # secrets, web/prod and the override symlink overwrite the tracked placeholders.
+  echo "Restoring file backup to staging directory..."
+  staging="${PWD}/.dr-restore"
+  rm -rf "${staging}"
+  mkdir -p "${staging}" "${PWD}/logs"
   HOME="/home/$(logname)" duplicity \
     --no-encryption \
     --s3-endpoint-url https://storage.yandexcloud.net \
-    --log-file /web/logs/duplicity.log \
+    --log-file "${PWD}/logs/duplicity.log" \
     --archive-dir /root/.cache/duplicity \
     --force \
-    "${duplicity_backup_location}" "${PWD}"
-  echo "Server has latest backup of files and DB restored!"
+    "${duplicity_backup_location}" "${staging}"
+  # duplicity 3.x prints no completion summary, so assert the restore actually produced
+  # the secrets we depend on before merging (catches a silent/partial restore).
+  if [ ! -f "${staging}/private/environment/mysql.env" ]; then
+    echo "ERROR: restore did not produce private/environment/mysql.env — aborting." >&2
+    exit 49
+  fi
+  echo "merging restored files into ${PWD} (this can take a few minutes)..."
+  cp -a "${staging}/." "${PWD}/"
+  rm -rf "${staging}"
+  touch "${restore_marker}"
+  echo "Server has latest backup of files restored!"
   echo "Linking logrotate configuration to /etc/logrotate.d/..."
   ln -sf /web/config/logrotate/* /etc/logrotate.d/
   ./scripts/fix-rights.sh
@@ -221,14 +243,24 @@ restore_mysql() {
   backup_directory_path="./backup/"
 
   # retrieving last backup from the S3
+  # Select the most-recent DATED daily dump that is large enough to be real:
+  #  - grep keeps only keys under a /YYYY-MM-DD/ folder, excluding ad-hoc dumps like
+  #    pre-8.4-upgrade/ (which otherwise sorts LAST lexically and would be picked by a
+  #    naive `tail -1`, restoring a months-old DB).
+  #  - awk '$3 > 1000000' drops empty/broken dumps (a failed mysqldump yields a ~20-byte
+  #    gzip; see the size guard in scripts/mysql-dump.sh).
+  #  - sort -k1,2 orders by the object's upload date+time so tail -1 is the newest good one.
   echo -n "looking for the last mysql backup in S3..."
   HOME="/home/$(logname)" backup_filepath=$(/usr/local/bin/aws \
     --endpoint-url=https://storage.yandexcloud.net \
     --recursive \
     s3 ls "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/" |
-    grep .gz |
+    grep -E "/[0-9]{4}-[0-9]{2}-[0-9]{2}/.*-mysqldump\.sql\.gz$" |
+    awk '$3 > 1000000' |
+    sort -k1,2 |
     tail -1 |
     cut -d '/' -f 2-)
+  [ -n "${backup_filepath}" ] || { echo " no valid (>1MB, dated) mysql dump found in S3!" && exit 48; }
   echo " found s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}"
   backup_dir=$(echo "${backup_filepath}" | cut -d "/" -f -1)
   if [ ! -f "${backup_directory_path}${backup_filepath}" ]; then
@@ -252,6 +284,19 @@ restore_mysql() {
 
   mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
   echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >"${mysql_config_file}"
+
+  # start_services() returns as soon as `up -d` exits, but MySQL needs ~30s to initialise
+  # and accept socket connections. Without this wait the first query fails with
+  # "ERROR 2002 ... Can't connect ... through socket" and set -e aborts the whole restore.
+  echo -n "waiting for MySQL to accept connections..."
+  wait_i=0
+  until docker exec mysql mysqladmin ping --silent >/dev/null 2>&1; do
+    wait_i=$((wait_i + 1))
+    if [ "${wait_i}" -gt 60 ]; then echo " timeout after 180s" && exit 50; fi
+    sleep 3
+  done
+  echo " ready"
+
   prod_db_tables=$(
     docker exec -u0 mysql /bin/mysql \
       --defaults-extra-file="${mysql_config_inside_container}" \
@@ -271,6 +316,14 @@ restore_mysql() {
 }
 
 start_services() {
+  # The production overlay makes nginx depend on profile-gated services (adminer=dbadmin,
+  # updater=hooks), so a bare `docker compose <cmd>` errors at project load with
+  # "service nginx depends on undefined service updater". Default to the full prod set;
+  # an operator can override BEFORE running (e.g. a rehearsal that must not touch the live
+  # DNS zone or Zabbix exports COMPOSE_PROFILES=dbadmin,hooks,ftp to skip certs+monitoring).
+  : "${COMPOSE_PROFILES:=certs,dbadmin,monitoring,hooks,ftp}"
+  export COMPOSE_PROFILES
+  echo "starting services with COMPOSE_PROFILES=${COMPOSE_PROFILES}"
   echo "pulling docker images..."
   docker compose pull >/dev/null 2>&1 || true
   echo "building docker images..."

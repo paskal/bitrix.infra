@@ -372,6 +372,8 @@ Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP
 
 To start the full production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d`.
 
+> **Required for ALL ongoing ops, not just startup:** once the overlay is active, `nginx` `depends_on` the profile-gated `adminer`/`updater`, so *every* `docker compose` command — including `ps`, `logs`, `restart`, `down` — fails with `service "nginx" depends on undefined service "updater"` unless `COMPOSE_PROFILES` is set. Export it for the session (`export COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp`) or prefix each invocation. `scripts/disaster-recovery.sh` sets this default itself.
+
 ## File structure
 
 ### /config
@@ -523,21 +525,50 @@ For a more dynamic approach to switching PHP versions, you could consider:
 <details>
 <summary>Disaster recovery</summary>
 
-To start the recovery you should have a machine with the latest Ubuntu with static external IP with DDoS protection attached to it, created [in Yandex Cloud](https://console.yandex.cloud/) (your folder → Compute Cloud). It should be created with 100Gb of disk space, 12Gb of RAM and 8 cores.
+You need an Ubuntu host in [Yandex Cloud](https://console.yandex.cloud/) (your folder → Compute Cloud). Production sizing is 100 GB disk / 12 GB RAM / 8 cores; for a **rehearsal** (standing up a second machine to validate the runbook, DNS switched later) 2 cores / 8 GB is enough.
 
-SSH to the machine you want to set up as a new server and then execute the following, then follow the instructions of the script:
+**Provision the VM (`yc` CLI).** This one command is the whole "create a machine" step — it boots the latest non-OS-Login Ubuntu 24.04 and installs your SSH key for user `yc-user`:
 
 ```shell
-# that is preparation for backup restoration
+# pick the newest NON-oslogin 24.04 image id (the plain `ubuntu-2404-lts` family
+# lives in the `standard-images` folder, not yours — you must look it up by folder):
+IMAGE_ID=$(yc compute image list --folder-id standard-images --format json \
+  | python3 -c 'import sys,json;print([i["id"] for i in json.load(sys.stdin) if i["family"]=="ubuntu-2404-lts"][0])')
+
+yc compute instance create \
+  --name dr-rehearsal \
+  --zone ru-central1-a \
+  --platform standard-v3 \
+  --cores 2 --memory 8GB --core-fraction 100 \
+  --create-boot-disk image-id="$IMAGE_ID",size=100GB,type=network-ssd \
+  --network-interface subnet-id=<SUBNET_ID_IN_THAT_ZONE>,nat-ip-version=ipv4 \
+  --ssh-key ~/.ssh/id_ed25519.pub
+# subnet id: `yc vpc subnet list`. Public IP is printed under network_interfaces → one_to_one_nat → address.
+```
+
+Gotchas that otherwise eat ten minutes (all confirmed 2026-06-13):
+- **Use `--ssh-key <pubkey>`, not a cloud-init `users:` block.** These standard images run cloud-init with the **EC2 datasource**; a `user-data` `users:` block silently fails (`cloud-final.service` errors) and no login user is created. `--ssh-key` sets the `ssh-keys` metadata and creates `yc-user` reliably. Log in as **`yc-user`** (not `ubuntu`/`admin`).
+- **SSH with the matching private key.** `--ssh-key` only takes the `.pub`; make sure its private half is the one your client offers (`ssh -i <privkey>` or an `ssh-agent` that has it). A `.pub` whose private key you don't hold will hard-fail with `Permission denied (publickey)` no matter what.
+- **`image-family=` alone resolves against *your* folder and 404s** with `Image "ubuntu-2404-lts" not found`. Pass the explicit `image-id` from `standard-images` (above) or add `image-folder-id=standard-images`.
+- **Recreate ≠ instant.** `yc compute instance delete` then immediately re-`create` with the same `--name` fails while the old one is still `DELETING`. Wait it out: `until ! yc compute instance list | grep -q dr-rehearsal; do sleep 8; done`.
+
+Then SSH in (as `yc-user`) and run the restore — it is safe to run multiple times:
+
+```shell
+# preparation for backup restoration
 sudo mkdir -p /web
-sudo chown $USER:$(id -g -n) /web
+sudo chown "$USER":"$(id -g -n)" /web
 sudo apt-get update >/dev/null
 sudo apt-get -y install git >/dev/null
 git clone https://github.com/paskal/bitrix.infra.git /web
 cd /web
-# backup restoration, it's safe to run it multiple times
+# backup restoration, then follow the script's instructions
 sudo ./scripts/disaster-recovery.sh
 ```
+
+**Rehearsal safety (when the new box must NOT disturb live prod — DNS still points at prod):**
+- The script's `start_services` runs bare `docker compose up -d`; with the restored production overlay (`nginx` `depends_on` `adminer`+`updater`) modern compose errors unless profiles are set. Bring the stack up **without** `certs` and `monitoring`: `COMPOSE_PROFILES=dbadmin,hooks,ftp docker compose up -d`. Omitting `certs` means no Let's Encrypt **DNS-01 challenge writes to the live DNS zone**; omitting `monitoring` avoids a duplicate `ZBX_HOSTNAME` colliding with prod in Zabbix. The real prod TLS cert is restored from `private/letsencrypt/`, so HTTPS still serves — verify with `curl -k --resolve favor-group.ru:443:<new-ip> https://favor-group.ru/`.
+- **Do not let the host cron fire on the rehearsal box.** `create_host_cronjob_if_not_exist` installs `/etc/cron.d/bitrix_infra`, whose jobs push to the **same S3 backup paths as prod** (`file-backup.sh`, `mysql-dump.sh`) and submit SEO reindex requests. Remove it right after the script: `sudo rm -f /etc/cron.d/bitrix_infra /etc/cron.d/bitrix_site`. Likewise `docker compose stop php-cron` to keep the in-container site cron (exports, price updates) from running against external services twice.
 
 </details>
 
