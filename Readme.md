@@ -439,6 +439,50 @@ Site files in directories `web/prod` and `web/dev`.
 
 - `private/msmtprc` — [msmtp configuration](https://wiki.archlinux.org/index.php/Msmtp) for PHP mail sending
 
+## Composite site (Bitrix "Композит")
+
+nginx is preconfigured to serve Bitrix composite snapshots **directly, without
+PHP** (~0.03s) for anonymous, parameter-less `GET` requests, and to answer
+`If-Modified-Since` with `304`. The wiring lives in `config/nginx/bitrix.conf`
+(`location /` + `@bitrix`) and `config/nginx/conf.d/composite.conf` (the
+`$bx_composite_file` map). It ships **enabled-by-default but inert**: with Bitrix
+composite off there are no snapshots, so every request falls through to PHP —
+behaviour is identical to a non-composite site. Nothing to configure in nginx.
+
+To turn it on:
+
+1. **Admin → Settings → Composite site** (`/bitrix/admin/composite.php`) → enable.
+   Choose **file** storage (it supports `304` and is what nginx serves; do not
+   use memcached storage for composite).
+2. Register every domain (incl. subdomains) in the composite domain list.
+3. **Exclude what must stay dynamic** (composite is opt-out):
+   - Non-cacheable templates (admin, account, checkout) and personalised pages:
+     add an `OnEpilog` handler that calls
+     `\Bitrix\Main\Composite\Engine::setEnable(false)` for those — keying on
+     `SITE_TEMPLATE_ID` is robust. `setEnable(false)` is a no-op while composite
+     is off, so the handler is safe to deploy ahead of enabling.
+   - Strip ad/tracking query params (utm/yclid/gclid/yd_\*/ga_\*/…) via the
+     composite **"Игнорировать параметры URL"** setting, so ad clicks collapse to
+     one snapshot instead of one-per-click.
+4. **Verify**: a 2nd anonymous GET of a content page is served by nginx
+   (`Last-Modified` + `ETag`, **no** `X-Bitrix-Composite` header), and
+   `If-Modified-Since` → `304`; an ad-param URL, a logged-in cookie, and `POST`
+   all fall through to PHP (`X-Bitrix-Composite: Cache` or a full render).
+
+To turn it off: disable composite in the admin. nginx reverts to PHP serving
+automatically — no nginx change needed.
+
+**Deploy note:** `bitrix.conf` is bind-mounted into the nginx container as a
+single file, which pins it to the inode present at container start. Editing it
+on a running stack via an atomic write (`git pull`, `rsync` without
+`--inplace`) replaces the inode, so the container keeps serving the OLD file and
+`nginx -s reload` won't pick up the change. After changing `bitrix.conf` (or any
+single-file-mounted conf) on a running stack, **restart the nginx container**
+(`docker restart <nginx>` / `docker compose up -d nginx`), not just reload. A
+fresh `docker compose up` is unaffected — it binds the current inode. Files
+under directory mounts (`conf.d/`, the private overlay) pick up changes without a
+restart.
+
 ## Managing Optional Services with Profiles
 
 This project uses Docker Compose profiles to manage optional services. This allows you to run only the services you need, saving resources. The core services (`nginx`, `php`, `php-cron`, `mysql`, `memcached`, `memcached-sessions`) will always start.
