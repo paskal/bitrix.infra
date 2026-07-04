@@ -12,4 +12,4 @@
 # Standard Bitrix cron agent runner — required for all Bitrix installations.
 # Site-specific jobs (exports, sitemap generators, popularity sort, etc.) belong
 # in a private overlay cron file mounted as a second /etc/cron.d entry.
-*  *  *  *  * www-data /usr/bin/php /web/prod/bitrix/modules/main/tools/cron_events.php 2>&1 >>/web/prod/local/cron/cron_events.log
+*  *  *  *  * www-data /usr/bin/php /web/prod/bitrix/modules/main/tools/cron_events.php >>/web/prod/local/cron/cron_events.log 2>&1
