@@ -431,7 +431,7 @@ submit_url() {
 		return 1
 	fi
 
-	response=$(api_call POST "/user/$YANDEX_USER_ID/hosts/$host_id/recrawl/queue" "{\"url\": \"$url\"}")
+	response=$(api_call POST "/user/$YANDEX_USER_ID/hosts/$host_id/recrawl/queue" "$(jq -n --arg url "$url" '{url: $url}')")
 	task_id=$(echo "$response" | jq -r '.task_id // empty')
 	quota=$(echo "$response" | jq -r '.quota_remainder // empty')
 	error=$(echo "$response" | jq -r '.error_code // empty')

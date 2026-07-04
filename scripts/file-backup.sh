@@ -20,6 +20,10 @@ cache_dir="${src}/backup/.duplicity-cache"
 dest="boto3+s3://${BACKUP_S3_BUCKET}/duplicity_web_$(hostname)"
 
 # HOME is required to read .aws/credentials from it
+# NOTE: --no-encryption uploads to S3 in cleartext, including private/environment/*.env
+# (MySQL root password, OAuth/AWS tokens) which is NOT excluded below. The bucket ACL is
+# the only protection — keep the bucket private. Matches the DR restore path, which also
+# runs --no-encryption (see scripts/disaster-recovery.sh).
 HOME="/home/admin" duplicity \
   --no-encryption \
   --full-if-older-than 60D \

@@ -30,7 +30,9 @@ mkdir -p "${CACHE_DIR}"
 
 # Function to list available backups
 list_backups() {
-  echo "Listing available backups..."
+  # stderr: this function's stdout is captured by select_backup via $(...),
+  # so only the backup list itself may go to stdout.
+  echo "Listing available backups..." >&2
 
   # Use duplicity to list all available backups
   HOME="${HOME_DIR}" duplicity \
@@ -52,29 +54,36 @@ select_backup() {
 
   # Check if we have any backups
   if [ -z "${available_backups}" ]; then
-    echo "No backups found. Exiting."
+    echo "No backups found. Exiting." >&2
     exit 1
   fi
 
-  # Display backups and let user choose
-  echo "${prompt}"
-  echo "Available backups:"
+  # Everything the user sees goes to stderr; only the chosen timestamp is
+  # printed to stdout, because the whole function is captured via $(...).
+  echo "${prompt}" >&2
+  echo "Available backups:" >&2
 
-  # Convert to array for selection
-  IFS=$'\n' read -rd '' -a backup_array <<<"${available_backups}"
+  # Convert to array for selection. A while-read loop is portable (mapfile is
+  # bash 4+, absent on macOS bash 3.2) and set -e-safe (the old `read -d ''`
+  # returned 1 at EOF and aborted the whole script under set -e).
+  local backup_array=() line
+  while IFS= read -r line; do
+    backup_array+=("$line")
+  done <<<"${available_backups}"
 
   # Display menu
+  local i
   for i in "${!backup_array[@]}"; do
-    echo "$((i + 1))) ${backup_array[$i]}"
+    echo "$((i + 1))) ${backup_array[$i]}" >&2
   done
 
-  # Get user selection
+  # Get user selection (read -rp writes the prompt to stderr)
   local selection
   read -rp "Select backup number: " selection
 
   # Validate selection
   if ! [[ "${selection}" =~ ^[0-9]+$ ]] || [ "${selection}" -lt 1 ] || [ "${selection}" -gt "${#backup_array[@]}" ]; then
-    echo "Invalid selection. Please try again."
+    echo "Invalid selection. Please try again." >&2
     exit 1
   fi
 
