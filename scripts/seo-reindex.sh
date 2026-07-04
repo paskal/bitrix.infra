@@ -65,8 +65,9 @@ CONSUMED=0  # physical queue lines processed (used for truncation)
 
 # `|| [ -n "$URL" ]` so a final line with no trailing newline is still processed.
 while IFS= read -r URL || [ -n "$URL" ]; do
-  # Stop once we've submitted a full quota's worth of URLs; the line we stop on
-  # is left unread so it stays at the head of the queue for the next run.
+  # Stop once we've submitted a full quota's worth of URLs. The line just read
+  # into URL is not counted in CONSUMED before we break, so truncation by
+  # CONSUMED leaves it at the head of the queue for the next run.
   [ "$ATTEMPTED" -ge "$BATCH" ] && break
   CONSUMED=$((CONSUMED + 1))
 

@@ -83,7 +83,7 @@ select_backup() {
 
   # Validate selection
   if ! [[ "${selection}" =~ ^[0-9]+$ ]] || [ "${selection}" -lt 1 ] || [ "${selection}" -gt "${#backup_array[@]}" ]; then
-    echo "Invalid selection. Please try again." >&2
+    echo "Invalid selection." >&2
     exit 1
   fi
 
