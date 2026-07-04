@@ -30,7 +30,11 @@ chmod 0644 ./config/cron/*
 # overlay cron files are bind-mounted into /etc/cron.d and must be root-owned too
 if [ -d ./private/cron ]; then
   chown -R 0:0 ./private/cron
-  chmod 0644 ./private/cron/*.cron
+  # guard the glob: an empty private/cron/ would leave *.cron literal and error
+  for f in ./private/cron/*.cron; do
+    [ -e "$f" ] || continue
+    chmod 0644 "$f"
+  done
 fi
 
 # logrotate configuration should be owned by root,

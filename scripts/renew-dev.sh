@@ -3,7 +3,7 @@ set -e -u
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Please run with sudo, 'sudo $0'"
-  exit
+  exit 1
 fi
 
 # This script recreates dev site from current prod one with deleting old dev in the process

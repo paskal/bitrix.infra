@@ -4,7 +4,7 @@
 # submits as many as today's quota allows, removes submitted ones from the queue,
 # appends a summary block to /web/private/seo-reindex/progress_log.md.
 #
-# Cron: 15 21 * * *  (21:15 UTC == 00:15 Moscow time, runs as root)
+# Cron: 15 21 * * *  (21:15 UTC == 00:15 Moscow time, runs as admin)
 
 set -euo pipefail
 
@@ -60,19 +60,25 @@ echo "queue: $QUEUE_LEN urls, will attempt: $BATCH"
 
 OK=0
 FAIL=0
-ATTEMPTED=0
+ATTEMPTED=0 # URLs actually submitted (quota consumed)
+CONSUMED=0  # physical queue lines processed (used for truncation)
 
-while IFS= read -r URL; do
+# `|| [ -n "$URL" ]` so a final line with no trailing newline is still processed.
+while IFS= read -r URL || [ -n "$URL" ]; do
+  # Stop once we've submitted a full quota's worth of URLs; the line we stop on
+  # is left unread so it stays at the head of the queue for the next run.
   [ "$ATTEMPTED" -ge "$BATCH" ] && break
-  ATTEMPTED=$((ATTEMPTED + 1))
+  CONSUMED=$((CONSUMED + 1))
 
-  # Skip blanks/comments without consuming a slot (rare but possible).
+  # Skip blanks/comments without consuming a quota slot (they are still consumed
+  # from the queue via CONSUMED above, so they don't desync the truncation).
   case "$URL" in
   '' | \#*)
-    ATTEMPTED=$((ATTEMPTED - 1))
     continue
     ;;
   esac
+
+  ATTEMPTED=$((ATTEMPTED + 1))
 
   HOST_PART=$(echo "$URL" | awk -F/ '{print $3}')
   if [ -z "$HOST_PART" ]; then
@@ -85,7 +91,7 @@ while IFS= read -r URL; do
   RESP=$(curl -sS --max-time 30 -X POST \
     -H "Authorization: OAuth $YANDEX_WEBMASTER_TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"url\":\"$URL\"}" \
+    -d "$(jq -n --arg url "$URL" '{url: $url}')" \
     "https://api.webmaster.yandex.net/v4/user/$YANDEX_WEBMASTER_USER_ID/hosts/$HOST_ID/recrawl/queue/" 2>&1 ||
     echo '{"error_code":"CURL_FAILED"}')
 
@@ -99,10 +105,11 @@ while IFS= read -r URL; do
   sleep 0.2
 done <"$QUEUE"
 
-# Remove the first ATTEMPTED lines from the queue (success or fail -- both consume quota,
-# and a persistent failure should not block the queue head). Operator can re-queue from logs.
-if [ "$ATTEMPTED" -gt 0 ]; then
-  tail -n +"$((ATTEMPTED + 1))" "$QUEUE" >"$QUEUE.tmp"
+# Remove the CONSUMED physical lines from the queue head (URLs plus any blank/comment
+# lines processed). Both submitted and failed URLs consume quota, and a persistent
+# failure should not block the queue head; the operator can re-queue from the logs.
+if [ "$CONSUMED" -gt 0 ]; then
+  tail -n +"$((CONSUMED + 1))" "$QUEUE" >"$QUEUE.tmp"
   mv "$QUEUE.tmp" "$QUEUE"
 fi
 REMAINING_LINES=$(wc -l <"$QUEUE")
@@ -112,7 +119,7 @@ REMAINING_LINES=$(wc -l <"$QUEUE")
   echo "### $(date -u +'%Y-%m-%d %H:%M') UTC -- server cron"
   echo "- Attempted: $ATTEMPTED (ok $OK / fail $FAIL)"
   echo "- Quota at start: $REMAINING / $DAILY"
-  echo "- Removed from queue.txt: $ATTEMPTED"
+  echo "- Removed from queue.txt: $CONSUMED"
   echo "- Remaining in queue.txt: $REMAINING_LINES"
   echo "- Log: $LOG"
 } >>"$PROGRESS"
