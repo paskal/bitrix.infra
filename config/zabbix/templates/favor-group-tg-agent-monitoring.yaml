@@ -17,7 +17,7 @@ zabbix_export:
           key: tgagent.adscron.status
           delay: '0'
           history: 90d
-          description: 'Exit code of the latest ads-cron daily/weekly run (0 = report posted or correctly skipped as duplicate). Pushed by tg-agent/cron/ads-cron-run.sh on terrty after every run: daily at 21:00 UTC Sunday-Friday, so the longest normal silence is the Saturday gap (Friday 21:00 -> Sunday 21:00, 48h).'
+          description: 'Exit code of the latest ads-cron daily/weekly run (0 = report posted or correctly skipped as duplicate). Pushed by tg-agent/cron/ads-cron-run.sh on terrty after every run: daily at 21:00 UTC Monday-Friday and weekly at 15:00 UTC Monday (18:00 MSK). The longest normal silence is 66h (Friday 21:00 UTC -> Monday 15:00 UTC).'
           tags:
             - tag: Application
               value: tg-agent
@@ -29,8 +29,8 @@ zabbix_export:
               description: 'The unattended ads report run exited non-zero. Most likely the shared claude.ai OAuth login in the favor-tg-agent_claude-auth volume expired (this also silently kills all three Telegram bots). Check tg-agent/data/ads-cron/cron.log on terrty; re-login per tg-agent/README.md (interactive claude session in any agent container). Clears on the next successful run.'
               manual_close: 'YES'
             - uuid: 5e762b2c957f4d2ca18d46722ce57c97
-              expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.adscron.status,54h)=1'
-              name: 'tg-agent ads-cron has not reported for 54h'
+              expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.adscron.status,70h)=1'
+              name: 'tg-agent ads-cron has not reported for 70h'
               priority: AVERAGE
-              description: 'No exit-code push for over 54h — the host crontab entry is gone, docker compose is broken, or the wrapper can''t reach zabbix. Normal max gap is 48h (no run covering Saturday). Check crontab -l and tg-agent/data/ads-cron/cron.log on terrty.'
+              description: 'No exit-code push for over 70h — the host crontab entry is gone, docker compose is broken, or the wrapper can''t reach zabbix. Normal max gap is 66h (Friday 21:00 UTC -> Monday weekly run at 15:00 UTC). The 70h threshold allows four hours for the weekly run to complete, while still alerting at Monday 19:00 UTC before the 21:00 UTC daily push can mask a missed weekly run. Check crontab -l and tg-agent/data/ads-cron/cron.log on terrty.'
               manual_close: 'YES'
