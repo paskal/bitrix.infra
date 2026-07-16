@@ -370,9 +370,9 @@ Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP
 
 > **Security note:** a fresh public clone serves **no `Content-Security-Policy`** — the CSP includes are globs that match nothing until an overlay supplies `private/nginx/bitrix_csp_headers.conf` / `static_csp_headers.conf` (deliberate: a copy-pasted CSP is worse than none). Before pointing a real domain at this stack, create those files; a minimal starting point is `add_header Content-Security-Policy "default-src 'self';" always;`.
 
-To start the full production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d`.
+To start the regular production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks docker compose up -d`.
 
-> **Required for ALL ongoing ops, not just startup:** once the overlay is active, `nginx` `depends_on` the profile-gated `adminer`/`updater`, so *every* `docker compose` command — including `ps`, `logs`, `restart`, `down` — fails with `service "nginx" depends on undefined service "updater"` unless `COMPOSE_PROFILES` is set. Export it for the session (`export COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp`) or prefix each invocation. `scripts/disaster-recovery.sh` sets this default itself.
+> **Required for ALL ongoing ops, not just startup:** once the overlay is active, `nginx` `depends_on` the profile-gated `adminer`/`updater`, so *every* `docker compose` command, including `ps`, `logs`, `restart` and `down`, fails with `service "nginx" depends on undefined service "updater"` unless `COMPOSE_PROFILES` is set. Export it for the session (`export COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks`) or prefix each invocation. `scripts/disaster-recovery.sh` sets this default itself. Do not include the manual FTP profile in this default.
 
 ## File structure
 
@@ -495,7 +495,7 @@ Here are the available profiles and the services they enable:
 *   **`monitoring`**: Enables `zabbix-agent` for Zabbix monitoring.
 *   **`dbadmin`**: Enables `adminer` for database administration.
 *   **`hooks`**: Enables `updater` for handling webhooks.
-*   **`ftp`**: Enables `ftp` for FTP access.
+*   **`ftp-manual`**: Enables temporary FTP access. This profile is deliberately excluded from regular production operations.
 
 **Examples:**
 
@@ -504,24 +504,20 @@ Here are the available profiles and the services they enable:
     docker-compose up -d
     ```
 
-*   To run core services plus `adminer` and `ftp`:
+*   To start FTP for a temporary access window:
     ```bash
-    docker-compose --profile dbadmin --profile ftp up -d
+    COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose up -d ftp
     ```
 
-*   Alternatively, you can set profiles using the `COMPOSE_PROFILES` environment variable:
+*   Stop and remove FTP at the end of that window:
     ```bash
-    COMPOSE_PROFILES=dbadmin,ftp docker-compose up -d
-    ```
-    Or export it for the session:
-    ```bash
-    export COMPOSE_PROFILES=dbadmin,ftp
-    docker-compose up -d
+    COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose stop ftp
+    COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose rm -f ftp
     ```
 
 *   To run all services, including all defined profiles:
     ```bash
-    COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose up -d
+    COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose up -d
     ```
     Note: the `--profile "*"` wildcard syntax is only available in newer compose versions and is not supported on compose 2.6.0. Use the explicit `COMPOSE_PROFILES` list above for compatibility. As mentioned in "Getting Started," this project uses pre-built images. If you've made custom changes to Dockerfiles or need to ensure you have the absolute latest build not yet reflected in the pre-built images, you can add the `--build` flag.
 
@@ -611,7 +607,7 @@ sudo ./scripts/disaster-recovery.sh
 ```
 
 **Rehearsal safety (when the new box must NOT disturb live prod — DNS still points at prod):**
-- The script's `start_services` runs bare `docker compose up -d`; with the restored production overlay (`nginx` `depends_on` `adminer`+`updater`) modern compose errors unless profiles are set. Bring the stack up **without** `certs` and `monitoring`: `COMPOSE_PROFILES=dbadmin,hooks,ftp docker compose up -d`. Omitting `certs` means no Let's Encrypt **DNS-01 challenge writes to the live DNS zone**; omitting `monitoring` avoids a duplicate `ZBX_HOSTNAME` colliding with prod in Zabbix. The real prod TLS cert is restored from `private/letsencrypt/`, so HTTPS still serves — verify with `curl -k --resolve favor-group.ru:443:<new-ip> https://favor-group.ru/`.
+- The script's `start_services` runs bare `docker compose up -d`; with the restored production overlay (`nginx` `depends_on` `adminer`+`updater`) modern compose errors unless profiles are set. Bring the stack up **without** `certs`, `monitoring` or FTP: `COMPOSE_PROFILES=dbadmin,hooks docker compose up -d`. Omitting `certs` means no Let's Encrypt **DNS-01 challenge writes to the live DNS zone**; omitting `monitoring` avoids a duplicate `ZBX_HOSTNAME` colliding with prod in Zabbix. The real prod TLS cert is restored from `private/letsencrypt/`, so HTTPS still serves; verify with `curl -k --resolve favor-group.ru:443:<new-ip> https://favor-group.ru/`.
 - **Do not let the host cron fire on the rehearsal box.** `create_host_cronjob_if_not_exist` installs `/etc/cron.d/bitrix_infra`, whose jobs push to the **same S3 backup paths as prod** (`file-backup.sh`, `mysql-dump.sh`) and submit SEO reindex requests. Remove it right after the script: `sudo rm -f /etc/cron.d/bitrix_infra /etc/cron.d/bitrix_site`. Likewise `docker compose stop php-cron` to keep the in-container site cron (exports, price updates) from running against external services twice.
 
 </details>

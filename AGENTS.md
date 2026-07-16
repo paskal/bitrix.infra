@@ -64,5 +64,5 @@ docker run --rm --add-host php:127.0.0.1 \
   ghcr.io/paskal/nginx:latest nginx -t
 
 # compose validation
-COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose config -q
+COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose config -q
 ```

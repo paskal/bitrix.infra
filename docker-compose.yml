@@ -309,7 +309,9 @@ services:
       - LISTEN=0.0.0.0:8080
       - CONF=/etc/updater.yml
       - APP_UID=1000
-    ports:
+    # Nginx reaches the updater on the Compose network. Publishing this port
+    # exposes the command runner directly on a random host port.
+    expose:
       - "8080"
     volumes:
       - ./config/updater.yaml:/etc/updater.yml
@@ -326,16 +328,29 @@ services:
       - "30000-30009:30000-30009"
     volumes:
       - ./web/dev:/home/web
+      - ./logs/ftp:/var/log/pure-ftpd
+      - ./scripts/ftp-entrypoint.sh:/usr/local/sbin/ftp-entrypoint.sh:ro
     environment:
       PUBLICHOST: ${DOMAIN:-localhost}
       FTP_USER_HOME: /home/web
       FTP_PASSIVE_PORTS: 30000:30009
+    entrypoint:
+      - /usr/local/sbin/ftp-entrypoint.sh
+    command:
+      - -l
+      - puredb:/etc/pure-ftpd/pureftpd.pdb
+      - -E
+      - -j
+      - -R
+      - --verboselog
+      - --altlog=clf:/var/log/pure-ftpd/transfer.log
     profiles:
-      - ftp
+      # Deliberately absent from the production shell's default profiles.
+      - ftp-manual
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "5"
 
-    restart: unless-stopped
+    restart: "no"
