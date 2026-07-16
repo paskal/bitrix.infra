@@ -1,6 +1,5 @@
 /web/logs/ftp/pureftpd.log
 /web/logs/ftp/session-history.log
-/web/logs/ftp/transfer.log
 {
 	daily
 	rotate 365

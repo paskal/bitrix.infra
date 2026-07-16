@@ -334,6 +334,8 @@ services:
       PUBLICHOST: ${DOMAIN:-localhost}
       FTP_USER_HOME: /home/web
       FTP_PASSIVE_PORTS: 30000:30009
+      FTP_LOG_UID: ${FTP_LOG_UID:-1000}
+      FTP_LOG_GID: ${FTP_LOG_GID:-1000}
     entrypoint:
       - /usr/local/sbin/ftp-entrypoint.sh
     command:
@@ -343,7 +345,6 @@ services:
       - -j
       - -R
       - --verboselog
-      - --altlog=clf:/var/log/pure-ftpd/transfer.log
     profiles:
       # Deliberately absent from the production shell's default profiles.
       - ftp-manual

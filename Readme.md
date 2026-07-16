@@ -515,6 +515,12 @@ Here are the available profiles and the services they enable:
     COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose rm -f ftp
     ```
 
+    The current session log is `/web/logs/ftp/pureftpd.log`; completed sessions
+    are retained in `/web/logs/ftp/session-history.log`. Verbose logging records
+    connections, authentication failures and successes, commands, transfers,
+    and disconnects while redacting passwords. Host logrotate rotates both files
+    daily and retains 365 copies.
+
 *   To run all services, including all defined profiles:
     ```bash
     COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose up -d
