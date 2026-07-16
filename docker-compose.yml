@@ -16,10 +16,10 @@ services:
     volumes:
       - ./private/letsencrypt:/etc/letsencrypt
       # needed for nginx container autorestart, https://dnsrobocert.readthedocs.io/en/latest/configuration_reference.html#autorestart
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       # should be in the following format:
       # https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
-      - ./config/dnsrobocert.yml:/etc/dnsrobocert/config.yml
+      - ./config/dnsrobocert.yml:/etc/dnsrobocert/config.yml:ro
 
     # For yandexcloud:
     # AUTH_KEY must be provided, short-lived and set by scripts/update-dns-token.sh
@@ -98,9 +98,9 @@ services:
     volumes:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
-      - ./private/msmtprc:/etc/msmtprc
+      - ./private/msmtprc:/etc/msmtprc:ro
       # MySQL socket to prevent transferring data through TCP
-      - ./private/mysqld:/var/run/mysqld
+      - ./private/mysqld:/var/run/mysqld:ro
       # PHPStan neon configs (phpstan-scan.sh runs `php /phpstan/phpstan.phar`)
       - ./private/phpstan:/phpstan:ro
       # PHPStan output (JSON + count file consumed by Zabbix via zabbix-agent)
@@ -108,12 +108,12 @@ services:
       # Logs
       - ./logs/php:/var/log/php
       # configuration
-      - ./config/php/90-php.ini:/etc/php/8.4/fpm/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.4/fpm/conf.d/90-php.ini:ro
       - ./config/php/91-disable-functions.ini:/etc/php/8.4/fpm/conf.d/91-disable-functions.ini:ro
-      - ./config/php/zz-pm.conf:/etc/php/8.4/fpm/pool.d/zz-pm.conf
-      - ./config/php/xdebug.ini:/etc/php/8.4/mods-available/xdebug.ini
+      - ./config/php/zz-pm.conf:/etc/php/8.4/fpm/pool.d/zz-pm.conf:ro
+      - ./config/php/xdebug.ini:/etc/php/8.4/mods-available/xdebug.ini:ro
       # for monitoring purposes
-      - ./logs/nginx:/var/log/nginx
+      - ./logs/nginx:/var/log/nginx:ro
       # switch timezone from UTC to Moscow
       - ./config/php/moscow-timezone:/etc/timezone:ro
       - ./config/php/moscow-localtime:/etc/localtime:ro
@@ -140,9 +140,9 @@ services:
     volumes:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
-      - ./private/msmtprc:/etc/msmtprc
+      - ./private/msmtprc:/etc/msmtprc:ro
       # MySQL socket to prevent transferring data through TCP
-      - ./private/mysqld:/var/run/mysqld
+      - ./private/mysqld:/var/run/mysqld:ro
       # PHPStan neon configs (phpstan-scan.sh runs `php /phpstan/phpstan.phar`)
       - ./private/phpstan:/phpstan:ro
       # PHPStan output (JSON + count file consumed by Zabbix via zabbix-agent)
@@ -150,7 +150,7 @@ services:
       # Logs for email sending: msmtp expects to write logs there
       - ./logs/php:/var/log/php
       # configuration
-      - ./config/php/90-php.ini:/etc/php/8.4/cli/conf.d/90-php.ini
+      - ./config/php/90-php.ini:/etc/php/8.4/cli/conf.d/90-php.ini:ro
       - ./config/php/91-disable-functions.ini:/etc/php/8.4/cli/conf.d/91-disable-functions.ini:ro
       # Cronjobs
       - ./config/cron/php-cron.cron:/etc/cron.d/tasks:ro
@@ -173,7 +173,7 @@ services:
     env_file: private/environment/mysql.env
     volumes:
       # Configuration
-      - ./config/mysql/my.cnf:/etc/my.cnf.d/my.cnf
+      - ./config/mysql/my.cnf:/etc/my.cnf.d/my.cnf:ro
       # Data persistence
       - ./private/mysql-data:/var/lib/mysql
       # MySQL socket to prevent transferring data through TCP
@@ -231,9 +231,9 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: localhost
     volumes:
-      - ./config/adminer/mysql-socket.ini:/usr/local/etc/php/conf.d/mysql-socket.ini
+      - ./config/adminer/mysql-socket.ini:/usr/local/etc/php/conf.d/mysql-socket.ini:ro
       # MySQL socket to prevent transferring data through TCP
-      - ./private/mysqld:/var/run/mysqld
+      - ./private/mysqld:/var/run/mysqld:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 30s
@@ -269,15 +269,15 @@ services:
       - memcached
     volumes:
       # for monitoring purposes
-      - ./logs/nginx:/var/log/nginx
+      - ./logs/nginx:/var/log/nginx:ro
       # for monitoring purposes
-      - ./web/prod/upload:/web/prod/upload
+      - ./web/prod/upload:/web/prod/upload:ro
       # this is needed in order to monitor docker
       # to make it work you need to create user "zabbix" with id 1997 on the host system,
       # and make sure it has enough permissions to read /var/run/docker.sock
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       # MySQL socket to prevent transferring data through TCP
-      - ./private/mysqld:/var/run/mysqld
+      - ./private/mysqld:/var/run/mysqld:ro
       # PHPStan output (read-only): system.run["cat /var/log/phpstan/owned_errors_count.txt"]
       - ./logs/phpstan:/var/log/phpstan:ro
       # backup status files (read-only): mysql-last-size.txt / files-last.txt, written by
@@ -314,8 +314,8 @@ services:
     expose:
       - "8080"
     volumes:
-      - ./config/updater.yaml:/etc/updater.yml
-      - ./private/updater_ssh_key:/home/app/.ssh/id_rsa
+      - ./config/updater.yaml:/etc/updater.yml:ro
+      - ./private/updater_ssh_key:/home/app/.ssh/id_rsa:ro
 
   # FTP access
 
