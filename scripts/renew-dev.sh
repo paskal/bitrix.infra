@@ -216,7 +216,7 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 # mark site as development one
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'update_devsrv';" ${DEV_DB}
 # keep dev admin sessions valid when Private Relay rotates an address inside the same /16
-"${mysql_binary_path}"/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_group set SESSION_IP_MASK = '255.255.0.0', STORE_IP_MASK = '255.255.0.0' where ID = 1;" "${DEV_DB}"
+${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_group set SESSION_IP_MASK = '255.255.0.0', STORE_IP_MASK = '255.255.0.0' where ID = 1;" "${DEV_DB}"
 # disable external access to the site
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'site_stopped';" ${DEV_DB}
 # give admin access to users #6, #92, #1560, #1561
