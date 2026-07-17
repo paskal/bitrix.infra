@@ -660,6 +660,13 @@ When using `--date`, the script will:
 4. Prompt you to select a specific backup file
 5. Restore the database from that backup instead of creating a new dump
 
+After either restore path, the script reapplies DEV-only settings. Administrator sessions and
+remembered authorisation for group 1 use `255.255.0.0` network masks so Safari Private Relay can
+rotate an address within the same `/16` without ending the session. Production retains the stricter
+`255.255.255.255` masks. This slightly broadens the DEV cookie replay boundary, but authentication
+and the session cookie are still required. A session created before the override may require one
+new login.
+
 This is useful for:
 - Testing changes against historical data
 - Reverting problematic database changes by comparing with old backups
