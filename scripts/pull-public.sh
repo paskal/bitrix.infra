@@ -164,7 +164,7 @@ echo "pull-public: granting admin temporary write access to protected config dir
 sudo -n chown admin:admin "$cron_dir" "$logrotate_dir"
 
 echo "pull-public: pulling public infrastructure"
-git -C "$repo" pull --ff-only
+git -C "$repo" pull --ff-only origin master
 
 restore_protected_permissions
 permission_guard_active=0
