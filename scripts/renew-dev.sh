@@ -215,8 +215,6 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'dev.cdn-favor-group.ru' where MODULE_ID = 'skypark.cdn' and NAME = 'cdn_domains1';" ${DEV_DB}
 # mark site as development one
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'update_devsrv';" ${DEV_DB}
-# keep dev admin sessions valid when Private Relay rotates an address inside the same /16
-${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_group set SESSION_IP_MASK = '255.255.0.0', STORE_IP_MASK = '255.255.0.0' where ID = 1;" "${DEV_DB}"
 # disable external access to the site
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'site_stopped';" ${DEV_DB}
 # give admin access to users #6, #92, #1560, #1561
@@ -250,5 +248,50 @@ sed -i \
   -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/\1'login' => '${DEV_USER}',/" \
   -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/\1'password' => '${DEV_PASSWORD}',/" \
   "${DEV_LOCATION}/bitrix/.settings.php"
+
+# keep dev admin sessions valid when Private Relay rotates an address inside the same /16
+docker exec -i -u www-data php php <<'PHP'
+<?php
+declare(strict_types=1);
+
+$_SERVER['DOCUMENT_ROOT'] = '/web/dev';
+define('NO_KEEP_STATISTIC', true);
+define('NOT_CHECK_PERMISSIONS', true);
+require '/web/dev/bitrix/modules/main/include/prolog_before.php';
+
+use Bitrix\Main\GroupTable;
+
+$row = GroupTable::getRow([
+    'select' => ['SECURITY_POLICY'],
+    'filter' => ['=ID' => 1],
+]);
+$policy = unserialize((string) ($row['SECURITY_POLICY'] ?? ''), ['allowed_classes' => false]);
+if (!is_array($policy)) {
+    fwrite(STDERR, "Administrator security policy is invalid\n");
+    exit(1);
+}
+
+$policy['SESSION_IP_MASK'] = '255.255.0.0';
+$policy['STORE_IP_MASK'] = '255.255.0.0';
+$result = GroupTable::update(1, ['SECURITY_POLICY' => serialize($policy)]);
+if (!$result->isSuccess()) {
+    fwrite(STDERR, implode('; ', $result->getErrorMessages()) . "\n");
+    exit(1);
+}
+
+$updated = GroupTable::getRow([
+    'select' => ['SECURITY_POLICY'],
+    'filter' => ['=ID' => 1],
+]);
+$verified = unserialize((string) ($updated['SECURITY_POLICY'] ?? ''), ['allowed_classes' => false]);
+if (
+    !is_array($verified)
+    || ($verified['SESSION_IP_MASK'] ?? null) !== '255.255.0.0'
+    || ($verified['STORE_IP_MASK'] ?? null) !== '255.255.0.0'
+) {
+    fwrite(STDERR, "Administrator security policy update was not persisted\n");
+    exit(1);
+}
+PHP
 
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
