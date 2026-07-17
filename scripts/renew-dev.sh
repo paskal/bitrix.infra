@@ -8,6 +8,30 @@ fi
 
 # This script recreates dev site from current prod one with deleting old dev in the process
 
+dump_file=''
+mysql_config_file=''
+
+cleanup() {
+  if [ -n "${dump_file}" ]; then
+    rm -f -- "${dump_file}" || :
+  fi
+  if [ -n "${mysql_config_file}" ]; then
+    rm -f -- "${mysql_config_file}" || :
+  fi
+}
+
+handle_signal() {
+  exit_code=$1
+  trap - EXIT HUP INT TERM
+  cleanup
+  exit "${exit_code}"
+}
+
+trap cleanup EXIT
+trap 'handle_signal 129' HUP
+trap 'handle_signal 130' INT
+trap 'handle_signal 143' TERM
+
 # Validate identifier for use in SQL (alphanumeric, underscore, hyphen only)
 validate_sql_identifier() {
   case "$1" in
@@ -226,13 +250,5 @@ sed -i \
   -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/\1'login' => '${DEV_USER}',/" \
   -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/\1'password' => '${DEV_PASSWORD}',/" \
   "${DEV_LOCATION}/bitrix/.settings.php"
-
-echo "Cleaning up"
-
-# remove mysql dump
-rm -f "${dump_file}"
-
-# clean up tmp files with credentials (even from other runs)
-rm -f ./private/mysql-data/deleteme_*
 
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
