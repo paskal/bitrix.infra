@@ -9,6 +9,7 @@ private `docker-compose.override.yml` (see "Production overlay" in Readme.md).
 ```bash
 git clone https://github.com/paskal/bitrix.infra.git && cd bitrix.infra
 for f in private/environment/*.env.example; do cp "$f" "${f%.example}"; done
+cp config/zabbix/mysql-session.conf.example private/environment/zabbix-mysql-session.conf
 sudo ./scripts/fix-rights.sh
 docker compose up -d
 curl -L https://www.1c-bitrix.ru/download/start_encode.tar.gz | tar -xz -C web/prod/

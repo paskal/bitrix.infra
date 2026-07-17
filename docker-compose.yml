@@ -257,10 +257,8 @@ services:
     profiles:
       - monitoring
     privileged: true
-    # MYSQL_USER, MYSQL_PASSWORD
     # ZBX_HOSTNAME, ZBX_SERVER_HOST
     env_file:
-      - private/environment/mysql.env
       - private/environment/zabbix.env
       # for monitoring purposes, as AUTH_TOKEN is supposed to be set by scripts/update-dns-token.sh
       - private/environment/dnsrobocert.env
@@ -278,6 +276,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # MySQL socket to prevent transferring data through TCP
       - ./private/mysqld:/var/run/mysqld:ro
+      # MySQL Agent 2 named session. Keeping credentials in the agent config
+      # prevents expanded active-item keys from writing them to agent logs.
+      - type: bind
+        source: ./private/environment/zabbix-mysql-session.conf
+        target: /etc/zabbix/zabbix_agent2.d/plugins.d/mysql-local.conf
+        read_only: true
+        bind:
+          create_host_path: false
       # PHPStan output (read-only): system.run["cat /var/log/phpstan/owned_errors_count.txt"]
       - ./logs/phpstan:/var/log/phpstan:ro
       # backup status files (read-only): mysql-last-size.txt / files-last.txt, written by

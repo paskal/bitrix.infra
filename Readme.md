@@ -323,8 +323,9 @@ return array(
     Copy the example files in `private/environment/` and fill in your values:
     ```bash
     for f in private/environment/*.env.example; do cp "$f" "${f%.example}"; done
+    cp config/zabbix/mysql-session.conf.example private/environment/zabbix-mysql-session.conf
     ```
-    Edit each `.env` file — the examples contain comments explaining every variable. At minimum you need `mysql.env`; the others are for optional services (FTP, monitoring, certificates, webhooks).
+    Edit each copied file. At minimum you need `mysql.env`; the others are for optional services (FTP, monitoring, certificates, webhooks). For MySQL monitoring, `zabbix-mysql-session.conf` keeps the monitoring credentials in an Agent 2 named session instead of expanded item keys. Compose refuses to start the monitoring service if this file is absent.
 
     Optionally copy `.env.example` to `.env` to override ports or other compose variables (e.g. if port 80 is taken on the host):
     ```bash
@@ -441,6 +442,7 @@ Site files in directories `web/prod` and `web/dev`.
     - `mysql.env` — Percona MySQL credentials (root, application user, read-only agent user)
     - `dnsrobocert.env` — Yandex Cloud DNS credentials for Let's Encrypt wildcard certificates (`certs` profile)
     - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, key restrictions) (`monitoring` profile)
+    - `zabbix-mysql-session.conf` — private MySQL named session for Agent 2; set `{$MYSQL.DSN}` to `LocalMysql` and leave `{$MYSQL.USER}` / `{$MYSQL.PASSWORD}` empty in Zabbix
     - `updater.env` — webhook server shared secret (`hooks` profile)
     - `ftp.env` — Pure-FTPD credentials (`ftp` profile)
     - `seo-reindex.env` — Yandex Webmaster OAuth token and quota host for the daily SEO reindex cron

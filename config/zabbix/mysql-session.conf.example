@@ -1,0 +1,6 @@
+# Zabbix Agent 2 MySQL named session
+# https://www.zabbix.com/documentation/current/en/manual/appendix/config/zabbix_agent2_plugins/mysql_plugin
+
+Plugins.Mysql.Sessions.LocalMysql.Uri=unix:/var/run/mysqld/mysqld.sock
+Plugins.Mysql.Sessions.LocalMysql.User=zbx_monitor
+Plugins.Mysql.Sessions.LocalMysql.Password=change_me
