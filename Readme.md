@@ -117,6 +117,25 @@ These run on the host machine outside Docker, scheduled via `config/cron/host.cr
 - **Image optimisation** — runs weekly (Saturday night) via `scripts/optimise-images.sh`, processing PNG ([optipng](http://optipng.sourceforge.net/) + [advpng](https://www.advancemame.it/comp-readme)), JPEG ([jpegoptim](https://github.com/tjko/jpegoptim)), WebP ([cwebp](https://developers.google.com/speed/webp/docs/cwebp)) and GIF ([gifsicle](https://www.lcdf.org/gifsicle/)) in `web/prod/upload`. Uses a SQLite database to track already-processed files and avoid redundant work
 - **Log rotation** — configured in `config/logrotate/` for nginx (weekly for production access logs at 100 MB minimum, monthly for others) and PHP (monthly for error, cron and msmtp logs). Nginx logs are reopened via `nginx -s reopen`, PHP-FPM via `USR1` signal
 
+Production public-repository webhook pulls run through `scripts/pull-public.sh`. The wrapper validates
+the `admin` user, repository, branch and origin; temporarily makes only `config/cron` and
+`config/logrotate` writable; restores their root ownership and `0644` file modes on every exit path;
+and rebinds only file-mounted cron or nginx configuration whose inode changed. The initial rollout
+must stage the wrapper outside the worktree before switching the private updater task:
+
+```shell
+cd /web
+git fetch origin master
+git show origin/master:scripts/pull-public.sh >/tmp/pull-public.sh
+chmod 0700 /tmp/pull-public.sh
+sh /tmp/pull-public.sh
+rm -f /tmp/pull-public.sh
+cd /web/private
+sh /web/private/scripts/pull-private.sh
+docker restart updater
+docker exec updater grep -F '/web/scripts/pull-public.sh' /etc/updater.yml
+```
+
 ### PHPStan static analysis monitoring
 
 Bitrix sites accumulate type-strictness bugs that PHP 8.x will tolerate at parse time but blow up at runtime — methods like `mysqli::real_escape_string()` started rejecting non-string arguments in 8.x, and a Bitrix codebase that worked for years on 7.x can have dozens of latent `TypeError`s waiting for a specific code path to fire. PHPStan catches them, but only if it's run regularly against the *deployed* code (not your local working copy).

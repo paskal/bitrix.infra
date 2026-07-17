@@ -46,11 +46,10 @@ Local-demo quickstart (for newcomers and coding agents): see [AGENTS.md](AGENTS.
 - `nginx -V` output from a running container may not match the image used on restart — don't trust module availability without testing in a fresh container
 
 ## Cron File Deployment
-- `/web/config/cron` directory is owned by root; to deploy cron changes:
-  `sudo chown admin:admin /web/config/cron && git pull && sudo chown root:root /web/config/cron && sudo chown root:root /web/config/cron/*.cron && sudo chmod 0644 /web/config/cron/*.cron`
-- `/etc/cron.d/bitrix_infra` is a symlink to `/web/config/cron/host.cron` (per `disaster-recovery.sh`), so the chown dance + `git pull` is the whole deploy.
-- **The auto-deploy webhooks (`pull-code`, `pull-private` in `updater.yaml`) run a plain `git pull` as `admin`, so they CANNOT deploy any root-owned cron file.** The pull aborts with `error: unable to unlink old '<cron file>': Permission denied` and the overlay/repo silently stays on the old commit (the `deploy` Action shows a red run; `git log` on the server still points at the previous SHA). Cron changes must be finished by hand with the chown dance above.
-- Same applies to the **private overlay** cron (`/web/private/cron/*.cron`): `sudo chown admin:admin /web/private/cron && cd /web/private && git pull --ff-only && sudo chown root:root /web/private/cron /web/private/cron/*.cron && sudo chmod 0644 /web/private/cron/*.cron`.
+- `/web/config/cron` and `/web/config/logrotate` are root-owned. Production public pulls must run through `scripts/pull-public.sh`, never a plain `git pull`. The wrapper gives `admin` temporary ownership of only those two directories and restores both directories and their files to `root:root`, mode `0644`, through an exit and signal trap.
+- The wrapper restarts `php-cron` only when the file-mounted `config/cron/php-cron.cron` inode changes, then verifies the host and container inodes. Host cron and logrotate use symlinks to repository paths and need no service restart.
+- Public nginx changes are tested before activation. Directory-mounted `conf.d` changes receive an `nginx -t` and reload. A changed file-level bind is first tested in a fresh container using the new host files, then nginx is restarted to rebind those inodes.
+- Private overlay pulls continue through `/web/private/scripts/pull-private.sh`; do not replace either wrapper with a plain pull in `updater.yaml`.
 - **`private/cron/site.cron` is a file-level mount into php-cron (`/etc/cron.d/site-tasks`)**, so `git pull` swaps the inode and the container keeps reading the OLD file — `docker restart php-cron` after the pull to re-bind (verify with `docker exec php-cron stat -c %i /etc/cron.d/site-tasks` vs the host file). Host symlinks like `bitrix_infra` / `bitrix_site` and directory mounts don't have this issue.
 
 ## Private overlay
