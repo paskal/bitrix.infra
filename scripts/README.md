@@ -57,20 +57,7 @@ Below is a list of scripts and relevant files found in this directory:
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Optimizes PNG, JPEG, WebP, and GIF images using various tools. Uses SQLite database at `private/image-optimisation/optimised.db` to track processed files and avoid reprocessing.
 
-*   **`renew-dev.sh`**
-    *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Recreates dev site from production or from an existing backup.
-    *   **Options:**
-        *   `--date` - Restore from an existing backup file instead of creating a new dump from production. When used, the script will:
-            1. List available backup dates from `/web/backup/` (newest first, up to 20)
-            2. Prompt for date selection (YYYY-MM-DD format)
-            3. List available `.sql.gz` files for that date
-            4. Prompt for file selection
-            5. Restore from the selected backup
-    *   **Use cases:**
-        *   Restore dev from a specific point in time for debugging
-        *   Compare current prod data with historical backup (useful with SEO tools)
-        *   Test migrations against old data
+*   **`renew-dev.sh`:** Recreates dev from current production or a selected backup; see [Dev site renewal from backup](../Readme.md#dev-site-renewal-from-backup) for usage and safeguards.
 
 *   **`requirements.txt`**
     *   **Type:** Data file (Python dependencies)
