@@ -688,6 +688,10 @@ rotate an address within the same `/16` without ending the session. Production r
 and the session cookie are still required. A session created before the override may require one
 new login.
 
+If `private/scripts/renew-dev-post.sh` exists and is executable, the script runs it after the DEV
+database connection and administrator policy have been restored. This optional hook keeps
+site-specific post-clone settings in the private overlay; installations without it are unchanged.
+
 This is useful for:
 - Testing changes against historical data
 - Reverting problematic database changes by comparing with old backups

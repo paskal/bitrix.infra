@@ -294,4 +294,10 @@ if (
 }
 PHP
 
+post_renew_hook="./private/scripts/renew-dev-post.sh"
+if [ -x "${post_renew_hook}" ]; then
+  echo "Running site-specific dev post-renew hook"
+  "${post_renew_hook}"
+fi
+
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
