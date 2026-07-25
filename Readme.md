@@ -410,10 +410,10 @@ To start the regular production stack: `COMPOSE_PROFILES=certs,dbadmin,monitorin
     - `fastcgi.conf` — FastCGI params including HTTP/3-safe `HTTP_HOST`
     - `security_headers.conf` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
     - `static-cdn.conf` — CDN vhost include (static-only, hotlink protection)
-    - `bots.conf` — bot detection logic
+    - `bots.conf` — bot detection logic. Included by the PHP locations only, so it never touches static assets. It does two separate things: sets `IS_BOT` from `$bad_agent`/`$bad_ip`/`$bad_referer` (a hint passed to PHP, the request still runs), and answers `403` for `$denied_ip`/`$denied_agent` (the request never reaches PHP). Both deny maps default to empty, so this half is inert until something is listed.
     - `conf.d/localhost.conf` — HTTP-only demo server on port 80 for a fresh clone
     - `conf.d/host-map.conf` — `$bitrix_host` map (preserves `:port` for local demos, falls back to `$host` for QUIC)
-    - `conf.d/upstream.conf`, `bad_ips.conf`, `status.conf`, `useragents.conf` — generic infrastructure
+    - `conf.d/upstream.conf`, `bad_ips.conf`, `status.conf`, `useragents.conf` — generic infrastructure. `bad_ips.conf` holds `$bad_ip` (flag) and `$denied_ip` (403); `useragents.conf` holds `$bad_agent` (flag) and `$denied_agent` (403). Put an entry in a deny map only when it cannot match a real visitor: a self-identified crawler that ignores `robots.txt` or brings no traffic worth the render cost, or an address range whose every request is an attack. Search crawlers that obey `robots.txt` and send visitors do not belong there, and a denied CIDR also denies any legitimate visitor sharing it.
     - Site vhosts live in the private overlay (`private.conf.d/sites/*.conf`)
 
 - `php` directory contains the build Dockerfiles (`Dockerfile.8.3`, `Dockerfile.8.4`, `Dockerfile.8.5`) and php configuration, applied on top of package-provided one.
