@@ -29,8 +29,8 @@ zabbix_export:
               description: 'The unattended ads report run exited non-zero. Most likely the shared claude.ai OAuth login in the favor-tg-agent_claude-auth volume expired (this also silently kills all three Telegram bots). Check tg-agent/data/ads-cron/cron.log on terrty; re-login per tg-agent/README.md (interactive claude session in any agent container). Clears on the next successful run.'
               manual_close: 'YES'
             - uuid: 5e762b2c957f4d2ca18d46722ce57c97
-              expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.adscron.status,70h)=1'
-              name: 'tg-agent ads-cron has not reported for 70h'
+              expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.adscron.status,90h)=1'
+              name: 'tg-agent ads-cron has not reported for 90h'
               priority: AVERAGE
-              description: 'No exit-code push for over 70h — the host crontab entry is gone, docker compose is broken, or the wrapper can''t reach zabbix. Normal max gap is 66h (Friday 21:00 UTC -> Monday weekly run at 15:00 UTC). The 70h threshold allows four hours for the weekly run to complete, while still alerting at Monday 19:00 UTC before the 21:00 UTC daily push can mask a missed weekly run. Check crontab -l and tg-agent/data/ads-cron/cron.log on terrty.'
+              description: 'No exit-code push for over 90h — the host crontab entry is gone, docker compose is broken, or the wrapper can''t reach zabbix. Normal max gap is 82.5h (Friday 04:30 UTC morning run -> Monday 15:00 UTC weekly run). The 90h threshold allows 7.5 hours for the weekly run to complete and still fires at Monday 22:30 UTC, well before the Tuesday 04:30 UTC morning push could mask a missed weekly. Raised from 70h on 2026-08-10 when the morning note moved from Tue-Sat 03:00 UTC to Mon-Fri 04:30 UTC: the old threshold would have fired every single weekend. Check crontab -l and tg-agent/data/ads-cron/cron.log on terrty.'
               manual_close: 'YES'
