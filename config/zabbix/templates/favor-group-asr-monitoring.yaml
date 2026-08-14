@@ -11,26 +11,101 @@ zabbix_export:
         Watches the unattended call-transcription loop (/web/private/asr-test/auto/auto_run.sh, cron
         every 30 minutes) that turns Voximplant recordings into B24 timeline notes. The script writes
         status files into ./heartbeat, which the zabbix-agent mounts read-only at /asr-heartbeat.
-
+        
         Key design: last-run.txt is written only by a cycle that reaches an orderly end, and
         last-publish-epoch.txt only when a note actually reached B24. Freshness alone would be
         useless, because a quiet night legitimately publishes nothing — so the outage trigger pairs
         the publish age with the pending count, and a pending backlog that stops draining is what
         distinguishes a broken loop from an idle one.
-
+        
         Written after two silent outages: a pruned whisper image stalled the pipeline for 7 days from
         17 July 2026, and DeepSeek retiring the deepseek-chat model stalled it for 41 hours from
         24 July 2026 (82 consecutive cron runs publishing nothing). Neither raised anything.
       groups:
         - name: Favor-group
       items:
+        - uuid: 768285c60a4a4f719b727772ce4dfeab
+          name: 'DeepSeek: остаток на счёте'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.contents[/asr-heartbeat/heartbeat/deepseek-balance.txt]'
+          delay: 5m
+          value_type: FLOAT
+          units: $
+          description: |
+            Остаток боевого счёта DeepSeek, которым оплачивается сборка заметок по звонкам.
+            Пустой счёт - самый тихий отказ конвейера: reconcile.py сворачивает ошибку API
+            в строку fail:, заметка не появляется, а остальные сигналы остаются зелёными.
+          triggers:
+            - uuid: 90c1ee6609f44e3898d82ff2ce335cce
+              expression: 'last(/Favor-group ASR monitoring/vfs.file.contents[/asr-heartbeat/heartbeat/deepseek-balance.txt])<2'
+              name: 'DeepSeek: на счёте меньше $2, конвейер заметок скоро встанет'
+              priority: HIGH
+              description: |
+                Пополнить счёт DeepSeek. При нулевом остатке заметки по звонкам перестают
+                собираться молча: ошибка API уходит в строку fail:, а не в отказ прогона.
+        - uuid: 4ebbb549269347baa1e1dbfafed03701
+          name: 'ASR loop: calls waiting to publish'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.contents[/asr-heartbeat/heartbeat/pending.txt]'
+          delay: 10m
+          history: 90d
+          description: |
+            Recordings whose audio is downloaded but whose note has not reached B24 (the
+            kept-for-retry count of the last cycle). Healthy is 0 or a small number that drains within
+            a cycle or two. A number that stays up is the signature of every silent stall so far.
+          tags:
+            - tag: Application
+              value: ASR
+        - uuid: a6ebc8c735ef4aec8a24d5da8cda7599
+          name: 'ASR loop: notes published in total'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.contents[/asr-heartbeat/heartbeat/processed-total.txt]'
+          delay: 10m
+          history: 90d
+          trends: 730d
+          description: |
+            Cumulative count of calls whose note is on a B24 timeline (the processed_ids ledger). Kept
+            for the trend: the slope shows call volume, and a flat line over a working day is a softer
+            version of the outage signal above.
+          tags:
+            - tag: Application
+              value: ASR
+        - uuid: 1a06e40157c3454fb750ded53a537f98
+          name: 'DeepSeek: возраст замера остатка'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.time[/asr-heartbeat/heartbeat/deepseek-balance-epoch.txt,modify]'
+          delay: 5m
+          units: unixtime
+          description: |
+            Когда остаток считывался в последний раз. Замер пишется только при удачном чтении,
+            поэтому застывший файл означает, что запрос к API перестал проходить.
+          triggers:
+            - uuid: 65047b9a9ada41c995a344ddb6f9d3b1
+              expression: 'fuzzytime(/Favor-group ASR monitoring/vfs.file.time[/asr-heartbeat/heartbeat/deepseek-balance-epoch.txt,modify],3h)=0'
+              name: 'DeepSeek: остаток не проверяется больше 3 часов'
+              priority: WARNING
+              description: |
+                Замер остатка пишется только при удачном чтении, поэтому застывший файл значит,
+                что запрос к API перестал проходить, и цифра остатка на дашборде уже недостоверна.
+        - uuid: c5dd18695b444bb2a4f638523cafc059
+          name: 'ASR loop: last note published to B24'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.time[/asr-heartbeat/heartbeat/last-publish-epoch.txt,modify]'
+          delay: 10m
+          history: 90d
+          description: |
+            Modify time (epoch) of the file auto_run.sh writes only when a cycle actually published at
+            least one transcript note. Age on its own is not a fault: nights and weekends produce no
+            calls. It becomes one when calls are waiting, which is what the paired trigger checks.
+          tags:
+            - tag: Application
+              value: ASR
         - uuid: f20286da5a8a4803a155870eafac97d7
           name: 'ASR loop: last completed cycle'
           type: ZABBIX_ACTIVE
           key: 'vfs.file.time[/asr-heartbeat/heartbeat/last-run.txt,modify]'
           delay: 10m
           history: 90d
-          value_type: UNSIGNED
           description: |
             Modify time (epoch) of the status file that auto_run.sh writes at the end of every cycle,
             including cycles with nothing to do. Cron fires every 30 minutes, so a growing age means
@@ -49,61 +124,18 @@ zabbix_export:
                 running or is exiting early. Read /web/private/asr-test/auto/auto.log — the tail names
                 the stage that stopped, and a "GATE FAILED" line is the pipeline protecting itself
                 rather than a crash.
-        - uuid: c5dd18695b444bb2a4f638523cafc059
-          name: 'ASR loop: last note published to B24'
-          type: ZABBIX_ACTIVE
-          key: 'vfs.file.time[/asr-heartbeat/heartbeat/last-publish-epoch.txt,modify]'
-          delay: 10m
-          history: 90d
-          value_type: UNSIGNED
-          description: |
-            Modify time (epoch) of the file auto_run.sh writes only when a cycle actually published at
-            least one transcript note. Age on its own is not a fault: nights and weekends produce no
-            calls. It becomes one when calls are waiting, which is what the paired trigger checks.
-          tags:
-            - tag: Application
-              value: ASR
-        - uuid: 4ebbb549269347baa1e1dbfafed03701
-          name: 'ASR loop: calls waiting to publish'
-          type: ZABBIX_ACTIVE
-          key: 'vfs.file.contents[/asr-heartbeat/heartbeat/pending.txt]'
-          delay: 10m
-          history: 90d
-          value_type: UNSIGNED
-          description: |
-            Recordings whose audio is downloaded but whose note has not reached B24 (the
-            kept-for-retry count of the last cycle). Healthy is 0 or a small number that drains within
-            a cycle or two. A number that stays up is the signature of every silent stall so far.
-          tags:
-            - tag: Application
-              value: ASR
-          triggers:
-            - uuid: fcba209793994fdcbcc19f882ca6b723
-              expression: |
-                last(/Favor-group ASR monitoring/vfs.file.contents[/asr-heartbeat/heartbeat/pending.txt])>0
-                and (now()-last(/Favor-group ASR monitoring/vfs.file.time[/asr-heartbeat/heartbeat/last-publish-epoch.txt,modify]))>21600
-              name: 'ASR: calls waiting but nothing published for 6h'
-              priority: HIGH
-              description: |
-                Recordings are queued and no note has reached B24 for six hours, so the pipeline is
-                consuming work without producing anything. Both known outages look exactly like this.
-                First stop is the reconcile stage: /web/private/asr-test/auto/auto.log now prints the
-                HTTP body behind a failed call and a per-reason tally, so a retired model id or an
-                exhausted DeepSeek balance names itself. Then check that the asr-fw whisper image
-                still exists (docker images asr-fw) — auto_run.sh rebuilds it on demand, but a failed
-                rebuild stops the cycle before publish.
-        - uuid: a6ebc8c735ef4aec8a24d5da8cda7599
-          name: 'ASR loop: notes published in total'
-          type: ZABBIX_ACTIVE
-          key: 'vfs.file.contents[/asr-heartbeat/heartbeat/processed-total.txt]'
-          delay: 10m
-          history: 90d
-          trends: 730d
-          value_type: UNSIGNED
-          description: |
-            Cumulative count of calls whose note is on a B24 timeline (the processed_ids ledger). Kept
-            for the trend: the slope shows call volume, and a flat line over a working day is a softer
-            version of the outage signal above.
-          tags:
-            - tag: Application
-              value: ASR
+  triggers:
+    - uuid: fcba209793994fdcbcc19f882ca6b723
+      expression: |
+        last(/Favor-group ASR monitoring/vfs.file.contents[/asr-heartbeat/heartbeat/pending.txt])>0
+        and (now()-last(/Favor-group ASR monitoring/vfs.file.time[/asr-heartbeat/heartbeat/last-publish-epoch.txt,modify]))>21600
+      name: 'ASR: calls waiting but nothing published for 6h'
+      priority: HIGH
+      description: |
+        Recordings are queued and no note has reached B24 for six hours, so the pipeline is
+        consuming work without producing anything. Both known outages look exactly like this.
+        First stop is the reconcile stage: /web/private/asr-test/auto/auto.log now prints the
+        HTTP body behind a failed call and a per-reason tally, so a retired model id or an
+        exhausted DeepSeek balance names itself. Then check that the asr-fw whisper image
+        still exists (docker images asr-fw) — auto_run.sh rebuilds it on demand, but a failed
+        rebuild stops the cycle before publish.
