@@ -23,17 +23,11 @@ zabbix_export:
               name: 'lead enrichment failed - codex may be logged out on terrty'
               priority: AVERAGE
               description: 'Exit 2 = codex returned no answer, most often a revoked ChatGPT token. Run `codex login` on terrty as opc. Other non-zero codes: see ~/lead-enrich/enrich.log.'
-              tags:
-                - tag: notify
-                  value: admin
             - uuid: 7cd0624d6b314ce7acf797fa952aa834
               expression: 'nodata(/Favor-group tg-agent monitoring/leadenrich.status,8h)=1'
               name: 'lead enrichment has not reported for 8h'
               priority: WARNING
               description: 'Runs every 2h from the opc crontab. Check `crontab -l` on terrty and ~/lead-enrich/enrich.log.'
-              tags:
-                - tag: notify
-                  value: admin
         - uuid: b3c6daf7c31444da8dcdaa57cf6a90f1
           name: 'tg-agent ads-cron run exit code'
           type: TRAP
@@ -50,15 +44,9 @@ zabbix_export:
               priority: AVERAGE
               description: 'No exit-code push for over 90h. Normal max gap is 82.5h (Friday 04:30 UTC morning run -> Monday 15:00 UTC weekly). Raised from 70h on 2026-08-12 when the morning note moved from Tue-Sat 03:00 UTC to Mon-Fri 04:30 UTC: the old threshold fired every weekend. Check crontab -l and tg-agent/data/ads-cron/cron.log on terrty.'
               manual_close: 'YES'
-              tags:
-                - tag: notify
-                  value: admin
             - uuid: 62cabf479eab4551b0aa78288a3f77c5
               expression: 'last(/Favor-group tg-agent monitoring/tgagent.adscron.status)<>0'
               name: 'tg-agent ads-cron run failed — check claude.ai login on terrty'
               priority: HIGH
               description: 'The unattended ads report run exited non-zero. Most likely the shared claude.ai OAuth login in the favor-tg-agent_claude-auth volume expired (this also silently kills all three Telegram bots). Check tg-agent/data/ads-cron/cron.log on terrty; re-login per tg-agent/README.md (interactive claude session in any agent container). Clears on the next successful run.'
               manual_close: 'YES'
-              tags:
-                - tag: notify
-                  value: admin

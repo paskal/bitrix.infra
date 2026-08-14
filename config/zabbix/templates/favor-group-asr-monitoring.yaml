@@ -43,9 +43,6 @@ zabbix_export:
               description: |
                 Пополнить счёт DeepSeek. При нулевом остатке заметки по звонкам перестают
                 собираться молча: ошибка API уходит в строку fail:, а не в отказ прогона.
-              tags:
-                - tag: notify
-                  value: admin
         - uuid: 4ebbb549269347baa1e1dbfafed03701
           name: 'ASR loop: calls waiting to publish'
           type: ZABBIX_ACTIVE
@@ -90,9 +87,6 @@ zabbix_export:
               description: |
                 Замер остатка пишется только при удачном чтении, поэтому застывший файл значит,
                 что запрос к API перестал проходить, и цифра остатка на дашборде уже недостоверна.
-              tags:
-                - tag: notify
-                  value: admin
         - uuid: c5dd18695b444bb2a4f638523cafc059
           name: 'ASR loop: last note published to B24'
           type: ZABBIX_ACTIVE
@@ -130,9 +124,6 @@ zabbix_export:
                 running or is exiting early. Read /web/private/asr-test/auto/auto.log — the tail names
                 the stage that stopped, and a "GATE FAILED" line is the pipeline protecting itself
                 rather than a crash.
-              tags:
-                - tag: notify
-                  value: admin
   triggers:
     - uuid: fcba209793994fdcbcc19f882ca6b723
       expression: |
@@ -148,6 +139,3 @@ zabbix_export:
         exhausted DeepSeek balance names itself. Then check that the asr-fw whisper image
         still exists (docker images asr-fw) — auto_run.sh rebuilds it on demand, but a failed
         rebuild stops the cycle before publish.
-      tags:
-        - tag: notify
-          value: admin
