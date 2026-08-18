@@ -6,6 +6,16 @@ networks:
     driver: bridge
     driver_opts:
       com.docker.network.driver.mtu: "${DOCKER_MTU:-1500}"
+  # Adminer sits alone here with nginx. It talks to MySQL over the mounted unix
+  # socket, never over TCP, so it does not need the shared network - and being on
+  # it meant a user-supplied auth[server] could make Adminer open connections to
+  # any container (php, memcached, zabbix) or to itself, which wedged it on
+  # 2026-08-13. internal: true also denies egress to the internet.
+  adminer:
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.driver.mtu: "${DOCKER_MTU:-1500}"
 
 services:
   certbot:
@@ -55,6 +65,9 @@ services:
       - "${HTTPS_PORT:-443}:443/udp"
     expose:
       - "8084"
+    networks:
+      - default
+      - adminer
     volumes:
       - ./web/prod:/web/prod
       - ./web/dev:/web/dev
@@ -230,6 +243,8 @@ services:
       - "8080"
     environment:
       ADMINER_DEFAULT_SERVER: localhost
+    networks:
+      - adminer
     volumes:
       - ./config/adminer/mysql-socket.ini:/usr/local/etc/php/conf.d/mysql-socket.ini:ro
       # MySQL socket to prevent transferring data through TCP
