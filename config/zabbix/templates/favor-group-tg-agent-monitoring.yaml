@@ -28,6 +28,30 @@ zabbix_export:
               name: 'lead enrichment has not reported for 8h'
               priority: WARNING
               description: 'Runs every 2h from the opc crontab. Check `crontab -l` on terrty and ~/lead-enrich/enrich.log.'
+        - uuid: f7b8dd02daee4cf6a708d8fc7579b5bd
+          name: 'claude.ai login state on terrty (1 = logged out)'
+          type: TRAP
+          key: tgagent.claude.auth
+          history: 90d
+          description: 'Pushed every 30 min by tg-agent/cron/claude-auth-check.sh on terrty: `claude auth status --json` inside the agent-dmitry container, which shares the claude-auth volume with the other two Telegram bots and ads-cron. 0 = loggedIn true, 1 = logged out (OAuth session expired and could not be refreshed). A logged-out volume kills all three Telegram bots and every ads-cron run silently; recovery is the interactive re-login in tg-agent/README.md ("claude.ai session"). Added 25.08.2026 after three failed ads-cron runs (24-25.08) went unnoticed because the exit-code alert looked like any other tg-agent failure.'
+          tags:
+            - tag: Application
+              value: tg-agent
+          triggers:
+            - uuid: 86e50fb30d5f4f8aad31b220ea4c19ca
+              expression: 'last(/Favor-group tg-agent monitoring/tgagent.claude.auth)=1'
+              name: 'CLAUDE.AI LOGIN EXPIRED on terrty: Telegram bots and ads-cron are dead until re-login'
+              priority: DISASTER
+              description: '`claude auth status` in the shared claude-auth volume reports loggedIn=false. Nothing that runs claude on terrty works until someone re-logs in: ssh -t terrty ''cd ~/favor-group/tg-agent && docker compose exec -it agent-dmitry claude'' -> /login, then docker compose up -d --force-recreate --no-deps agent-dmitry agent-aleksandr agent-maria. Clears automatically on the next 30-min check after the re-login.'
+              tags:
+                - tag: notify
+                  value: admin
+            - uuid: e85f7ce1a931432c91b776806f581494
+              expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.claude.auth,3h)=1'
+              name: 'claude.ai login watchdog has not reported for 3h'
+              priority: AVERAGE
+              description: 'claude-auth-check.sh runs every 30 min from the opc crontab on terrty. Check crontab -l, docker ps (fg-agent-dmitry must be up) and tg-agent/data/ads-cron/auth-check.log.'
+              manual_close: 'YES'
         - uuid: b3c6daf7c31444da8dcdaa57cf6a90f1
           name: 'tg-agent ads-cron run exit code'
           type: TRAP
@@ -47,6 +71,6 @@ zabbix_export:
             - uuid: 62cabf479eab4551b0aa78288a3f77c5
               expression: 'last(/Favor-group tg-agent monitoring/tgagent.adscron.status)<>0'
               name: 'tg-agent ads-cron run failed — check claude.ai login on terrty'
-              priority: HIGH
+              priority: DISASTER
               description: 'The unattended ads report run exited non-zero. Most likely the shared claude.ai OAuth login in the favor-tg-agent_claude-auth volume expired (this also silently kills all three Telegram bots). Check tg-agent/data/ads-cron/cron.log on terrty; re-login per tg-agent/README.md (interactive claude session in any agent container). Clears on the next successful run.'
               manual_close: 'YES'
