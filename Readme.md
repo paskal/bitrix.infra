@@ -393,6 +393,8 @@ Production identity (TLS certificates, site vhosts, site-specific cron jobs, CSP
 To start the regular production stack: `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks docker compose up -d`.
 
 > **Required for ALL ongoing ops, not just startup:** once the overlay is active, `nginx` `depends_on` the profile-gated `adminer`/`updater`, so *every* `docker compose` command, including `ps`, `logs`, `restart` and `down`, fails with `service "nginx" depends on undefined service "updater"` unless `COMPOSE_PROFILES` is set. Export it for the session (`export COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks`) or prefix each invocation. `scripts/disaster-recovery.sh` sets this default itself. Do not include the manual FTP profile in this default.
+>
+> On the production host this default now lives in `/web/.env` as `COMPOSE_PROFILES=certs,dbadmin,hooks,monitoring`, so a bare `docker compose` there resolves all ten services. That file is gitignored and therefore survives a deploy, but it also means a rebuilt host starts without it: recreate it before running any compose command. It was added on 29 Aug 2026 after a compose run without the profiles left `zabbix-agent` removed, which silently took monitoring down and produced eight cascading alerts (agent unavailable, MySQL/Docker/Memcached no-data, and a backup alert that was purely stale data, the backup itself having run normally).
 
 ## File structure
 
