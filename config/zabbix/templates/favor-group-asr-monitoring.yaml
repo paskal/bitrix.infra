@@ -108,22 +108,26 @@ zabbix_export:
           history: 90d
           description: |
             Modify time (epoch) of the status file that auto_run.sh writes at the end of every cycle,
-            including cycles with nothing to do. Cron fires every 30 minutes, so a growing age means
-            the cron, the docker stack or the flock is stuck, or the run is dying before its end (a
-            failed pre-publish gate exits early and deliberately leaves this file stale).
+            including cycles with nothing to do. Cron fires every 30 minutes, but a cycle is allowed to
+            run far longer than that: at daytime call volume one batch legitimately takes one to two
+            hours, and the flock makes the intervening firings no-ops. A growing age means the cron, the
+            docker stack or the flock is stuck, or the run is dying before its end (a failed pre-publish
+            gate exits early and deliberately leaves this file stale).
           tags:
             - tag: Application
               value: ASR
           triggers:
             - uuid: 67ce1980b19d48559a0d804743f98595
-              expression: '(now()-last(/Favor-group ASR monitoring/vfs.file.time[/asr-heartbeat/heartbeat/last-run.txt,modify]))>7200'
-              name: 'ASR: no completed pipeline cycle in >2h'
+              expression: '(now()-last(/Favor-group ASR monitoring/vfs.file.time[/asr-heartbeat/heartbeat/last-run.txt,modify]))>21600'
+              name: 'ASR: no completed pipeline cycle in >6h'
               priority: AVERAGE
               description: |
-                The loop runs every 30 minutes, so two hours without a completed cycle means it is not
-                running or is exiting early. Read /web/private/asr-test/auto/auto.log — the tail names
-                the stage that stopped, and a "GATE FAILED" line is the pipeline protecting itself
-                rather than a crash.
+                Cron fires every 30 minutes, but a long batch is normal and must not alert: measured
+                31.08.2026, a 16-call daytime batch took 102 minutes end to end, and the threshold was
+                raised from two hours to six for exactly that reason. Six hours without a completed
+                cycle means the loop is stuck or exiting early, not merely busy. Read
+                /web/private/asr-test/auto/auto.log - the tail names the stage that stopped, and a
+                "GATE FAILED" line is the pipeline protecting itself rather than a crash.
   triggers:
     - uuid: fcba209793994fdcbcc19f882ca6b723
       expression: |
