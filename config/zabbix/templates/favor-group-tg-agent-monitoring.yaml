@@ -18,16 +18,22 @@ zabbix_export:
           history: 90d
           description: 'Exit code of ~/lead-enrich/enrich_run.sh on terrty. 2 means codex produced nothing, which usually means it is logged out; the script fails loudly instead of reporting an innocent ''nothing to fill''.'
           triggers:
-            - uuid: e1d1b712bafa4fd0b7a243a0cf108eaf
-              expression: 'last(/Favor-group tg-agent monitoring/leadenrich.status)<>0'
-              name: 'lead enrichment failed - codex may be logged out on terrty'
-              priority: AVERAGE
-              description: 'Exit 2 = codex returned no answer, most often a revoked ChatGPT token. Run `codex login` on terrty as opc. Other non-zero codes: see ~/lead-enrich/enrich.log.'
             - uuid: 7cd0624d6b314ce7acf797fa952aa834
               expression: 'nodata(/Favor-group tg-agent monitoring/leadenrich.status,8h)=1'
               name: 'lead enrichment has not reported for 8h'
               priority: WARNING
               description: 'Runs every 2h from the opc crontab. Check `crontab -l` on terrty and ~/lead-enrich/enrich.log.'
+        - uuid: aa899bcb1d9241b5a10ec8e33cbb2488
+          name: 'lead enrichment last failure reason'
+          type: TRAP
+          key: leadenrich.reason
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          description: 'One line pushed by ~/lead-enrich/enrich_run.sh right before leadenrich.status: "ok" on exit 0, otherwise the last ERROR/LUNA_FAILED line of the run (codex usage limit with its reset time, "codex не авторизован", and so on). Shown in the failed-run alert through {ITEM.LASTVALUE2}, so the Telegram message says what broke instead of a bare exit code.'
+          tags:
+            - tag: Application
+              value: tg-agent
         - uuid: f7b8dd02daee4cf6a708d8fc7579b5bd
           name: 'claude.ai login state on terrty (1 = logged out)'
           type: TRAP
@@ -74,3 +80,10 @@ zabbix_export:
               priority: DISASTER
               description: 'The unattended ads report run exited non-zero. Most likely the shared claude.ai OAuth login in the favor-tg-agent_claude-auth volume expired (this also silently kills all three Telegram bots). Check tg-agent/data/ads-cron/cron.log on terrty; re-login per tg-agent/README.md (interactive claude session in any agent container). Clears on the next successful run.'
               manual_close: 'YES'
+  triggers:
+    - uuid: e1d1b712bafa4fd0b7a243a0cf108eaf
+      expression: 'last(/Favor-group tg-agent monitoring/leadenrich.status)<>0 and length(last(/Favor-group tg-agent monitoring/leadenrich.reason))>=0'
+      name: 'lead enrichment failed on terrty: {ITEM.LASTVALUE2}'
+      opdata: '{ITEM.LASTVALUE2}'
+      priority: AVERAGE
+      description: 'Exit 2 = codex returned no answer. The reason item names the cause: "usage limit ... try again at HH:MM" means the ChatGPT quota is spent and the next run after that time recovers by itself, nothing to do; "codex не авторизован" means the token is revoked, run `codex login` on terrty as opc. Other non-zero codes: see ~/lead-enrich/enrich.log. The length() term only pulls leadenrich.reason into the trigger so {ITEM.LASTVALUE2} resolves.'
