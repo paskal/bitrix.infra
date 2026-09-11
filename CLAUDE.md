@@ -170,7 +170,8 @@ for tid, macro in (('17810', '{$VFS.FS.PUSED.MAX.WARN:"{#FSNAME}"}'),
 Prototype ids are stable across edits but not across a template re-import, so look them up by name
 if the update fails. Filesystems already discovered keep the old behaviour until the next run of
 `Mounted filesystem discovery`, which is dependent on the active-agent item `vfs.fs.get` and
-therefore cannot be forced with «Execute now».
+therefore cannot be forced with «Execute now»; on 11.09.2026 the two live triggers picked up the
+recovery expression 35 minutes after the prototypes changed.
 
 The inode triggers (17811, 17812) still have no hysteresis; the same pattern applies with the
 comparison reversed, recovery at `> {$VFS.FS.INODE.PFREE.MIN.*}+5`.
