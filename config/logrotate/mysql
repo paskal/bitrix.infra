@@ -13,8 +13,8 @@
 	delaycompress
 	sharedscripts
 	postrotate
-		# read MYSQL_ROOT_PASSWORD
-		. ./private/environment/mysql.env
+		# read MYSQL_ROOT_PASSWORD; logrotate runs from / under systemd, so the path is absolute
+		. /web/private/environment/mysql.env
 		/usr/bin/docker exec mysql /bin/sh -c "/usr/bin/mysqladmin -uroot -p\"${MYSQL_ROOT_PASSWORD}\" flush-logs > /dev/null 2>/dev/null"
 	endscript
 }
