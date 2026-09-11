@@ -284,6 +284,7 @@ restore_mysql() {
 
   mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
   echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >"${mysql_config_file}"
+  trap 'rm -f -- "${mysql_config_file}"' EXIT
 
   # start_services() returns as soon as `up -d` exits, but MySQL needs ~30s to initialise
   # and accept socket connections. Without this wait the first query fails with
@@ -309,8 +310,12 @@ restore_mysql() {
     return
   fi
   echo "restoring the MySQL backup..."
-  zcat "${backup_directory_path}${backup_filepath}" |
-    docker exec -u0 -i mysql /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" "${mysql_restore_db}"
+  # The archive is checked before the import, and the import runs under bash with
+  # pipefail (sh has none): without it a zcat that dies mid-stream leaves mysql to
+  # load the prefix and exit 0, and a partial database would be reported as restored.
+  gzip -t "${backup_directory_path}${backup_filepath}"
+  bash -o pipefail -c 'zcat "$1" | docker exec -u0 -i mysql /bin/mysql --defaults-extra-file="$2" "$3"' \
+    restore-mysql "${backup_directory_path}${backup_filepath}" "${mysql_config_inside_container}" "${mysql_restore_db}"
   rm -f "${mysql_config_file}"
   echo "MySQL backup is restored"
 }
