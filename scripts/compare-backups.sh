@@ -24,8 +24,6 @@ DIFF_FILE="${BACKUP_DIR}/backup_diff.txt"
 
 # Create restore directory if it doesn't exist
 mkdir -p "${BACKUP_DIR}"
-mkdir -p "${BACKUP_DIR}/older"
-mkdir -p "${BACKUP_DIR}/newer"
 mkdir -p "${CACHE_DIR}"
 
 # Function to list available backups
@@ -98,8 +96,10 @@ restore_backup() {
 
   echo "Restoring backup from ${backup_time} to ${restore_dir}..."
 
-  # Clear the target directory first
-  rm -rf "${restore_dir:?}/"*
+  # Start from no directory at all: duplicity recreates it, and a previous run's
+  # files (dotfiles included, which a glob would skip) would otherwise stay in
+  # the restore and show up in the comparison
+  rm -rf "${restore_dir:?}"
 
   # Restore the backup as of the specified time
   HOME="${HOME_DIR}" duplicity \
@@ -123,8 +123,15 @@ compare_backups() {
 
   echo "Comparing backups..."
 
-  # Use diff to create a comparison between the two directories
-  diff -rua "${older_dir}" "${newer_dir}" >"${diff_file}" 2>/dev/null || true
+  # Use diff to create a comparison between the two directories. Status 1 means
+  # differences were found; anything above that is a diff failure, which must not
+  # be reported as a completed comparison.
+  local status=0
+  diff -rua "${older_dir}" "${newer_dir}" >"${diff_file}" || status=$?
+  if [ "${status}" -gt 1 ]; then
+    echo "diff failed with status ${status}, comparison is incomplete" >&2
+    return "${status}"
+  fi
 
   # Count number of differences
   local diff_count
