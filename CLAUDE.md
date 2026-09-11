@@ -132,6 +132,49 @@ All three ship `status: ENABLED` in the YAML — re-imports stay armed without a
 
 **Full design rationale** (D1–D7, all task post-mortems, ignoreErrors taxonomy, synthetic-regression test transcript): `favor-group.ru/docs/plans/completed/20260517-phpstan-prod-monitoring.md`.
 
+## Disk-space alerts: hysteresis lives in the stock Linux template
+
+The free-space triggers flapped because they fired above the threshold and recovered the moment the
+value dipped back under it, so a filesystem sitting on the line alerted several times a day. Both
+space triggers now have a recovery expression five points below the firing threshold: the problem
+opens above X and closes only below X-5.
+
+Applied to the trigger prototypes in **`Linux by Zabbix agent active`** (templateid 10284), which is
+the lowest level available here: it has no parent and no nested templates, and all four monitored
+hosts link to it, so every discovered filesystem inherits the change.
+
+| Prototype | Problem | Recovery |
+|---|---|---|
+| `Linux: FS [{#FSNAME}]: Space is low` (17810) | `min(…pused,5m) > {$VFS.FS.PUSED.MAX.WARN:"{#FSNAME}"}` | `max(…pused,5m) < {$VFS.FS.PUSED.MAX.WARN:"{#FSNAME}"}-5` |
+| `Linux: FS [{#FSNAME}]: Space is critically low` (17809) | `min(…pused,5m) > {$VFS.FS.PUSED.MAX.CRIT:"{#FSNAME}"}` | `max(…pused,5m) < {$VFS.FS.PUSED.MAX.CRIT:"{#FSNAME}"}-5` |
+
+Thresholds stay per host through the existing macros, and the arithmetic resolves after macro
+substitution, so a host at 95 recovers at 90 without any extra macro.
+
+🚨 **This is a stock Zabbix template, so an upgrade or a re-import of it silently reverts the
+recovery expressions and the flapping returns.** Re-apply after every Zabbix upgrade and after any
+re-import of the Linux template, then confirm the prototypes report `recovery_mode: 1`:
+
+```python
+import os
+from zabbix_utils import ZabbixAPI
+api = ZabbixAPI(url=os.environ['ZABBIX_URL']); api.login(token=os.environ['ZABBIX_TOKEN'])
+T, KEY = 'Linux by Zabbix agent active', 'vfs.fs.dependent.size[{#FSNAME},pused]'
+for tid, macro in (('17810', '{$VFS.FS.PUSED.MAX.WARN:"{#FSNAME}"}'),
+                   ('17809', '{$VFS.FS.PUSED.MAX.CRIT:"{#FSNAME}"}')):
+    api.triggerprototype.update(triggerid=tid, recovery_mode=1,
+        expression=f'min(/{T}/{KEY},5m)>{macro}',
+        recovery_expression=f'max(/{T}/{KEY},5m)<{macro}-5')
+```
+
+Prototype ids are stable across edits but not across a template re-import, so look them up by name
+if the update fails. Filesystems already discovered keep the old behaviour until the next run of
+`Mounted filesystem discovery`, which is dependent on the active-agent item `vfs.fs.get` and
+therefore cannot be forced with «Execute now».
+
+The inode triggers (17811, 17812) still have no hysteresis; the same pattern applies with the
+comparison reversed, recovery at `> {$VFS.FS.INODE.PFREE.MIN.*}+5`.
+
 ## SEO Reindex Cron
 - `scripts/seo-reindex.sh` (daily 21:15 UTC = 00:15 MSK as `admin`) drains URLs from `/web/private/seo-reindex/queue.txt` into Yandex Webmaster recrawl, up to ~960/day account-wide quota. Token: `/web/private/environment/seo-reindex.env`. Logs: `/web/logs/seo-reindex/YYYY-MM-DD.log`. Bing is sent manually via `bin/search-reindex submit --bing-only <file>`.
 
