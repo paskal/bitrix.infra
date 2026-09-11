@@ -10,6 +10,8 @@ fi
 
 dump_file=''
 mysql_config_file=''
+dev_dbconn_tmp=''
+dev_settings_tmp=''
 
 cleanup() {
   if [ -n "${dump_file}" ]; then
@@ -17,6 +19,12 @@ cleanup() {
   fi
   if [ -n "${mysql_config_file}" ]; then
     rm -f -- "${mysql_config_file}" || :
+  fi
+  if [ -n "${dev_dbconn_tmp}" ]; then
+    rm -f -- "${dev_dbconn_tmp}" || :
+  fi
+  if [ -n "${dev_settings_tmp}" ]; then
+    rm -f -- "${dev_settings_tmp}" || :
   fi
 }
 
@@ -31,6 +39,27 @@ trap cleanup EXIT
 trap 'handle_signal 129' HUP
 trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
+
+# Abort unless the dev copy of a DB connection file is safe to publish: every
+# expected dev line is present, and no line that assigns a database, login or
+# password is left without a dev value. sed reports success even when a pattern
+# matched nothing, so a layout the substitution does not cover (other quoting, a
+# second connection) would otherwise be published to dev with production
+# credentials.
+check_dev_db_config() {
+  file=$1
+  shift
+  for needle in "$@"; do
+    grep -q -F -- "${needle}" "${file}" && continue
+    echo "${file}: expected line not found, DB connection file layout is not supported" >&2
+    exit 1
+  done
+  if grep -iE "(database|login|password)['\"]?[[:space:]]*=>|\\\$DB(Name|Login|Password)[[:space:]]*=" "${file}" |
+    grep -v -F -e "'${DEV_DB}'" -e "'${DEV_USER}'" -e "'${DEV_PASSWORD}'" | grep -q .; then
+    echo "${file}: a connection setting was not rewritten, DB connection file layout is not supported" >&2
+    exit 1
+  fi
+}
 
 # Validate identifier for use in SQL (alphanumeric, underscore, hyphen only)
 validate_sql_identifier() {
@@ -151,6 +180,35 @@ mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 # shellcheck disable=SC2028
 echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
 
+# The dev DB connection files are built from the production ones with the dev
+# credentials substituted and checked before the dev database is dropped, so an
+# unsupported production file aborts while the old dev site still works. They are
+# published right after the new dev user exists, so an existing dev site keeps
+# working through the dump and restore. rsync below excludes both files, so
+# production credentials never reach the dev tree, and --delete leaves excluded
+# files in place.
+echo "Preparing dev DB connection settings"
+# install -d is the same as mkdir -p, but it allows setting owner user and group for created folders
+install -d -o 1000 -g 1000 "${DEV_LOCATION}/bitrix/php_interface"
+dev_dbconn="${DEV_LOCATION}/bitrix/php_interface/dbconn.php"
+dev_settings="${DEV_LOCATION}/bitrix/.settings.php"
+dev_dbconn_tmp=$(mktemp "${dev_dbconn}.XXXXXX")
+dev_settings_tmp=$(mktemp "${dev_settings}.XXXXXX")
+sed \
+  -e "s/^\([[:space:]]*\)\$DBName[[:space:]]*=.*/\1\$DBName = '${DEV_DB}';/" \
+  -e "s/^\([[:space:]]*\)\$DBLogin[[:space:]]*=.*/\1\$DBLogin = '${DEV_USER}';/" \
+  -e "s/^\([[:space:]]*\)\$DBPassword[[:space:]]*=.*/\1\$DBPassword = '${DEV_PASSWORD}';/" \
+  "${PROD_LOCATION}/bitrix/php_interface/dbconn.php" >"${dev_dbconn_tmp}"
+sed \
+  -e "s/^\([[:space:]]*\)'database'[[:space:]]*=>.*/\1'database' => '${DEV_DB}',/" \
+  -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/\1'login' => '${DEV_USER}',/" \
+  -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/\1'password' => '${DEV_PASSWORD}',/" \
+  "${PROD_LOCATION}/bitrix/.settings.php" >"${dev_settings_tmp}"
+check_dev_db_config "${dev_dbconn_tmp}" \
+  "\$DBName = '${DEV_DB}';" "\$DBLogin = '${DEV_USER}';" "\$DBPassword = '${DEV_PASSWORD}';"
+check_dev_db_config "${dev_settings_tmp}" \
+  "'database' => '${DEV_DB}'," "'login' => '${DEV_USER}'," "'password' => '${DEV_PASSWORD}',"
+
 echo "Recreating DB base and user"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "drop database if exists ${DEV_DB};"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "drop user if exists '${DEV_USER}'@'localhost';"
@@ -162,23 +220,13 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "grant system_variables_admin on *.* to '${DEV_USER}'@'localhost';"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e 'flush privileges;'
 
-# best-effort update of existing dev config files with new credentials
-# this minimizes downtime: site works during DB operations, only broken during rsync
-if [ -f "${DEV_LOCATION}/bitrix/php_interface/dbconn.php" ]; then
-  echo "Updating existing dev config files with new credentials (before rsync)"
-  sed -i \
-    -e "s/^\([[:space:]]*\)\$DBName[[:space:]]*=.*/\1\$DBName = '${DEV_DB}';/" \
-    -e "s/^\([[:space:]]*\)\$DBLogin[[:space:]]*=.*/\1\$DBLogin = '${DEV_USER}';/" \
-    -e "s/^\([[:space:]]*\)\$DBPassword[[:space:]]*=.*/\1\$DBPassword = '${DEV_PASSWORD}';/" \
-    "${DEV_LOCATION}/bitrix/php_interface/dbconn.php"
-fi
-if [ -f "${DEV_LOCATION}/bitrix/.settings.php" ]; then
-  sed -i \
-    -e "s/^\([[:space:]]*\)'database'[[:space:]]*=>.*/\1'database' => '${DEV_DB}',/" \
-    -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/\1'login' => '${DEV_USER}',/" \
-    -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/\1'password' => '${DEV_PASSWORD}',/" \
-    "${DEV_LOCATION}/bitrix/.settings.php"
-fi
+echo "Writing dev DB connection settings"
+chown 1000:1000 "${dev_dbconn_tmp}" "${dev_settings_tmp}"
+chmod 0640 "${dev_dbconn_tmp}" "${dev_settings_tmp}"
+mv -f "${dev_dbconn_tmp}" "${dev_dbconn}"
+mv -f "${dev_settings_tmp}" "${dev_settings}"
+dev_dbconn_tmp=''
+dev_settings_tmp=''
 
 # create and load database dump
 dump_file="prod-dump.sql"
@@ -222,32 +270,17 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "INSERT IGNORE INTO b_user_group (user_id, group_id, date_active_from, date_active_to) VALUES ('6', '1', NULL, NULL), ('92', '1', NULL, NULL), ('1560', '1', NULL, NULL), ('1561', '1', NULL, NULL);" ${DEV_DB}
 
 echo "Copying files"
-# install -d is the same as mkdir -p, but it allows setting owner user and group for created folder
-install -d -o 1000 -g 1000 "${DEV_LOCATION}"
 # copy files
 # --archive preserves file permissions and so on
 # --whole-file skips delta-transfer algorithm, faster for local copy
 # --inplace writes directly to destination file, avoids temp file overhead
 # --delete deletes files from destination if they are not present in the source
 # --force allows deletion of non-empty directories when their contents were excluded
-# --exclude excludes backup, Bitrix caches, temp files, PDFs, and image caches from the sync
+# --exclude excludes the DB connection files written above, backup, Bitrix caches, temp files, PDFs, and image caches from the sync
 # / in the end of src location avoid creating additional directory level at destination
 echo "Starting rsync at $(date '+%H:%M:%S'), estimated duration ~3 minutes, expected completion at $(date -d '+3 minutes' '+%H:%M:%S')"
-rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/backup' --exclude '/bitrix/cache/' --exclude '/bitrix/managed_cache/' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
+rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/php_interface/dbconn.php' --exclude '/bitrix/.settings.php' --exclude '/bitrix/backup' --exclude '/bitrix/cache/' --exclude '/bitrix/managed_cache/' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
 echo "Rsync completed at $(date '+%H:%M:%S')"
-
-echo "Changing DB connection settings"
-# change settings in files to reflect dev site DB user
-sed -i \
-  -e "s/^\([[:space:]]*\)\$DBName[[:space:]]*=.*/\1\$DBName = '${DEV_DB}';/" \
-  -e "s/^\([[:space:]]*\)\$DBLogin[[:space:]]*=.*/\1\$DBLogin = '${DEV_USER}';/" \
-  -e "s/^\([[:space:]]*\)\$DBPassword[[:space:]]*=.*/\1\$DBPassword = '${DEV_PASSWORD}';/" \
-  "${DEV_LOCATION}/bitrix/php_interface/dbconn.php"
-sed -i \
-  -e "s/^\([[:space:]]*\)'database'[[:space:]]*=>.*/\1'database' => '${DEV_DB}',/" \
-  -e "s/^\([[:space:]]*\)'login'[[:space:]]*=>.*/\1'login' => '${DEV_USER}',/" \
-  -e "s/^\([[:space:]]*\)'password'[[:space:]]*=>.*/\1'password' => '${DEV_PASSWORD}',/" \
-  "${DEV_LOCATION}/bitrix/.settings.php"
 
 # keep dev admin sessions valid when Private Relay rotates an address inside the same /16
 docker exec -i -u www-data php php <<'PHP'
