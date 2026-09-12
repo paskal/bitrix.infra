@@ -85,6 +85,13 @@ services:
       - ./logs/nginx:/var/log/nginx
     environment:
       - TZ=${TZ:-Europe/Moscow}
+    # stub_status vhost on 8084 (conf.d/status.conf); the Zabbix Docker template
+    # alerts on any container reporting unhealthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8084/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
     logging:
       driver: json-file
@@ -131,6 +138,14 @@ services:
       # switch timezone from UTC to Moscow
       - ./config/php/moscow-timezone:/etc/timezone:ro
       - ./config/php/moscow-localtime:/etc/localtime:ro
+    # php-fpm accepts FastCGI connections; overrides the image's "php --ini"
+    # check, which passes while php-fpm is down
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
     logging:
       driver: json-file
@@ -171,6 +186,12 @@ services:
       # switch timezone from UTC to Moscow
       - ./config/php/moscow-timezone:/etc/timezone:ro
       - ./config/php/moscow-localtime:/etc/localtime:ro
+    # the cron daemon is the service here, not php-fpm
+    healthcheck:
+      test: ["CMD", "pgrep", "-x", "cron"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
     logging:
       driver: json-file
@@ -198,6 +219,14 @@ services:
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-bitrix}
       TZ: ${TZ:-Europe/Moscow}
+    # ping over the socket from my.cnf [client]; exits 0 whenever the server
+    # answers, credentials are not needed
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE
 
