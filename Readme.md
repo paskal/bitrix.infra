@@ -273,7 +273,6 @@ define("BX_DISABLE_INDEX_PAGE", true);
         'options' => 3,
         // once the database is utf8mb4, see "Converting the database to utf8mb4"
         'charset' => 'utf8mb4',
-        'include_after_connected' => __DIR__ . '/php_interface/after_connect_d7.php',
         'utf8mb4' => array('global' => true),
       ),
     ),
@@ -761,11 +760,13 @@ The database alone does not switch the application. In `bitrix/.settings.php`, i
 
 ```php
 'charset' => 'utf8mb4',
-'include_after_connected' => __DIR__ . '/php_interface/after_connect_d7.php',
 'utf8mb4' => array('global' => true),
 ```
 
-and create `bitrix/php_interface/after_connect_d7.php` naming the collation the tables were converted to:
+and create `bitrix/php_interface/after_connect_d7.php` naming the collation the tables were converted
+to. Bitrix includes this file on every connection by default (`ConnectionPool` fills in
+`include_after_connected` when the setting is absent), and its install wizard writes the same file
+on a fresh install, so this is the standard place for the connection charset:
 
 ```php
 <?php
