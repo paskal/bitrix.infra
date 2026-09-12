@@ -283,7 +283,7 @@ restore_mysql() {
   ) || exit
 
   mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
-  echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >"${mysql_config_file}"
+  echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}\ndefault-character-set = utf8mb4" >"${mysql_config_file}"
   trap 'rm -f -- "${mysql_config_file}"' EXIT
 
   # start_services() returns as soon as `up -d` exits, but MySQL needs ~30s to initialise

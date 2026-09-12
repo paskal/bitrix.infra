@@ -62,7 +62,7 @@ mysql_config_file=$(
 mysql_binary_path="docker exec -u0 mysql /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
-printf '[client]\nuser = root\npassword = %s\n' "${MYSQL_ROOT_PASSWORD}" >"${mysql_config_file}"
+printf '[client]\nuser = root\npassword = %s\ndefault-character-set = utf8mb4\n' "${MYSQL_ROOT_PASSWORD}" >"${mysql_config_file}"
 
 echo "Backing up MySQL to ${backup_path}"
 

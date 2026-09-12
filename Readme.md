@@ -691,6 +691,13 @@ rotate an address within the same `/16` without ending the session. Production r
 and the session cookie are still required. A session created before the override may require one
 new login.
 
+The dev DB connection files are generated from the production ones with dev credentials and go
+live only after the dump is restored, so dev never runs against an empty or a production database;
+the tree keeps its previous dev credentials, which stop working the moment the dev user is
+recreated. After the file sync the script clears the dev site's Bitrix caches (managed, tagged, file
+and composite) through the Bitrix API, because cache entries from the previous copy describe another
+database.
+
 If `private/scripts/renew-dev-post.sh` exists and is executable, the script runs it after the DEV
 database connection and administrator policy have been restored. This optional hook keeps
 site-specific post-clone settings in the private overlay; installations without it are unchanged.
@@ -714,9 +721,56 @@ sudo ./scripts/renew-dev.sh --date
 </details>
 
 <details>
+<summary>Converting the database to utf8mb4</summary>
+
+Bitrix installs of this age run on `utf8` (utf8mb3), which cannot store 4-byte characters: an
+emoji in a name or a comment is silently cut off together with everything after it. The
+`convert-utf8mb4.sh` script converts every table of a database in place:
+
+```shell
+# see what would change: statement count, sizes, the generated ALTER file
+sudo ./scripts/convert-utf8mb4.sh --dry-run favor_group_ru
+# convert (stop the site and php-cron first; tables are rebuilt with a copy and block writes)
+sudo ./scripts/convert-utf8mb4.sh favor_group_ru
+```
+
+One `ALTER TABLE` per table is generated from `information_schema`: every character column is
+rewritten with its current type, nullability, default and comment, `*_bin` columns become
+`utf8mb4_bin`, everything else takes the target collation (default `utf8mb4_unicode_ci`, the
+same comparison rules as `utf8mb3_unicode_ci`; `--collation utf8mb4_0900_ai_ci` selects the
+MySQL 8 default that fresh Bitrix installs use). A plain `CONVERT TO CHARACTER SET` is not used:
+it widens `TEXT` to `MEDIUMTEXT` and replaces binary collations, which breaks unique keys such as
+`b_search_stem.STEM`. Before and after the run the script writes a column snapshot and a per-table
+data fingerprint under `logs/utf8mb4/` and fails when anything but charset and collation differs.
+A run that stops halfway can be repeated; it picks up the tables that are still not converted.
+
+The database alone does not switch the application. In `bitrix/.settings.php`, inside
+`connections` → `default`, add:
+
+```php
+'charset' => 'utf8mb4',
+'include_after_connected' => __DIR__ . '/php_interface/after_connect_d7.php',
+'utf8mb4' => array('global' => true),
+```
+
+and create `bitrix/php_interface/after_connect_d7.php` with the same collation as the tables:
+
+```php
+<?php
+$this->queryExecute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'");
+```
+
+Set `default_character_set = utf8mb4` in the `[client]` section of `config/mysql/my.cnf`, otherwise
+`mysqldump` (backups, `renew-dev.sh`) reads the tables as utf8mb3 and turns 4-byte characters into
+`?`; `character_set_server` and `collation_server` there should follow too so new tables created
+without an explicit charset match.
+
+</details>
+
+<details>
 <summary>Cleaning (mem)cache</summary>
 
-There are two memcached instances in use, one for site cache and another for sessions. Here are the commands to clean them completely:
+There are two memcached instances in use, one for site cache and another for sessions. The site cache is shared by prod and dev, each under its own namespace (`sid` in `.settings_extra.php`); `flush_all` below empties both, `renew-dev.sh` shows how to clean one site through the Bitrix API. Here are the commands to clean them completely:
 
 ```shell
 # to flush site cache
