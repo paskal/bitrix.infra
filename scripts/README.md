@@ -23,12 +23,22 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`check-404.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Analyzes nginx logs to find 404 errors from search engine bots for redirect troubleshooting.
-    *   **Notes:** Might use `urls.txt` or a similar file as input.
+    *   **Purpose:** Prints the 404 URLs that YandexBot and Googlebot hit in the nginx access log, counted, with `/bitrix/cache/` and `/upload/` paths excluded, for redirect troubleshooting.
+    *   **Notes:** `check-404.sh [log-file]`; the log defaults to `logs/nginx/prod.access.log` or `CHECK_404_LOG`.
 
 *   **`compare-backups.sh`**
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Interactive tool to compare two backups from S3, showing differences between selected dates.
+
+*   **`convert-utf8mb4.sh`**
+    *   **Type:** Shell script (`.sh`)
+    *   **Purpose:** Converts a database to utf8mb4 in place with one generated `ALTER TABLE` per table that still needs it, keeping column types and binary collations; verifies column definitions and per-table row digests before and after each run. Makes no backup of its own.
+    *   **Notes:** `sudo ./scripts/convert-utf8mb4.sh [--dry-run] [--collation NAME] DATABASE`; see [Converting the database to utf8mb4](../Readme.md#routine-operations) for the Bitrix settings that go with it.
+
+*   **`dedup-upload.sh`**
+    *   **Type:** Shell script (`.sh`)
+    *   **Purpose:** Replaces byte-identical files under `web/prod/upload` with hard links (`hardlink -t -X` from util-linux), excluding module scratch, exchange and log directories. Runs monthly from `config/cron/host.cron`.
+    *   **Notes:** `./scripts/dedup-upload.sh [--dry-run] [directory]`; full `hardlink` output goes to `logs/dedup-upload.log`. Linked copies share later in-place writes, so review the exclusions for your modules; needs util-linux `hardlink` with `--respect-xattrs` and `flock`.
 
 *   **`disaster-recovery.sh`**
     *   **Type:** Shell script (`.sh`)
@@ -37,11 +47,15 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`file-backup.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Performs incremental file backups to S3 using duplicity. Excludes cache, logs, and development directories. Full backup every 60 days.
+    *   **Purpose:** Performs incremental file backups to S3 using duplicity, under a `duplicity_web_<hostname>` prefix. Excludes cache, logs, and development directories. Full backup every 60 days. Runs without encryption and includes `private/environment/*.env`, so the bucket must stay private.
 
 *   **`find-image-type-mismatch.sh`**
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Detects images where file extension doesn't match actual MIME type.
+
+*   **`ftp-entrypoint.sh`**
+    *   **Type:** Shell script (`.sh`)
+    *   **Purpose:** Entrypoint of the `ftp` service (`ftp-manual` profile): starts pure-ftpd with verbose logging into `logs/ftp/pureftpd.log` and, at each container start, appends the previous run's log to `session-history.log` before the image clears it.
 
 *   **`fix-rights.sh`**
     *   **Type:** Shell script (`.sh`)
@@ -50,14 +64,19 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`mysql-dump.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Creates compressed MySQL dump and uploads to S3. Excludes user sessions table to reduce backup size.
-    *   **Notes:** May require database credentials, possibly from environment variables or a configuration file.
+    *   **Purpose:** Creates a compressed MySQL dump (utf8mb4 client, `b_user_session` excluded) and uploads it to S3; a dump under 1 MB is treated as a failure and not synced.
+    *   **Notes:** Reads `private/environment/mysql.env` and `private/environment/backup.env` (`BACKUP_S3_BUCKET`, `S3_ENDPOINT_URL`, `DOMAIN`); the database name is derived from `DOMAIN` (dots and dashes to underscores), not from `MYSQL_DATABASE`, and the dump lands under `mysql_<hostname>/` in the bucket.
 
 *   **`optimise-images.sh`**
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Optimizes PNG, JPEG, WebP, and GIF images using various tools. Uses SQLite database at `private/image-optimisation/optimised.db` to track processed files and avoid reprocessing.
 
-*   **`renew-dev.sh`:** Recreates dev from current production or a selected backup; see [Dev site renewal from backup](../Readme.md#dev-site-renewal-from-backup) for usage and safeguards.
+*   **`pull-public.sh`**
+    *   **Type:** Shell script (`.sh`)
+    *   **Purpose:** Production pull of this repository for the `updater` webhook: validates user, repository, branch and origin, makes the root-owned `config/cron` and `config/logrotate` writable for the pull only, and restarts `php-cron` or nginx when a file-mounted config changed inode (nginx after a test in a fresh container).
+    *   **Notes:** See [Automation (host cron)](../Readme.md#automation-host-cron) for the first-time rollout.
+
+*   **`renew-dev.sh`:** Recreates dev from current production or a selected backup; see [Dev site renewal from backup](../Readme.md#routine-operations) for usage and safeguards.
 
 *   **`requirements.txt`**
     *   **Type:** Data file (Python dependencies)
@@ -66,7 +85,7 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`setup.py`**
     *   **Type:** Python packaging script (`.py`)
-    *   **Purpose:** Standard Python project setup script, likely used for packaging any Python utilities or scripts in this directory if they were to be distributed or installed as a package.
+    *   **Purpose:** Packages `urls.py` as the `bitrix-infra-scripts` module.
 
 *   **`phpstan-scan.sh`**
     *   **Type:** Shell script (`.sh`)
@@ -80,13 +99,13 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`update-dns-token.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Updates Yandex Cloud DNS authentication token for automatic certificate renewal.
-    *   **Notes:** Requires API credentials, probably sourced from environment variables or a secure configuration file.
+    *   **Purpose:** Refreshes the Yandex Cloud IAM token (12-hour lifetime) that DNSroboCert uses for the DNS challenge; runs three times a day from `config/cron/host.cron`.
+    *   **Notes:** Calls the `yc` CLI from the `admin` user's home and writes the token into `private/environment/dnsrobocert.env`.
 
 *   **`urls.py`**
     *   **Type:** Python script (`.py`)
     *   **Purpose:** Python utility for checking URLs, finding redirects, broken links, and extracting page titles. Supports updating redirect maps.
-    *   **Notes:** May use `requirements.txt` for its dependencies.
+    *   **Notes:** Dependencies in `requirements.txt`; `urls.txt` is its empty input placeholder.
 
 ## bin/ Directory Tools
 
