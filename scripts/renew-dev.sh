@@ -10,8 +10,7 @@ fi
 
 dump_file=''
 mysql_config_file=''
-dev_dbconn_tmp=''
-dev_settings_tmp=''
+dev_config_tmp=''
 
 cleanup() {
   if [ -n "${dump_file}" ]; then
@@ -20,11 +19,8 @@ cleanup() {
   if [ -n "${mysql_config_file}" ]; then
     rm -f -- "${mysql_config_file}" || :
   fi
-  if [ -n "${dev_dbconn_tmp}" ]; then
-    rm -f -- "${dev_dbconn_tmp}" || :
-  fi
-  if [ -n "${dev_settings_tmp}" ]; then
-    rm -f -- "${dev_settings_tmp}" || :
+  if [ -n "${dev_config_tmp}" ]; then
+    rm -rf -- "${dev_config_tmp}" || :
   fi
 }
 
@@ -178,22 +174,20 @@ mysql_binary_path="docker exec -u0 mysql /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
 # shellcheck disable=SC2028
-echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}" >${mysql_config_file}
+echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}\ndefault-character-set = utf8mb4" >${mysql_config_file}
 
 # The dev DB connection files are built from the production ones with the dev
 # credentials substituted and checked before the dev database is dropped, so an
-# unsupported production file aborts while the old dev site still works. They are
-# published right after the new dev user exists, so an existing dev site keeps
-# working through the dump and restore. rsync below excludes both files, so
-# production credentials never reach the dev tree, and --delete leaves excluded
-# files in place.
+# unsupported production file aborts while the old dev site still works. They
+# stay in a root-only temporary directory until the restore is complete: see the
+# publishing step below. rsync excludes both files, so production credentials
+# never reach the dev tree, and --delete leaves excluded files in place.
 echo "Preparing dev DB connection settings"
-# install -d is the same as mkdir -p, but it allows setting owner user and group for created folders
-install -d -o 1000 -g 1000 "${DEV_LOCATION}/bitrix/php_interface"
 dev_dbconn="${DEV_LOCATION}/bitrix/php_interface/dbconn.php"
 dev_settings="${DEV_LOCATION}/bitrix/.settings.php"
-dev_dbconn_tmp=$(mktemp "${dev_dbconn}.XXXXXX")
-dev_settings_tmp=$(mktemp "${dev_settings}.XXXXXX")
+dev_config_tmp=$(mktemp -d)
+dev_dbconn_tmp="${dev_config_tmp}/dbconn.php"
+dev_settings_tmp="${dev_config_tmp}/settings.php"
 sed \
   -e "s/^\([[:space:]]*\)\$DBName[[:space:]]*=.*/\1\$DBName = '${DEV_DB}';/" \
   -e "s/^\([[:space:]]*\)\$DBLogin[[:space:]]*=.*/\1\$DBLogin = '${DEV_USER}';/" \
@@ -212,21 +206,27 @@ check_dev_db_config "${dev_settings_tmp}" \
 echo "Recreating DB base and user"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "drop database if exists ${DEV_DB};"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "drop user if exists '${DEV_USER}'@'localhost';"
+# dropping the user leaves its open sessions alive (php-fpm keeps persistent
+# connections), and they would keep working on the recreated database
+${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -N -e "select concat('kill ', ID, ';') from information_schema.PROCESSLIST where USER = '${DEV_USER}';" |
+  docker exec -u0 -i mysql /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" --force >/dev/null || :
 
-# prepare new dev database and user
-${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "create database ${DEV_DB};"
+# prepare new dev database and user; the database takes the charset and
+# collation of the production one, the dump carries them per table only
+prod_db_charset=$(${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -N -e "select concat('character set ', DEFAULT_CHARACTER_SET_NAME, ' collate ', DEFAULT_COLLATION_NAME) from information_schema.SCHEMATA where SCHEMA_NAME = '${PROD_DB}';")
+case "${prod_db_charset}" in
+'character set '*' collate '*) ;;
+*)
+  echo "could not read the charset of ${PROD_DB}: '${prod_db_charset}'" >&2
+  exit 1
+  ;;
+esac
+validate_sql_identifier "${prod_db_charset##* }"
+${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "create database ${DEV_DB} ${prod_db_charset};"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "create user '${DEV_USER}'@'localhost' identified by '${DEV_PASSWORD}';"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "grant all on ${DEV_DB}.* to '${DEV_USER}'@'localhost';"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "grant system_variables_admin on *.* to '${DEV_USER}'@'localhost';"
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e 'flush privileges;'
-
-echo "Writing dev DB connection settings"
-chown 1000:1000 "${dev_dbconn_tmp}" "${dev_settings_tmp}"
-chmod 0640 "${dev_dbconn_tmp}" "${dev_settings_tmp}"
-mv -f "${dev_dbconn_tmp}" "${dev_dbconn}"
-mv -f "${dev_settings_tmp}" "${dev_settings}"
-dev_dbconn_tmp=''
-dev_settings_tmp=''
 
 # create and load database dump
 dump_file="prod-dump.sql"
@@ -244,7 +244,7 @@ else
   ${mysql_binary_path}/mysqldump --defaults-extra-file="${mysql_config_inside_container}" --single-transaction --no-tablespaces --ignore-table=${PROD_DB}.b_user_session ${PROD_DB} >>"${dump_file}"
 fi
 # shellcheck disable=SC2028
-echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}" >${mysql_config_file}
+echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}\ndefault-character-set = utf8mb4" >${mysql_config_file}
 echo "Restoring mysql dump for dev"
 cat "${dump_file}" | docker exec -u0 -i mysql /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" ${DEV_DB}
 
@@ -269,6 +269,22 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "INSERT IGNORE INTO b_user_access (user_id, provider_id, access_code) VALUES ('6', 'group', 'G1'), ('92', 'group', 'G1'), ('1560', 'group', 'G1'), ('1561', 'group', 'G1');" ${DEV_DB}
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "INSERT IGNORE INTO b_user_group (user_id, group_id, date_active_from, date_active_to) VALUES ('6', '1', NULL, NULL), ('92', '1', NULL, NULL), ('1560', '1', NULL, NULL), ('1561', '1', NULL, NULL);" ${DEV_DB}
 
+# Published only after the restore: a dev site that can connect while its
+# database is still empty caches those empty results in its cache backend, where
+# managed cache entries have no expiry, and serves errors from them after the
+# restore. Until this point the tree holds the previous dev credentials, invalid
+# since the dev user was recreated, so dev never connects to the production
+# database.
+echo "Writing dev DB connection settings"
+# install -d is the same as mkdir -p, but it allows setting owner user and group for created folders
+install -d -o 1000 -g 1000 "${DEV_LOCATION}/bitrix/php_interface"
+install -o 1000 -g 1000 -m 0640 "${dev_dbconn_tmp}" "${dev_dbconn}.new"
+install -o 1000 -g 1000 -m 0640 "${dev_settings_tmp}" "${dev_settings}.new"
+mv -f "${dev_dbconn}.new" "${dev_dbconn}"
+mv -f "${dev_settings}.new" "${dev_settings}"
+rm -rf -- "${dev_config_tmp}"
+dev_config_tmp=''
+
 echo "Copying files"
 # copy files
 # --archive preserves file permissions and so on
@@ -281,6 +297,29 @@ echo "Copying files"
 echo "Starting rsync at $(date '+%H:%M:%S'), estimated duration ~3 minutes, expected completion at $(date -d '+3 minutes' '+%H:%M:%S')"
 rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/php_interface/dbconn.php' --exclude '/bitrix/.settings.php' --exclude '/bitrix/backup' --exclude '/bitrix/cache/' --exclude '/bitrix/managed_cache/' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
 echo "Rsync completed at $(date '+%H:%M:%S')"
+
+# Cache entries left by the previous dev copy, or written while the files were
+# still syncing, describe another database and another tree. Bitrix cleans the
+# cache its own settings address; with a cache backend shared between sites,
+# every site needs its own sid in .settings_extra.php for this to stay local.
+# The composite page cache is not touched through the API: with memcached
+# storage its deleteAll() flushes the whole shared instance. Its file storage
+# keeps one directory per host, and the dev host's directory is removed here.
+echo "Clearing dev site caches"
+docker exec -i -u www-data php php <<'PHP'
+<?php
+declare(strict_types=1);
+
+$_SERVER['DOCUMENT_ROOT'] = '/web/dev';
+define('NO_KEEP_STATISTIC', true);
+define('NOT_CHECK_PERMISSIONS', true);
+define('NO_AGENT_CHECK', true);
+require '/web/dev/bitrix/modules/main/include/prolog_before.php';
+
+\Bitrix\Main\Application::getInstance()->getManagedCache()->cleanAll();
+BXClearCache(true);
+PHP
+rm -rf "${DEV_LOCATION:?}/bitrix/html_pages/${DEV_DOMAIN:?}"
 
 # keep dev admin sessions valid when Private Relay rotates an address inside the same /16
 docker exec -i -u www-data php php <<'PHP'
