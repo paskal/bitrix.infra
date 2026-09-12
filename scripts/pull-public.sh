@@ -83,12 +83,15 @@ on_signal() {
 test_fresh_nginx_configuration() {
   nginx_image=$(docker inspect --format '{{.Config.Image}}' nginx) ||
     fail "cannot determine the running nginx image"
+  # The test container must resolve the php upstream, so it joins php's
+  # network (the compose default). nginx itself also sits on the adminer
+  # network, which sorts first in its network list and has no php in it.
   nginx_network=$(
     docker inspect \
       --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' \
-      nginx | sed -n '1p'
-  ) || fail "cannot determine the nginx network"
-  [ -n "$nginx_network" ] || fail "nginx has no Docker network"
+      php | sed -n '1p'
+  ) || fail "cannot determine the php network"
+  [ -n "$nginx_network" ] || fail "php has no Docker network"
 
   for required_path in \
     "$repo/private/nginx" \
