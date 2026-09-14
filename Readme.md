@@ -676,6 +676,25 @@ sudo ./scripts/renew-dev.sh
 sudo ./scripts/renew-dev.sh --date
 ```
 
+The site-specific values are read from the environment when non-empty, so another site runs the
+script by setting what differs. Defaults in brackets: `DOMAIN` (`favor-group.ru`), `DEV_SUBDOMAIN`
+(`dev`; the dev host is `<DEV_SUBDOMAIN>.<DOMAIN>`), `PROD_LOCATION` (`./web/prod`), `DEV_LOCATION`
+(`./web/<DEV_SUBDOMAIN>`), `BACKUP_LOCATION` (`./backup`), `CONTAINER_WEB_ROOT` (`/web`) and
+`DEV_DOCROOT` (`<CONTAINER_WEB_ROOT>/<DEV_SUBDOMAIN>`; it must be `DEV_LOCATION` as mounted inside
+the php container, see the `php` volumes in `docker-compose.yml`), `PHP_CONTAINER` (`php`),
+`MYSQL_CONTAINER` (`mysql`), `MYSQL_ENV_FILE` (`./private/environment/mysql.env`), `MYSQL_DATA_DIR`
+(`./private/mysql-data`, the host path of the container's `/var/lib/mysql`), `WEB_UID` and `WEB_GID`
+(`1000`), `PROD_DB`, `DEV_DB` and `DEV_USER` (derived from the domains with dots and dashes as
+underscores), `DEV_ADMIN_USER_IDS` (`6 92 1560 1561` when unset, user ids added to the administrators
+group on dev; set it empty to add none), `DEV_ADMIN_IP_MASK` (`255.255.0.0`) and `POST_RENEW_HOOK`
+(`./private/scripts/renew-dev-post.sh`). The script refuses to run when the dev tree is the
+production tree or nested with it, when the backups sit inside the dev tree, or when the dev
+database or user matches the name or login in the production `dbconn.php`. For example:
+
+```sh
+sudo DOMAIN=example.com DEV_ADMIN_USER_IDS="1 7" ./scripts/renew-dev.sh
+```
+
 When using `--date`, the script will:
 1. List available backup dates from `/web/backup/`
 2. Prompt you to select a date (format: YYYY-MM-DD)
@@ -684,8 +703,8 @@ When using `--date`, the script will:
 5. Restore the database from that backup instead of creating a new dump
 
 After either restore path, the script reapplies DEV-only settings. Administrator sessions and
-remembered authorisation for group 1 use `255.255.0.0` network masks so Safari Private Relay can
-rotate an address within the same `/16` without ending the session. Production retains the stricter
+remembered authorisation for group 1 use the `DEV_ADMIN_IP_MASK` network mask (`255.255.0.0` by
+default) so Safari Private Relay can rotate an address within the same `/16` without ending the session. Production retains the stricter
 `255.255.255.255` masks. This slightly broadens the DEV cookie replay boundary, but authentication
 and the session cookie are still required. A session created before the override may require one
 new login.
@@ -700,8 +719,9 @@ composite page directory, because cache entries from the previous copy describe 
 with a cache backend shared between sites, dev needs its own `sid` in `.settings_extra.php` for
 this to stay local.
 
-If `private/scripts/renew-dev-post.sh` exists and is executable, the script runs it after the DEV
-database connection and administrator policy have been restored. This optional hook keeps
+If the `POST_RENEW_HOOK` script (`private/scripts/renew-dev-post.sh` by default) exists and is
+executable, the script runs it after the DEV database connection and administrator policy have been
+restored. This optional hook keeps
 site-specific post-clone settings in the private overlay; installations without it are unchanged.
 
 This is useful for:

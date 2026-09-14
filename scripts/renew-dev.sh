@@ -77,35 +77,187 @@ if [ $# -eq 1 ] && [ "$1" = "--date" ]; then
   USE_EXISTING_BACKUP=1
 fi
 
-# Domain names
-# SITE-SPECIFIC operational script (favor-group.ru): adjust DOMAIN and the
-# admin user IDs below before using on another site.
-DOMAIN=favor-group.ru
-DEV_SUBDOMAIN=dev
+# Site-specific values. Each one is read from the environment when non-empty,
+# so another site runs the script by setting what differs, e.g.
+#   sudo DOMAIN=example.com DEV_ADMIN_USER_IDS="1 7" ./scripts/renew-dev.sh
+DOMAIN="${DOMAIN:-favor-group.ru}"                 # production domain
+DEV_SUBDOMAIN="${DEV_SUBDOMAIN:-dev}"              # dev host is ${DEV_SUBDOMAIN}.${DOMAIN}
 DEV_DOMAIN="${DEV_SUBDOMAIN}.${DOMAIN}"
+PROD_LOCATION="${PROD_LOCATION:-./web/prod}"       # production tree on the host
+DEV_LOCATION="${DEV_LOCATION:-./web/${DEV_SUBDOMAIN}}" # dev tree on the host, recreated by this script
+BACKUP_LOCATION="${BACKUP_LOCATION:-./backup}"     # holds <date>/ directories with mysqldump.sql.gz
+CONTAINER_WEB_ROOT="${CONTAINER_WEB_ROOT:-/web}"   # where the php container mounts the trees
+DEV_DOCROOT="${DEV_DOCROOT:-${CONTAINER_WEB_ROOT}/${DEV_SUBDOMAIN}}" # DEV_LOCATION as the php container sees it
+PHP_CONTAINER="${PHP_CONTAINER:-php}"              # container names from docker-compose.yml
+MYSQL_CONTAINER="${MYSQL_CONTAINER:-mysql}"
+MYSQL_ENV_FILE="${MYSQL_ENV_FILE:-./private/environment/mysql.env}" # provides MYSQL_ROOT_PASSWORD
+MYSQL_DATA_DIR="${MYSQL_DATA_DIR:-./private/mysql-data}" # host path of the container's /var/lib/mysql
+WEB_UID="${WEB_UID:-1000}"                         # owner of the web trees (www-data in the php image)
+WEB_GID="${WEB_GID:-1000}"
+DEV_ADMIN_USER_IDS="${DEV_ADMIN_USER_IDS-6 92 1560 1561}" # user ids put into the administrators group on dev; unset means these, empty adds none
+DEV_ADMIN_IP_MASK="${DEV_ADMIN_IP_MASK:-255.255.0.0}"      # session/store IP mask of that group on dev
+POST_RENEW_HOOK="${POST_RENEW_HOOK:-./private/scripts/renew-dev-post.sh}"
 
-# MySQL variables
-PROD_DB=$(echo ${DOMAIN} | tr '.' '_' | tr '-' '_')
-# use production domain as-is as DB name and username, but replace dots and dashes with underscores
-DEV_DB=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
-DEV_USER=$(echo ${DEV_DOMAIN} | tr '.' '_' | tr '-' '_')
+# MySQL variables: production domain as-is as DB name and username, dots and dashes as underscores
+PROD_DB="${PROD_DB:-$(echo "${DOMAIN}" | tr '.' '_' | tr '-' '_')}"
+DEV_DB="${DEV_DB:-$(echo "${DEV_DOMAIN}" | tr '.' '_' | tr '-' '_')}"
+DEV_USER="${DEV_USER:-$(echo "${DEV_DOMAIN}" | tr '.' '_' | tr '-' '_')}"
 DEV_PASSWORD=$(tr -dc 'a-zA-Z0-9' </dev/urandom | fold -w 32 | head -n 1)
+
+# --- validators ---
+# Canonical absolute path; GNU realpath -m normalises components that do not
+# exist yet (the dev tree before its first run) and resolves symlinks.
+canonical_path() {
+  realpath -m -- "$1"
+}
+
+# True when $1 equals $2 or lies below it; both canonical absolute paths.
+is_within() {
+  case "$2" in
+  /) parent_prefix=/ ;;
+  *) parent_prefix="$2/" ;;
+  esac
+  [ "$1" = "$2" ] && return 0
+  case "$1" in
+  "${parent_prefix}"*) return 0 ;;
+  esac
+  return 1
+}
+
+# The dev tree is emptied and rewritten (rsync --delete, connection files
+# replaced), so it must be neither the production tree nor inside it, nor
+# contain it or the backups.
+check_tree_separation() {
+  prod=$(canonical_path "${PROD_LOCATION}") || exit 1
+  dev=$(canonical_path "${DEV_LOCATION}") || exit 1
+  backup=$(canonical_path "${BACKUP_LOCATION}") || exit 1
+  if is_within "${dev}" "${prod}" || is_within "${prod}" "${dev}"; then
+    echo "DEV_LOCATION ${dev} and the production tree ${prod} overlap" >&2
+    exit 1
+  fi
+  if is_within "${backup}" "${dev}"; then
+    echo "BACKUP_LOCATION ${backup} is inside DEV_LOCATION ${dev}" >&2
+    exit 1
+  fi
+}
+
+# Login and database name from the production connection file, so the dev
+# credentials can never name the production account that the script drops.
+# Fails closed: the variable must be assigned exactly once, as one complete
+# quoted literal ended by a semicolon (an optional // comment may follow);
+# concatenations, duplicates and other layouts are reported as unsupported.
+prod_connection_value() {
+  file="${PROD_LOCATION}/bitrix/php_interface/dbconn.php"
+  assignments=$(grep -c "^[[:space:]]*\\\$DB${1}[[:space:]]*=" "${file}") || :
+  if [ "${assignments}" -ne 1 ]; then
+    echo "${file}: \$DB${1} is assigned ${assignments} times, layout is not supported" >&2
+    return 1
+  fi
+  sed -n \
+    -e "s|^[[:space:]]*\\\$DB${1}[[:space:]]*=[[:space:]]*'\([^'\\\\]*\)'[[:space:]]*;[[:space:]]*\(//.*\)\{0,1\}\$|\1|p" \
+    -e "s|^[[:space:]]*\\\$DB${1}[[:space:]]*=[[:space:]]*\"\([^\"\\\\\$]*\)\"[[:space:]]*;[[:space:]]*\(//.*\)\{0,1\}\$|\1|p" \
+    "${file}"
+}
+
+check_dev_credentials_differ() {
+  prod_login=$(prod_connection_value Login) || exit 1
+  prod_name=$(prod_connection_value Name) || exit 1
+  if [ -z "${prod_login}" ] || [ -z "${prod_name}" ]; then
+    echo "${PROD_LOCATION}/bitrix/php_interface/dbconn.php: \$DBLogin or \$DBName is not one quoted literal assignment, layout is not supported" >&2
+    exit 1
+  fi
+  if [ "${DEV_USER}" = "${prod_login}" ] || [ "${DEV_DB}" = "${prod_name}" ] || [ "${DEV_DB}" = "${PROD_DB}" ]; then
+    echo "dev database '${DEV_DB}' or user '${DEV_USER}' would be the production one (${prod_name}, ${prod_login}); set DEV_DB and DEV_USER" >&2
+    exit 1
+  fi
+}
+
+# Digits and blanks only, so the list can be split without globbing.
+validate_admin_ids() {
+  case "$1" in
+  *[!0-9[:blank:]]*)
+    echo "DEV_ADMIN_USER_IDS must hold numeric user ids separated by spaces, got '$1'" >&2
+    exit 1
+    ;;
+  esac
+}
+
+# A dotted IPv4 netmask: four decimal octets without leading zeros, all-ones
+# octets, then at most one partial octet, then zeros (0.0.0.0 and
+# 255.255.255.255 included). Checked per octet, no wide arithmetic.
+validate_ip_mask() {
+  mask=$1
+  case "${mask}" in
+  *[!0-9.]* | '' | *..* | .* | *.)
+    echo "DEV_ADMIN_IP_MASK must be a dotted IPv4 mask, got '${mask}'" >&2
+    exit 1
+    ;;
+  esac
+  old_ifs=$IFS
+  IFS=.
+  # shellcheck disable=SC2086
+  set -- ${mask}
+  IFS=$old_ifs
+  if [ $# -ne 4 ]; then
+    echo "DEV_ADMIN_IP_MASK must have four octets, got '${mask}'" >&2
+    exit 1
+  fi
+  state=ones
+  for octet in "$@"; do
+    case "${octet}" in
+    0 | [1-9] | [1-9][0-9] | 1[0-9][0-9] | 2[0-4][0-9] | 25[0-5]) ;;
+    *)
+      echo "DEV_ADMIN_IP_MASK octet '${octet}' is not a decimal 0-255 in '${mask}'" >&2
+      exit 1
+      ;;
+    esac
+    case "${state}:${octet}" in
+    ones:255) ;;
+    ones:0 | ones:128 | ones:192 | ones:224 | ones:240 | ones:248 | ones:252 | ones:254) state=zeros ;;
+    zeros:0) ;;
+    *)
+      echo "DEV_ADMIN_IP_MASK must be a contiguous netmask such as 255.255.0.0, got '${mask}'" >&2
+      exit 1
+      ;;
+    esac
+  done
+}
+# --- end validators ---
+
+case "${DEV_SUBDOMAIN}" in
+*[!a-z0-9-]* | '')
+  echo "DEV_SUBDOMAIN must be a lowercase DNS label, got '${DEV_SUBDOMAIN}'" >&2
+  exit 1
+  ;;
+esac
+if ! realpath -m -- / >/dev/null 2>&1; then
+  echo "GNU realpath with -m is required (coreutils)" >&2
+  exit 1
+fi
+validate_admin_ids "${DEV_ADMIN_USER_IDS}"
+validate_ip_mask "${DEV_ADMIN_IP_MASK}"
+
+# SQL VALUES lists for the administrators group rows, one entry per user id;
+# empty lists skip the inserts.
+admin_access_values=''
+admin_group_values=''
+for id in ${DEV_ADMIN_USER_IDS}; do
+  admin_access_values="${admin_access_values:+${admin_access_values}, }('${id}', 'group', 'G1')"
+  admin_group_values="${admin_group_values:+${admin_group_values}, }('${id}', '1', NULL, NULL)"
+done
 
 # Validate SQL identifiers to prevent injection
 validate_sql_identifier "${PROD_DB}"
 validate_sql_identifier "${DEV_DB}"
 validate_sql_identifier "${DEV_USER}"
 
-# File path variables
-PROD_LOCATION="./web/prod"
-DEV_LOCATION="./web/${DEV_SUBDOMAIN}"
-BACKUP_LOCATION="./backup"
-
 # Sanity checks before the run
 if [ ! -d "${PROD_LOCATION}" ]; then
   echo "${PROD_LOCATION} (prod location) directory is absent"
   exit 45
 fi
+check_tree_separation
+check_dev_credentials_differ
 
 # If --date is provided, validate backup directory exists and select backup file
 if [ ${USE_EXISTING_BACKUP} -eq 1 ]; then
@@ -155,11 +307,12 @@ if [ ${USE_EXISTING_BACKUP} -eq 1 ]; then
 fi
 
 # read MYSQL_ROOT_PASSWORD
-if [ ! -f "./private/environment/mysql.env" ]; then
-  echo "./private/environment/mysql.env file is absent, couldn't read MYSQL_ROOT_PASSWORD variable"
+if [ ! -f "${MYSQL_ENV_FILE}" ]; then
+  echo "${MYSQL_ENV_FILE} file is absent, couldn't read MYSQL_ROOT_PASSWORD variable"
   exit 46
 fi
-. ./private/environment/mysql.env
+# shellcheck disable=SC1090
+. "${MYSQL_ENV_FILE}"
 
 echo "Creating dev copy of the production site in $DEV_LOCATION for $DEV_DOMAIN"
 
@@ -167,10 +320,10 @@ echo "Creating dev copy of the production site in $DEV_LOCATION for $DEV_DOMAIN"
 # location for it should be the directory which is passed inside the container
 mysql_config_file=$(
   echo 'mkstemp(template)' |
-    m4 -D template="./private/mysql-data/deleteme_XXXXXX"
+    m4 -D template="${MYSQL_DATA_DIR}/deleteme_XXXXXX"
 ) || exit
 
-mysql_binary_path="docker exec -u0 mysql /bin"
+mysql_binary_path="docker exec -u0 ${MYSQL_CONTAINER} /bin"
 mysql_config_inside_container="/var/lib/mysql/${mysql_config_file##*/}"
 
 # shellcheck disable=SC2028
@@ -209,7 +362,7 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 # dropping the user leaves its open sessions alive (php-fpm keeps persistent
 # connections), and they would keep working on the recreated database
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -N -e "select concat('kill ', ID, ';') from information_schema.PROCESSLIST where USER = '${DEV_USER}';" |
-  docker exec -u0 -i mysql /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" --force >/dev/null || :
+  docker exec -u0 -i "${MYSQL_CONTAINER}" /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" --force >/dev/null || :
 
 # prepare new dev database and user; the database takes the charset and
 # collation of the production one, the dump carries them per table only
@@ -246,7 +399,7 @@ fi
 # shellcheck disable=SC2028
 echo "[client]\nuser = ${DEV_USER}\npassword = ${DEV_PASSWORD}\ndefault-character-set = utf8mb4" >${mysql_config_file}
 echo "Restoring mysql dump for dev"
-cat "${dump_file}" | docker exec -u0 -i mysql /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" ${DEV_DB}
+cat "${dump_file}" | docker exec -u0 -i "${MYSQL_CONTAINER}" /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" ${DEV_DB}
 
 echo "Changing settings on dev site after DB restore"
 # change aspro and main site URL to reflect dev site value
@@ -264,8 +417,12 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 # disable external access to the site
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'site_stopped';" ${DEV_DB}
 # give admin access to users #6, #92, #1560, #1561
-${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "INSERT IGNORE INTO b_user_access (user_id, provider_id, access_code) VALUES ('6', 'group', 'G1'), ('92', 'group', 'G1'), ('1560', 'group', 'G1'), ('1561', 'group', 'G1');" ${DEV_DB}
-${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "INSERT IGNORE INTO b_user_group (user_id, group_id, date_active_from, date_active_to) VALUES ('6', '1', NULL, NULL), ('92', '1', NULL, NULL), ('1560', '1', NULL, NULL), ('1561', '1', NULL, NULL);" ${DEV_DB}
+if [ -n "${admin_access_values}" ]; then
+  ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "INSERT IGNORE INTO b_user_access (user_id, provider_id, access_code) VALUES ${admin_access_values};" ${DEV_DB}
+  ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "INSERT IGNORE INTO b_user_group (user_id, group_id, date_active_from, date_active_to) VALUES ${admin_group_values};" ${DEV_DB}
+else
+  echo "No extra administrators configured for dev (DEV_ADMIN_USER_IDS is empty)"
+fi
 
 # Published only after the restore: a dev site that can connect while its
 # database is still empty caches those empty results in its cache backend, where
@@ -275,9 +432,9 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 # database.
 echo "Writing dev DB connection settings"
 # install -d is the same as mkdir -p, but it allows setting owner user and group for created folders
-install -d -o 1000 -g 1000 "${DEV_LOCATION}/bitrix/php_interface"
-install -o 1000 -g 1000 -m 0640 "${dev_dbconn_tmp}" "${dev_dbconn}.new"
-install -o 1000 -g 1000 -m 0640 "${dev_settings_tmp}" "${dev_settings}.new"
+install -d -o "${WEB_UID}" -g "${WEB_GID}" "${DEV_LOCATION}/bitrix/php_interface"
+install -o "${WEB_UID}" -g "${WEB_GID}" -m 0640 "${dev_dbconn_tmp}" "${dev_dbconn}.new"
+install -o "${WEB_UID}" -g "${WEB_GID}" -m 0640 "${dev_settings_tmp}" "${dev_settings}.new"
 mv -f "${dev_dbconn}.new" "${dev_dbconn}"
 mv -f "${dev_settings}.new" "${dev_settings}"
 rm -rf -- "${dev_config_tmp}"
@@ -304,15 +461,20 @@ echo "Rsync completed at $(date '+%H:%M:%S')"
 # storage its deleteAll() flushes the whole shared instance. Its file storage
 # keeps one directory per host, and the dev host's directory is removed here.
 echo "Clearing dev site caches"
-docker exec -i -u www-data php php <<'PHP'
+docker exec -i -u www-data -e DEV_DOCROOT="${DEV_DOCROOT}" "${PHP_CONTAINER}" php <<'PHP'
 <?php
 declare(strict_types=1);
 
-$_SERVER['DOCUMENT_ROOT'] = '/web/dev';
+$docroot = (string) getenv('DEV_DOCROOT');
+if ($docroot === '' || !is_dir($docroot)) {
+    fwrite(STDERR, "DEV_DOCROOT is not a directory inside the php container: '{$docroot}'\n");
+    exit(1);
+}
+$_SERVER['DOCUMENT_ROOT'] = $docroot;
 define('NO_KEEP_STATISTIC', true);
 define('NOT_CHECK_PERMISSIONS', true);
 define('NO_AGENT_CHECK', true);
-require '/web/dev/bitrix/modules/main/include/prolog_before.php';
+require $docroot . '/bitrix/modules/main/include/prolog_before.php';
 
 \Bitrix\Main\Application::getInstance()->getManagedCache()->cleanAll();
 BXClearCache(true);
@@ -320,14 +482,20 @@ PHP
 rm -rf "${DEV_LOCATION:?}/bitrix/html_pages/${DEV_DOMAIN:?}"
 
 # keep dev admin sessions valid when Private Relay rotates an address inside the same /16
-docker exec -i -u www-data php php <<'PHP'
+docker exec -i -u www-data -e DEV_DOCROOT="${DEV_DOCROOT}" -e DEV_ADMIN_IP_MASK="${DEV_ADMIN_IP_MASK}" "${PHP_CONTAINER}" php <<'PHP'
 <?php
 declare(strict_types=1);
 
-$_SERVER['DOCUMENT_ROOT'] = '/web/dev';
+$docroot = (string) getenv('DEV_DOCROOT');
+$mask = (string) getenv('DEV_ADMIN_IP_MASK');
+if ($docroot === '' || !is_dir($docroot) || $mask === '') {
+    fwrite(STDERR, "DEV_DOCROOT or DEV_ADMIN_IP_MASK is missing inside the php container\n");
+    exit(1);
+}
+$_SERVER['DOCUMENT_ROOT'] = $docroot;
 define('NO_KEEP_STATISTIC', true);
 define('NOT_CHECK_PERMISSIONS', true);
-require '/web/dev/bitrix/modules/main/include/prolog_before.php';
+require $docroot . '/bitrix/modules/main/include/prolog_before.php';
 
 use Bitrix\Main\GroupTable;
 
@@ -341,8 +509,8 @@ if (!is_array($policy)) {
     exit(1);
 }
 
-$policy['SESSION_IP_MASK'] = '255.255.0.0';
-$policy['STORE_IP_MASK'] = '255.255.0.0';
+$policy['SESSION_IP_MASK'] = $mask;
+$policy['STORE_IP_MASK'] = $mask;
 $result = GroupTable::update(1, ['SECURITY_POLICY' => serialize($policy)]);
 if (!$result->isSuccess()) {
     fwrite(STDERR, implode('; ', $result->getErrorMessages()) . "\n");
@@ -356,18 +524,17 @@ $updated = GroupTable::getRow([
 $verified = unserialize((string) ($updated['SECURITY_POLICY'] ?? ''), ['allowed_classes' => false]);
 if (
     !is_array($verified)
-    || ($verified['SESSION_IP_MASK'] ?? null) !== '255.255.0.0'
-    || ($verified['STORE_IP_MASK'] ?? null) !== '255.255.0.0'
+    || ($verified['SESSION_IP_MASK'] ?? null) !== $mask
+    || ($verified['STORE_IP_MASK'] ?? null) !== $mask
 ) {
     fwrite(STDERR, "Administrator security policy update was not persisted\n");
     exit(1);
 }
 PHP
 
-post_renew_hook="./private/scripts/renew-dev-post.sh"
-if [ -x "${post_renew_hook}" ]; then
+if [ -x "${POST_RENEW_HOOK}" ]; then
   echo "Running site-specific dev post-renew hook"
-  "${post_renew_hook}"
+  "${POST_RENEW_HOOK}"
 fi
 
 echo "Dev renewal from production is complete, available at https://${DEV_DOMAIN}"
