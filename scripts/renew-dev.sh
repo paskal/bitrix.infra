@@ -259,8 +259,6 @@ ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_containe
 DEV_URL="https://${DEV_DOMAIN}"
 DEV_URL_LEN=$(printf '%s' "$DEV_URL" | LC_ALL=C wc -c | tr -d ' ')
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'a:1:{s:4:\"host\";s:${DEV_URL_LEN}:\"${DEV_URL}\";}' where MODULE_ID = 'security' AND name = 'restriction_hosts_action_options';" ${DEV_DB}
-# switch CDN from prod to dev instance
-${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'dev.cdn-favor-group.ru' where MODULE_ID = 'skypark.cdn' and NAME = 'cdn_domains1';" ${DEV_DB}
 # mark site as development one
 ${mysql_binary_path}/mysql --defaults-extra-file="${mysql_config_inside_container}" -e "update b_option set VALUE = 'Y' where MODULE_ID = 'main' and NAME = 'update_devsrv';" ${DEV_DB}
 # disable external access to the site

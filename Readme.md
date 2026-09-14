@@ -426,7 +426,7 @@ To start the regular production stack: `COMPOSE_PROFILES=certs,dbadmin,monitorin
     - `conf.d/host-map.conf` — `$bitrix_host` map (preserves `:port` for local demos, falls back to `$host` for QUIC)
     - `conf.d/composite.conf` — the `$bx_composite_file` map for [serving composite snapshots without PHP](#composite-site-bitrix-композит)
     - `conf.d/metrika-cookies.conf` — the [Metrika cookie](#yandex-metrika-cookie-extension) maps
-    - `conf.d/overlay-maps.conf` — default maps the private overlay extends (hotlink protection, `X-Frame-Options`, admin-page `frame-ancestors`/CORS)
+    - `conf.d/overlay-maps.conf` — default maps the private overlay extends (hotlink protection, `X-Frame-Options`, admin-page `frame-ancestors`/CORS, static-host CORS origin)
     - `conf.d/cid-context-ratelimit.conf` — `limit_req` zone (5 req/s per IP) for the anonymous pageview-context beacon `/local/ajax/t.js`; the location that uses it is in `bitrix.conf`
     - `conf.d/upstream.conf`, `bad_ips.conf`, `status.conf`, `useragents.conf` — generic infrastructure. `bad_ips.conf` holds `$bad_ip` (flag) and `$denied_ip` (403); `useragents.conf` holds `$bad_agent` (flag) and `$denied_agent` (403). Put an entry in a deny map only when it cannot match a real visitor: a self-identified crawler that ignores `robots.txt` or brings no traffic worth the render cost, or an address range whose every request is an attack. Search crawlers that obey `robots.txt` and send visitors do not belong there, and a denied CIDR also denies any legitimate visitor sharing it.
     - Site vhosts live in the private overlay: `private/nginx/sites/*.conf`, mounted as `/etc/nginx/private.conf.d/sites/`
