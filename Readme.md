@@ -583,7 +583,7 @@ Dockerfiles for PHP 8.3, 8.4 and 8.5 live in `config/php/`, and CI builds every 
 1. In `docker-compose.yml`, change the `image` tag of both `php` and `php-cron` (for example `ghcr.io/paskal/bitrix-php:8.5`) and the `/etc/php/8.4/...` destination paths of the config binds under both services (`90-php.ini`, `91-disable-functions.ini`, `zz-pm.conf`, `xdebug.ini`). With the old paths the files land in a directory the new PHP never reads and the settings silently disappear. `php-cron` has no `build` block; only `php` builds locally, so also point `build.dockerfile` under `php` at the selected version before any local build.
 2. `docker compose pull php php-cron && docker compose up -d php php-cron`. Build locally only after changing a Dockerfile: `docker compose build php`.
 
-The 8.5 image carries `php-memcached` only (`php-memcache` is not packaged for it): a `.settings.php` session block with `'type' => 'memcache'` has to move to `memcached` before the switch, the cache block already uses it.
+The 8.5 image carries `php-memcached` only (`php-memcache` is not packaged for it). Bitrix has no `memcached` session type, and its `'type' => 'memcache'` session handler needs the missing extension, so every request fails on 8.5 until the `.settings.php` session block uses `'general' => array ('type' => 'save_handler.php.ini')`: Bitrix then leaves sessions to PHP's native handler, which `config/php/90-php.ini` points at `memcached-sessions`. The cache block already uses `memcached`.
 
 ## Routine operations
 
