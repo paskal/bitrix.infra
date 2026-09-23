@@ -13,7 +13,7 @@ flowchart TB
     subgraph Docker["Docker Compose"]
         Nginx["Nginx<br>(brotli + lua + HTTP/3)"]
 
-        Nginx -->|"FastCGI :9000"| PHP["PHP-FPM 8.4"]
+        Nginx -->|"FastCGI :9000"| PHP["PHP-FPM 8.5"]
         Nginx -->|"static files"| Web["Web Files<br>prod / dev"]
 
         PHP -->|"Unix socket"| MySQL[("Percona MySQL 8.4<br>(socket-only, no TCP)")]
@@ -379,7 +379,7 @@ A fresh clone boots a working Bitrix installer at `http://localhost` without cha
 >       - ./private/my-local.cnf:/etc/my.cnf.d/zz-local.cnf:ro   # e.g. innodb_buffer_pool_size = 512M
 >   php:
 >     volumes:
->       - ./private/php-local.ini:/etc/php/8.4/fpm/conf.d/99-local.ini:ro
+>       - ./private/php-local.ini:/etc/php/8.5/fpm/conf.d/99-local.ini:ro
 > ```
 >
 > Typical `private/php-local.ini` for a demo: `session.cookie_secure = Off` (Chromium treats `localhost` as a secure context, but Firefox and curl-driven wizard runs discard the Secure session cookie over plain HTTP and silently freeze on the licence step) and `opcache.jit = disable` (PHP 8.4 JIT has been observed to segfault php-fpm workers on arm64 hosts, surfacing as 502s after the install). The shipped `config/mysql/my.cnf` is sized for a dedicated server (4 GB buffer pool) — shrink it in `my-local.cnf` for an 8 GB Docker Desktop VM.
@@ -580,7 +580,7 @@ Here are the available profiles and the services they enable:
 
 Dockerfiles for PHP 8.3, 8.4 and 8.5 live in `config/php/`, and CI builds every one of them as `ghcr.io/paskal/bitrix-php:<version>`, so switching needs no local build:
 
-1. In `docker-compose.yml`, change the `image` tag of both `php` and `php-cron` (for example `ghcr.io/paskal/bitrix-php:8.5`) and the `/etc/php/8.4/...` destination paths of the config binds under both services (`90-php.ini`, `91-disable-functions.ini`, `zz-pm.conf`, `xdebug.ini`). With the old paths the files land in a directory the new PHP never reads and the settings silently disappear. `php-cron` has no `build` block; only `php` builds locally, so also point `build.dockerfile` under `php` at the selected version before any local build.
+1. In `docker-compose.yml`, change the `image` tag of both `php` and `php-cron` (for example `ghcr.io/paskal/bitrix-php:8.5`) and the `/etc/php/<version>/...` destination paths of the config binds under both services (`90-php.ini`, `91-disable-functions.ini`, `zz-pm.conf`, `xdebug.ini`). With the old paths the files land in a directory the new PHP never reads and the settings silently disappear. `php-cron` has no `build` block; only `php` builds locally, so also point `build.dockerfile` under `php` at the selected version before any local build.
 2. `docker compose pull php php-cron && docker compose up -d php php-cron`. Build locally only after changing a Dockerfile: `docker compose build php`.
 
 The 8.5 image carries `php-memcached` only (`php-memcache` is not packaged for it). Bitrix has no `memcached` session type, and its `'type' => 'memcache'` session handler needs the missing extension, so every request fails on 8.5 until the `.settings.php` session block uses `'general' => array ('type' => 'save_handler.php.ini')`: Bitrix then leaves sessions to PHP's native handler, which `config/php/90-php.ini` points at `memcached-sessions`. The cache block already uses `memcached`.
