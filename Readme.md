@@ -249,12 +249,10 @@ define("BX_DISABLE_INDEX_PAGE", true);
     'handlers' =>
     array (
       'kernel'  => 'encrypted_cookies',
-      'general' =>
-      array (
-        'type' => 'memcache',
-        'host' => 'memcached-sessions',
-        'port' => '11211',
-      ),
+      // PHP's native handler from config/php/90-php.ini: php-memcached on memcached-sessions:11211.
+      // Bitrix has no 'memcached' session type, and its 'memcache' type needs the memcache
+      // extension, which the PHP 8.5 image does not ship.
+      'general' => array ('type' => 'save_handler.php.ini'),
     ),
   ),
   'readonly' => true,
