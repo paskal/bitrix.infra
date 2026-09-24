@@ -19,10 +19,10 @@ zabbix_export:
           description: 'Exit code of ~/lead-enrich/enrich_run.sh on terrty. 2 means codex produced nothing, which usually means it is logged out; the script fails loudly instead of reporting an innocent ''nothing to fill''.'
           triggers:
             - uuid: 7cd0624d6b314ce7acf797fa952aa834
-              expression: 'nodata(/Favor-group tg-agent monitoring/leadenrich.status,8h)=1'
-              name: 'lead enrichment has not reported for 8h'
+              expression: 'nodata(/Favor-group tg-agent monitoring/leadenrich.status,10h)=1'
+              name: 'lead enrichment has not reported for 10h'
               priority: WARNING
-              description: 'Runs every 2h from the opc crontab. Check `crontab -l` on terrty and ~/lead-enrich/enrich.log.'
+              description: 'Runs hourly 05:17-15:17 UTC (08:17-18:17 MSK) and once at 21:17 UTC (00:17 MSK) from the opc crontab, so the longest normal gap is the night one, eight hours plus the run time. Check `crontab -l` on terrty and ~/lead-enrich/enrich.log.'
         - uuid: aa899bcb1d9241b5a10ec8e33cbb2488
           name: 'lead enrichment last failure reason'
           type: TRAP
