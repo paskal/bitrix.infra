@@ -1,0 +1,59 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: 07956ec30a36409b855273573fb224c3
+      template: 'Favor-group lead check monitoring'
+      name: 'Favor-group lead check monitoring'
+      description: |
+        Watches the lead check cron in the favor-group.ru repository (local/cron/lead_spam_check.php, php-cron
+        container, every 5 minutes with --apply). It closes or marks new site-form leads whose phone number
+        belongs to someone else, and after every run stores its outcome in b_option (module
+        favorgroup.tracking): lead_check_ok_at is the time of the last run without errors, and
+        lead_check_fail_streak counts failed runs in a row and is reset to 0 by the next good run.
+        
+        The agent reads both values through the read-only zbx_monitor MySQL account. The run log is
+        /web/prod/local/cron/lead_spam_check.log.
+      groups:
+        - name: Favor-group
+      items:
+        - uuid: a8ebaeae1ba0429a8b8cda3aec008ae4
+          name: 'Lead check: failed runs in a row'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -N -e \"SELECT VALUE FROM favor_group_ru.b_option WHERE MODULE_ID=''favorgroup.tracking'' AND NAME=''lead_check_fail_streak'';\""]'
+          delay: 1m
+          history: 30d
+          description: 'Number of consecutive lead check runs that hit a B24 error (webhook down, access denied, malformed answer). 0 after every good run.'
+          tags:
+            - tag: Application
+              value: CRM
+          triggers:
+            - uuid: 05eaee27fb4d4ff1b45168678f19a8cd
+              expression: 'last(/Favor-group lead check monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -N -e \"SELECT VALUE FROM favor_group_ru.b_option WHERE MODULE_ID=''favorgroup.tracking'' AND NAME=''lead_check_fail_streak'';\""])>=2'
+              name: 'Lead check: two or more runs in a row failed'
+              priority: AVERAGE
+              description: |
+                New site-form leads are not being checked for someone else's number. One failed run is
+                tolerated because the next one retries every lead it could not decide. Read the tail of
+                /web/prod/local/cron/lead_spam_check.log: the ERROR lines name the B24 method and the error.
+        - uuid: bc94d09aa8014751967074c8f10c229b
+          name: 'Lead check: last run without errors'
+          type: ZABBIX_ACTIVE
+          key: 'system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -N -e \"SELECT VALUE FROM favor_group_ru.b_option WHERE MODULE_ID=''favorgroup.tracking'' AND NAME=''lead_check_ok_at'';\""]'
+          delay: 5m
+          history: 30d
+          units: unixtime
+          description: 'Unix time of the last lead check run that finished without errors. Written only by --apply runs.'
+          tags:
+            - tag: Application
+              value: CRM
+          triggers:
+            - uuid: 0a2dc04645e1480aa5d8d71eff0cc1b6
+              expression: '(now()-last(/Favor-group lead check monitoring/system.run["mariadb --defaults-extra-file=/etc/mysql/zbx.cnf -N -e \"SELECT VALUE FROM favor_group_ru.b_option WHERE MODULE_ID=''favorgroup.tracking'' AND NAME=''lead_check_ok_at'';\""]))>1800'
+              name: 'Lead check: no good run for 30 minutes'
+              priority: AVERAGE
+              description: |
+                The cron fires every 5 minutes, so 30 minutes without a good run means it stopped running or
+                keeps failing. Check the site-tasks crontab in php-cron (/etc/cron.d/site-tasks) and the log.
