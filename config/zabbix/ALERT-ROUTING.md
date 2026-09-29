@@ -20,12 +20,13 @@
 | Favor-group ASR monitoring (10658) | [12] Favor group deep tech | Dmitry лично `107408628` |
 | Favor-group tg-agent monitoring (10657) | [12] Favor group deep tech | Dmitry лично `107408628` |
 | Favor-group lead check monitoring (10659) | [12] Favor group deep tech | Dmitry лично `107408628` |
+| Favor-group 1C prices monitoring (10660) | [12] Favor group deep tech | Dmitry лично `107408628` |
 | Linux by Zabbix agent (10284), MySQL agent 2 (10635) | [12] Favor group deep tech | Dmitry лично `107408628` |
 | всё прочее в группе Favor-group | [7] tech chat problems reporting | общий tech-чат `-1001455514139` |
 
 Общий tech-чат **делится с Евгением и предназначен только для проблем PHP и сайта**. Всё, что
 относится к нашей собственной автоматике — расшифровки звонков, остаток DeepSeek, обогащение
-лидов, проверка заявок на чужой номер, рекламный крон, — идёт лично Дмитрию.
+лидов, проверка заявок на чужой номер, рекламный крон, загрузка цен из 1С, — идёт лично Дмитрию.
 
 ## Как подключить новый шаблон
 
