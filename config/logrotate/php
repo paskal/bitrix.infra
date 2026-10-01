@@ -31,3 +31,16 @@
 	delaycompress
 }
 
+/web/logs/php/lead-fallback.log
+/web/logs/php/lead-fallback-spool.log
+{
+	dateext
+	dateformat .%Y-%m-%d
+	extension .log
+	rotate 3
+	monthly
+	missingok
+	notifempty
+	compress
+	delaycompress
+}
