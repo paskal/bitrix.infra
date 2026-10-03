@@ -61,6 +61,10 @@ Production identity (TLS certs, site vhosts, site-specific cron jobs, CSP snippe
 - Container names: not in the public compose; overlay adds `container_name:` to pin prod names
 - `config/updater.yaml`: public file has a generic example; overlay remaps the volume to the private tasks file
 
+## Zabbix: disabled stock triggers
+
+The stock template «MySQL by Zabbix agent 2 active» is not managed in git. Its triggers «Number of internal temporary tables created per second is high» (21204) and «Number of temporary files created per second is high» (21203) are disabled since 03.10.2026: they fired 14 and 7 times in September and no action ever followed (Dmitry: «useless»). The on-disk temporary tables trigger stays on. Re-importing or upgrading that template re-enables both; disable them again afterwards (`trigger.update` with `status: 1`).
+
 ## PHPStan Monitoring
 
 Weekly PHPStan scan against the prod Bitrix tree; count of owned-code findings is read by zabbix-agent via `system.run`, trigger alerts when count ≠ 0.
