@@ -180,6 +180,20 @@ recovery expression 35 minutes after the prototypes changed.
 The inode triggers (17811, 17812) still have no hysteresis; the same pattern applies with the
 comparison reversed, recovery at `> {$VFS.FS.INODE.PFREE.MIN.*}+5`.
 
+## Zabbix: disabled stock triggers and tuned thresholds (03.10.2026)
+
+Decided by Dmitry after the September alert review (141 problems, about 15 real). Several of these live only in the Zabbix database, not in git, so a template re-import or upgrade silently undoes them; re-apply and read back after any of those.
+
+| What | Where it lives | State |
+|---|---|---|
+| `MySQL: Number of internal temporary tables created per second is high` (template trigger 21204, host 17757) and `MySQL: Number of temporary files created per second is high` (21203, host 17554) | template `MySQL by Zabbix agent 2 active` (id 10635), **database only** | `status` 1 (disabled). The on-disk temp-tables trigger (21202) stays on: September maximum 0.08 per second against a threshold of 60. |
+| `FS [.../mysql-local.conf]: Space is low / critically low` (21840, 21842), the /web volume | two host macros on `favor-group.ru_yandex.cloud.host` (10350), **database only**: `{$VFS.FS.PUSED.MAX.WARN:"/etc/zabbix/zabbix_agent2.d/plugins.d/mysql-local.conf"}` = 85 and `...MAX.CRIT:...` = 92 | 5-minute window kept, recovery 5 points lower (80 and 87). The nightly backup (01:05 UTC) lifts the volume about 12 points for minutes, so 90 fired on any day with a baseline above 78. |
+| `tg-spam site is down` (21526) | host `tg-spam.exe.xyz`, **database only** | fires after 5 failed checks in a row (`#5`, 15 minutes) instead of 2; `tg-spam homepage is slow` (21528) disabled |
+| `Silent 5xx responses on user-facing pages` (21551) | `bitrix.infra-private` `zabbix/templates/favor-group-technical-monitoring.yaml` | fires when one 6-minute window holds 10 or more 5xx lines, kept 30 minutes (`max(count,30m)>=10`). New numeric item `... , count`; it reports 0 between 03:25 and 03:50 UTC every day so the scheduled kernel reboot (nginx answers 502 for about ten seconds) does not alert. Re-import: `configuration.import` of that file with `updateExisting` on items and triggers. |
+| `lead enrichment failed on terrty` (22038 template, 22039 on Zabbix server) | `config/zabbix/templates/favor-group-tg-agent-monitoring.yaml` | exit codes 1 and 2 (codex logged out, usage limit) alert at once; exit 3 (B24 REST timeout) only when two runs in a row end with 3 |
+
+Not changed on purpose: `404 hits found on URLs with utm_*` (18259) stays in Telegram, it caught a real loss of paid clicks (SPb sitelink, 08.09.2026). Backtests and the per-trigger table: `~/Downloads/favor-group.ru/redesign/auto-run/zabbix-review/`.
+
 ## SEO Reindex Cron
 - `scripts/seo-reindex.sh` (daily 21:15 UTC = 00:15 MSK as `admin`) drains URLs from `/web/private/seo-reindex/queue.txt` into Yandex Webmaster recrawl, up to ~960/day account-wide quota. Token: `/web/private/environment/seo-reindex.env`. Logs: `/web/logs/seo-reindex/YYYY-MM-DD.log`. Bing is sent manually via `bin/search-reindex submit --bing-only <file>`.
 

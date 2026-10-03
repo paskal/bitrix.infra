@@ -82,8 +82,8 @@ zabbix_export:
               manual_close: 'YES'
   triggers:
     - uuid: e1d1b712bafa4fd0b7a243a0cf108eaf
-      expression: 'last(/Favor-group tg-agent monitoring/leadenrich.status)<>0 and length(last(/Favor-group tg-agent monitoring/leadenrich.reason))>=0'
+      expression: 'last(/Favor-group tg-agent monitoring/leadenrich.status)<>0 and (last(/Favor-group tg-agent monitoring/leadenrich.status)<>3 or min(/Favor-group tg-agent monitoring/leadenrich.status,#2)=3) and length(last(/Favor-group tg-agent monitoring/leadenrich.reason))>=0'
       name: 'lead enrichment failed on terrty: {ITEM.LASTVALUE2}'
       opdata: '{ITEM.LASTVALUE2}'
       priority: AVERAGE
-      description: 'Exit 2 = codex returned no answer. The reason item names the cause: "usage limit ... try again at HH:MM" means the ChatGPT quota is spent and the next run after that time recovers by itself, nothing to do; "codex не авторизован" means the token is revoked, run `codex login` on terrty as opc. Other non-zero codes: see ~/lead-enrich/enrich.log. The length() term only pulls leadenrich.reason into the trigger so {ITEM.LASTVALUE2} resolves.'
+      description: 'Exit 2 = codex returned no answer. The reason item names the cause: "usage limit ... try again at HH:MM" means the ChatGPT quota is spent and the next run after that time recovers by itself, nothing to do; "codex не авторизован" means the token is revoked, run `codex login` on terrty as opc. Exit 3 = a B24 REST read (crm.activity.list) timed out; it alerts only when two runs in a row end with 3, because a single timeout cleared on the next run every time in September 2026 (9 of 9; decision 03.10.2026). Other non-zero codes: see ~/lead-enrich/enrich.log. The length() term only pulls leadenrich.reason into the trigger so {ITEM.LASTVALUE2} resolves.'
