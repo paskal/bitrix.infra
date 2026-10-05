@@ -37,7 +37,7 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`dedup-upload.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Replaces byte-identical files under `web/prod/upload` with hard links (`hardlink -t -X` from util-linux), excluding module scratch, exchange and log directories. Runs monthly from `config/cron/host.cron`.
+    *   **Purpose:** Replaces byte-identical files under `web/prod/upload` with hard links (`hardlink -t -X` from util-linux), excluding module scratch, exchange, log and hidden `.*-backups` directories. Runs monthly from `config/cron/host.cron`.
     *   **Notes:** `./scripts/dedup-upload.sh [--dry-run] [directory]`; full `hardlink` output goes to `logs/dedup-upload.log`. Linked copies share later in-place writes, so review the exclusions for your modules; needs util-linux `hardlink` with `--respect-xattrs` and `flock`.
 
 *   **`disaster-recovery.sh`**

@@ -50,8 +50,8 @@ if [ ! -d "$target" ]; then
   exit 1
 fi
 
-# temporary, exchange and log directories that modules rewrite while the site runs
-exclude='/(tmp|\.tmp|1c_[^/]*|esol\.importxml|acrit\.core|acrit\.export|sproduction\.integration|webdebug\.antirutin|kda\.importexcel)(/|$)'
+# Keep rollback backups independent, along with module scratch and log directories.
+exclude='/(tmp|\.tmp|\.[^/]*-backups|1c_[^/]*|esol\.importxml|acrit\.core|acrit\.export|sproduction\.integration|webdebug\.antirutin|kda\.importexcel)(/|$)'
 
 mkdir -p ./logs
 log=./logs/dedup-upload.log
