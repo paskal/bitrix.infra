@@ -80,7 +80,63 @@ zabbix_export:
               priority: DISASTER
               description: 'The unattended ads report run exited non-zero. Most likely the shared claude.ai OAuth login in the favor-tg-agent_claude-auth volume expired (this also silently kills all three Telegram bots). Check tg-agent/data/ads-cron/cron.log on terrty; re-login per tg-agent/README.md (interactive claude session in any agent container). Clears on the next successful run.'
               manual_close: 'YES'
+        - uuid: 9e4a5dd9f8b347cb9cf220046f0148a3
+          name: 'Yandex OAuth tokens on terrty: rejected count'
+          type: TRAP
+          key: tgagent.yandex.tokens.invalid
+          history: 90d
+          description: 'Pushed daily by tg-agent/cron/yandex-token-check.py on terrty: how many TOKEN variables in tg-agent/secrets/yandex-*.env login.yandex.ru rejects (expired or revoked). Added 06.10.2026 after the expired YANDEX_METRIKA_TOKEN stopped the morning ads run with a 403.'
+          tags:
+            - tag: Application
+              value: tg-agent
+          triggers:
+            - uuid: fb65c225a6ed426ba79f05e5852f0469
+              expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.invalid,2d)=1'
+              name: 'Yandex token check has not reported for 2 days'
+              priority: AVERAGE
+              description: 'yandex-token-check.py runs daily from the opc crontab on terrty. Check crontab -l and tg-agent/data/token-check/check.log; exit 2 means Yandex could not be reached for any token.'
+              manual_close: 'YES'
+        - uuid: 540be40765d34e0c83be8de0d476cbb5
+          name: 'Yandex OAuth tokens on terrty: fewest days left'
+          type: TRAP
+          key: tgagent.yandex.tokens.days_left
+          history: 90d
+          value_type: FLOAT
+          units: d
+          description: 'Fewest days left among valid tokens, counting 365 days from the day the check first saw each value (seeded from the oldest copy of the env file, backups included, that holds the same value, so the first figures are approximate). Yandex does not expose a token''s expiry date.'
+          tags:
+            - tag: Application
+              value: tg-agent
+        - uuid: b7f99d1155c3424d881e7bb59b12a7b9
+          name: 'Yandex OAuth tokens on terrty: report'
+          type: TRAP
+          key: tgagent.yandex.tokens.report
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          description: 'One line per token: variable, env file, Yandex login, ok/invalid/unknown, date first seen, days left. Shown in the token alerts.'
+          tags:
+            - tag: Application
+              value: tg-agent
   triggers:
+    - uuid: 1e88984116144909bdbfbdf256824ea7
+      expression: 'last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.invalid)>0 and length(last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.report))>=0'
+      name: 'Yandex OAuth token rejected on terrty: renew it'
+      opdata: '{ITEM.LASTVALUE2}'
+      priority: HIGH
+      description: 'A Yandex token in tg-agent/secrets/yandex-*.env is expired or revoked (the report line says which variable and file). Renew: open https://oauth.yandex.ru/authorize?response_type=token&client_id=c5e90f6082cd4baf8fbf28dfa947371c logged in as the Yandex account that owns the token (f.favor for Metrika and Webmaster, the ad login for a Direct token), copy access_token from the address after redirect, replace the value in that env file on terrty, then docker compose up -d --force-recreate --no-deps agent-dmitry agent-aleksandr agent-maria. Clears on the next daily check.'
+      tags:
+        - tag: notify
+          value: admin
+    - uuid: 573cd6005b58402fab901913e3f7274c
+      expression: 'last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.days_left)<=30 and length(last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.report))>=0'
+      name: 'Yandex OAuth token due for renewal within 30 days'
+      opdata: '{ITEM.LASTVALUE2}'
+      priority: WARNING
+      description: 'A token on terrty is about 11 months old. Renew it before it expires: https://oauth.yandex.ru/authorize?response_type=token&client_id=c5e90f6082cd4baf8fbf28dfa947371c, logged in as the owning Yandex account; replace the value in the env file named in the report and recreate the agents. The count restarts when the value changes.'
+      tags:
+        - tag: notify
+          value: admin
     - uuid: e1d1b712bafa4fd0b7a243a0cf108eaf
       expression: 'last(/Favor-group tg-agent monitoring/leadenrich.status)<>0 and (last(/Favor-group tg-agent monitoring/leadenrich.status)<>3 or min(/Favor-group tg-agent monitoring/leadenrich.status,#2)=3) and length(last(/Favor-group tg-agent monitoring/leadenrich.reason))>=0'
       name: 'lead enrichment failed on terrty: {ITEM.LASTVALUE2}'
