@@ -129,11 +129,11 @@ zabbix_export:
         - tag: notify
           value: admin
     - uuid: 573cd6005b58402fab901913e3f7274c
-      expression: 'last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.days_left)<=30 and length(last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.report))>=0'
-      name: 'Yandex OAuth token due for renewal within 30 days'
+      expression: 'last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.days_left)<=7 and length(last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.report))>=0'
+      name: 'Yandex OAuth token due for renewal within 7 days'
       opdata: '{ITEM.LASTVALUE2}'
       priority: WARNING
-      description: 'A token on terrty is about 11 months old. Renew it before it expires: https://oauth.yandex.ru/authorize?response_type=token&client_id=c5e90f6082cd4baf8fbf28dfa947371c, logged in as the owning Yandex account; replace the value in the env file named in the report and recreate the agents. The count restarts when the value changes.'
+      description: 'A token on terrty is within a week of a year old. Renew it before it expires: https://oauth.yandex.ru/authorize?response_type=token&client_id=c5e90f6082cd4baf8fbf28dfa947371c, logged in as the owning Yandex account; replace the value in the env file named in the report and recreate the agents. The count restarts when the value changes.'
       tags:
         - tag: notify
           value: admin
