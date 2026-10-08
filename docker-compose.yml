@@ -229,6 +229,11 @@ services:
       start_period: 60s
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE
+    # The kernel OOM killer must pick any other process before the database
+    # (8 Oct 2026: mysqld was the victim of a 2 GB host python step, 5xx until
+    # restart). Applies on container creation only; a restart keeps the stored
+    # value, so the private overlay's host guard re-applies it on the live pid.
+    oom_score_adj: -500
 
     logging:
       driver: json-file
