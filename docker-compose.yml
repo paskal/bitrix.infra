@@ -247,7 +247,8 @@ services:
     image: memcached:1-alpine
     hostname: memcached
     restart: unless-stopped
-    command: ["-m", "2048", "-c", "32768"]
+    # 3 GB: evictions of 1.0 million entries in 6 days at 2 GB; the host keeps at least 3 GiB available at its post-ASR-cap low (09.10.2026)
+    command: ["-m", "3072", "-c", "32768"]
     expose:
       - "11211"
     healthcheck:
