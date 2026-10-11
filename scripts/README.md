@@ -47,7 +47,7 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`file-backup.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Performs incremental file backups to S3 using duplicity, under a `duplicity_web_<hostname>` prefix. Excludes cache, logs, and development directories. Full backup every 60 days. Runs without encryption and includes `private/environment/*.env`, so the bucket must stay private.
+    *   **Purpose:** Performs incremental file backups to S3 using duplicity, under a `duplicity_web_<hostname>` prefix. Excludes cache, logs, and development directories. Full backup every 60 days. When `BACKUP2_S3_BUCKET` is set in `backup.env`, it then backs up to that second destination as well, with a separate chain there; a failure at one destination does not stop the other. Runs without encryption and includes `private/environment/*.env`, so every bucket must stay private.
 
 *   **`find-image-type-mismatch.sh`**
     *   **Type:** Shell script (`.sh`)
@@ -65,7 +65,7 @@ Below is a list of scripts and relevant files found in this directory:
 *   **`mysql-dump.sh`**
     *   **Type:** Shell script (`.sh`)
     *   **Purpose:** Creates a compressed MySQL dump (utf8mb4 client, `b_user_session` excluded) and uploads it to S3; a dump under 1 MB is treated as a failure and not synced.
-    *   **Notes:** Reads `private/environment/mysql.env` and `private/environment/backup.env` (`BACKUP_S3_BUCKET`, `S3_ENDPOINT_URL`, `DOMAIN`); the database name is derived from `DOMAIN` (dots and dashes to underscores), not from `MYSQL_DATABASE`, and the dump lands under `mysql_<hostname>/` in the bucket.
+    *   **Notes:** Reads `private/environment/mysql.env` and `private/environment/backup.env` (`BACKUP_S3_BUCKET`, `S3_ENDPOINT_URL`, `DOMAIN`); the database name is derived from `DOMAIN` (dots and dashes to underscores), not from `MYSQL_DATABASE`, and the dump lands under `mysql_<hostname>/` in the bucket, and in the second destination too when `BACKUP2_S3_BUCKET` is set.
 
 *   **`optimise-images.sh`**
     *   **Type:** Shell script (`.sh`)

@@ -3,6 +3,7 @@
 # Configuration is read from private/environment/backup.env and
 # private/environment/mysql.env.
 # Required variables: BACKUP_S3_BUCKET, S3_ENDPOINT_URL, DOMAIN
+# Optional second destination: BACKUP2_S3_BUCKET, BACKUP2_S3_ENDPOINT_URL, BACKUP2_AWS_PROFILE
 
 set -e -u -o pipefail
 
@@ -85,12 +86,30 @@ if [ "${backup_size}" -lt 1000000 ]; then
 fi
 mv -f -- "${backup_tmp}" "${backup_path}"
 
-echo "Syncing backups to s3://${BACKUP_S3_BUCKET}"
-# sync with S3; ignore the duplicity cache in the backup volume and any dump a crashed
-# run left under its temporary name
-HOME=/home/admin /usr/local/bin/aws --endpoint-url="${S3_ENDPOINT_URL}" s3 sync "${backup_directory_path}" "s3://${BACKUP_S3_BUCKET}/mysql_$(hostname)/" --exclude '.duplicity-cache/*' --exclude '*.tmp'
+# sync with S3; ignore the duplicity caches in the backup volume (one per destination,
+# .duplicity-cache and .duplicity-cache-2; aws filters let * cross "/") and any dump a crashed
+# run left under its temporary name. The optional third argument is the credentials profile
+# holding that destination's keys (none = the default credentials).
+sync_to() {
+  echo "Syncing backups to s3://$1"
+  HOME=/home/admin /usr/local/bin/aws ${3:+--profile "$3"} --endpoint-url="$2" s3 sync "${backup_directory_path}" "s3://$1/mysql_$(hostname)/" --exclude '.duplicity-cache*' --exclude '*.tmp'
+}
+# A failed destination does not stop the other one: the second copy matters most exactly when
+# the first provider is down. The run still exits non-zero if either failed.
+failed=0
+sync_to "${BACKUP_S3_BUCKET}" "${S3_ENDPOINT_URL}" || failed=1
+if [ -n "${BACKUP2_S3_BUCKET:-}" ]; then
+  sync_to "${BACKUP2_S3_BUCKET}" \
+    "${BACKUP2_S3_ENDPOINT_URL:?BACKUP2_S3_ENDPOINT_URL must be set when BACKUP2_S3_BUCKET is}" \
+    "${BACKUP2_AWS_PROFILE:-}" || failed=1
+fi
+if [ "${failed}" -ne 0 ]; then
+  echo "ERROR: S3 sync failed for at least one destination" >&2
+  exit 1
+fi
 
-# Monitoring status file — written ONLY on a fully successful run (guard passed + sync done).
+# Monitoring status file — written ONLY on a fully successful run (guard passed + sync to every
+# destination done).
 # The zabbix-agent reads it read-only via ./logs/backup:/var/log/backup; a stale mtime means
 # the dump has been failing, and the size value is a secondary guard. See the "Backup monitoring"
 # Zabbix template (config/zabbix/templates/backup-monitoring.yaml).
