@@ -3,6 +3,12 @@ set -e -u
 
 # write down new token using file rewrite to avoid sed escaping issues
 env_file="./private/environment/dnsrobocert.env"
+# Only Yandex Cloud DNS needs a short-lived IAM token. Other providers (DigitalOcean) keep a
+# static AUTH_KEY in the same file, which this script must not overwrite.
+if ! grep -qE '^(DNS_ZONE_ID|FOLDER_ID)=["'"'"']?[^"'"'"'[:space:]]' "$env_file"; then
+  echo "Yandex Cloud DNS is not configured in ${env_file} (DNS_ZONE_ID and FOLDER_ID are empty), nothing to refresh"
+  exit 0
+fi
 token=$("$HOME/yandex-cloud/bin/yc" iam create-token)
 # rewrite file: keep all lines except AUTH_KEY, then append new AUTH_KEY
 grep -v '^AUTH_KEY=' "$env_file" >"${env_file}.tmp" || true
