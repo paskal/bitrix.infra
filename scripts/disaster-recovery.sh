@@ -27,8 +27,9 @@ echo "Note: it's safe to run the script multiple times"
 ### Functions
 
 setup_aws() {
-  mkdir -p "/home/$(logname)/.aws"
-  chown "$(logname)":"$(id -gn "$(logname)")" "/home/$(logname)/.aws"
+  # The backup scripts and this restore read the keys from /home/admin/.aws (see admin_user_setup).
+  mkdir -p /home/admin/.aws
+  chown admin:"$(id -gn admin)" /home/admin/.aws
   if [ ! -f /usr/local/bin/aws ]; then
     curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     apt-get -y install unzip >/dev/null
@@ -36,21 +37,68 @@ setup_aws() {
     ./aws/install >/dev/null
     rm -rf awscliv2.zip ./aws
   fi
-  if [ ! -f "/home/$(logname)/.aws/config" ]; then
-    echo "[default]\nregion = ru-central1\n" >"/home/$(logname)/.aws/config"
-    chown "$(logname)":"$(id -gn "$(logname)")" "/home/$(logname)/.aws/config"
+  if [ ! -f /home/admin/.aws/config ]; then
+    echo "[default]\nregion = ru-central1\n" >/home/admin/.aws/config
+    chown admin:"$(id -gn admin)" /home/admin/.aws/config
   fi
-  if [ ! -f "/home/$(logname)/.aws/credentials" ]; then
+  if [ ! -f /home/admin/.aws/credentials ]; then
     echo "!! AWS credentials file is absent, won't be able to restore backups without it !!\n"
     echo "Please go by the link and create new static key for the existing service account:"
     echo "https://console.yandex.cloud/folders/<your-folder-id>/iam/service-accounts\n"
     echo "\
-You'll get ID and secret key, write them to /home/$(logname)/.aws/credentials in the following format:\n\n\
+You'll get ID and secret key, write them to /home/admin/.aws/credentials in the following format:\n\n\
 [default]\n\
 aws_access_key_id = KEY\n\
 aws_secret_access_key = SECRET_KEY\
 "
     exit 47
+  fi
+}
+
+# Host tools the cron scripts need and a fresh image may lack: m4 and pigz for mysql-dump.sh
+# (without m4 the dump fails before writing anything), jq for seo-reindex.sh.
+install_host_packages() {
+  echo "installing host tools (m4, pigz, jq)..."
+  apt-get update -qq >/dev/null
+  apt-get -y install m4 pigz jq >/dev/null
+}
+
+# Host cron runs several jobs as admin, the backup scripts read /home/admin/.aws, and the
+# updater deploys over ssh as admin with passwordless sudo. Containers write as uid 1000, so
+# admin is uid 1000: an alias of the login user when that user already has uid 1000.
+admin_user_setup() {
+  if id admin >/dev/null 2>&1; then
+    if [ "$(id -u admin)" -ne 1000 ]; then
+      echo "admin exists with uid $(id -u admin), but the containers write as uid 1000; fix admin by hand" >&2
+      exit 53
+    fi
+  else
+    login_user=$(logname)
+    if [ "${login_user}" != "root" ] && [ "$(id -u "${login_user}")" -eq 1000 ]; then
+      echo "creating admin as an alias of ${login_user} (uid 1000)"
+      useradd -o -u 1000 -g "$(id -g "${login_user}")" -M -d "/home/${login_user}" -s /bin/bash admin
+      [ -e /home/admin ] || ln -s "/home/${login_user}" /home/admin
+    elif getent passwd 1000 >/dev/null; then
+      echo "uid 1000 belongs to $(getent passwd 1000 | cut -d: -f1), not the login user; create admin by hand" >&2
+      exit 52
+    else
+      echo "creating admin user (uid 1000)"
+      if getent group admin >/dev/null; then
+        useradd -u 1000 -g admin -m -d /home/admin -s /bin/bash admin
+      else
+        useradd -u 1000 -U -m -d /home/admin -s /bin/bash admin
+      fi
+    fi
+  fi
+  if getent group docker >/dev/null && ! id -nG admin | tr ' ' '\n' | grep -qx docker; then
+    usermod -aG docker admin
+  fi
+  # by uid: sudo names an alias after the first passwd entry with that uid, not "admin"
+  if [ ! -f /etc/sudoers.d/90-bitrix-infra-admin ]; then
+    echo '#1000 ALL=(ALL) NOPASSWD:ALL' >/tmp/90-bitrix-infra-admin
+    visudo -cf /tmp/90-bitrix-infra-admin >/dev/null
+    install -m 0440 /tmp/90-bitrix-infra-admin /etc/sudoers.d/90-bitrix-infra-admin
+    rm -f /tmp/90-bitrix-infra-admin
   fi
 }
 
@@ -180,6 +228,35 @@ set_up_duplicity() {
   echo "done setting up duplicity"
 }
 
+# The updater container deploys over ssh as admin with private/updater_ssh_key (config/updater.yaml).
+updater_access_setup() {
+  [ -f ./private/updater_ssh_key ] || return 0
+  pubkey=$(ssh-keygen -y -f ./private/updater_ssh_key)
+  # sshd looks in the home from passwd, which for an existing admin may not be /home/admin
+  ssh_dir="$(getent passwd admin | cut -d: -f6)/.ssh"
+  mkdir -p "${ssh_dir}"
+  touch "${ssh_dir}/authorized_keys"
+  if ! grep -qxF "${pubkey}" "${ssh_dir}/authorized_keys"; then
+    # a file without a final newline would glue the new key onto its last line
+    [ -z "$(tail -c1 "${ssh_dir}/authorized_keys")" ] || echo >>"${ssh_dir}/authorized_keys"
+    echo "${pubkey}" >>"${ssh_dir}/authorized_keys"
+  fi
+  chown -R admin:"$(id -gn admin)" "${ssh_dir}"
+  chmod 0700 "${ssh_dir}"
+  chmod 0600 "${ssh_dir}/authorized_keys"
+}
+
+# A second backup destination (BACKUP2_* in backup.env) needs its keys under its own profile.
+check_second_backup_destination() {
+  [ -f ./private/environment/backup.env ] || return 0
+  profile=$(sed -n 's/^BACKUP2_AWS_PROFILE=//p' ./private/environment/backup.env | tr -d "\"'")
+  [ -n "${profile}" ] || return 0
+  if ! grep -qx "\[${profile}\]" /home/admin/.aws/credentials; then
+    echo "\nbackup.env sends backups to a second destination with the AWS profile '${profile}',"
+    echo "but /home/admin/.aws/credentials has no [${profile}] section: add that destination's keys there."
+  fi
+}
+
 final_ip_check() {
   server_ip=$(dig +short myip.opendns.com @resolver1.opendns.com)
   site_a_entry=$(dig +short ${domain})
@@ -215,7 +292,7 @@ backup_restore() {
   staging="${PWD}/.dr-restore"
   rm -rf "${staging}"
   mkdir -p "${staging}" "${PWD}/logs"
-  HOME="/home/$(logname)" duplicity \
+  HOME=/home/admin duplicity \
     --no-encryption \
     --s3-endpoint-url https://storage.yandexcloud.net \
     --log-file "${PWD}/logs/duplicity.log" \
@@ -251,7 +328,7 @@ restore_mysql() {
   #    gzip; see the size guard in scripts/mysql-dump.sh).
   #  - sort -k1,2 orders by the object's upload date+time so tail -1 is the newest good one.
   echo -n "looking for the last mysql backup in S3..."
-  HOME="/home/$(logname)" backup_filepath=$(/usr/local/bin/aws \
+  backup_filepath=$(HOME=/home/admin /usr/local/bin/aws \
     --endpoint-url=https://storage.yandexcloud.net \
     --recursive \
     s3 ls "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/" |
@@ -264,7 +341,7 @@ restore_mysql() {
   echo " found s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}"
   backup_dir=$(echo "${backup_filepath}" | cut -d "/" -f -1)
   if [ ! -f "${backup_directory_path}${backup_filepath}" ]; then
-    HOME="/home/$(logname)" /usr/local/bin/aws \
+    HOME=/home/admin /usr/local/bin/aws \
       --endpoint-url=https://storage.yandexcloud.net \
       s3 cp \
       "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}" \
@@ -276,7 +353,6 @@ restore_mysql() {
 
   # create temp file to store mysql login and password for the time of the script
   # location for it should be the directory which is passed inside the container
-  apt-get -y install m4 >/dev/null
   mysql_config_file=$(
     echo 'mkstemp(template)' |
       m4 -D template="./private/mysql-data/deleteme_XXXXXX"
@@ -369,9 +445,11 @@ wait_for_apt_lock() {
 
 # Pre-setup
 wait_for_apt_lock
+install_host_packages
 set_mtu_1450_if_not_set
 install_docker_if_not_installed
 install_docker_compose_if_not_installed
+admin_user_setup
 zabbix_setup
 set_up_duplicity
 setup_aws
@@ -383,8 +461,10 @@ backup_restore
 start_services
 restore_mysql
 create_host_cronjob_if_not_exist
+updater_access_setup
 
 # Final recommendations
 echo "\n\n=== Recommendations ==="
 final_ip_check
+check_second_backup_destination
 check_zabbix_hostname
