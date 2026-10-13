@@ -15,6 +15,17 @@ restore_from_host="${RESTORE_FROM_HOST:-favor-group}"
 duplicity_backup_location="boto3+s3://${backup_s3_directory}/duplicity_web_${restore_from_host}"
 mysql_restore_hostname="${restore_from_host}"
 mysql_restore_db="favor_group_ru"
+# Where the backups are read from. The defaults read Yandex Object Storage with the default
+# credentials; another store needs its endpoint and, when its keys are not the default ones,
+# the profile that holds them in /home/admin/.aws/credentials.
+restore_s3_endpoint="${RESTORE_S3_ENDPOINT:-https://storage.yandexcloud.net}"
+restore_aws_profile="${RESTORE_AWS_PROFILE:-}"
+# The backups leave out .git, so nested checkouts come back as plain files. List them as
+# space-separated <dir>=<git url> pairs to turn them back into clones of their remotes,
+# fetched with the updater's deploy key, e.g.
+# DR_NESTED_REPOS="private=git@github.com:me/infra-private.git web/prod=git@github.com:me/site.git"
+nested_repos="${DR_NESTED_REPOS:-}"
+github_host_key="github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
 
 ### Pre-checks
 
@@ -29,6 +40,11 @@ fi
 echo "Note: it's safe to run the script multiple times"
 
 ### Functions
+
+# The user who called sudo. logname needs a terminal and fails under a plain `ssh host cmd`.
+login_user() {
+  logname 2>/dev/null || echo "${SUDO_USER:-root}"
+}
 
 setup_aws() {
   # The backup scripts and this restore read the keys from /home/admin/.aws (see admin_user_setup).
@@ -77,7 +93,7 @@ admin_user_setup() {
       exit 53
     fi
   else
-    login_user=$(logname)
+    login_user=$(login_user)
     if [ "${login_user}" != "root" ] && [ "$(id -u "${login_user}")" -eq 1000 ]; then
       echo "creating admin as an alias of ${login_user} (uid 1000)"
       useradd -o -u 1000 -g "$(id -g "${login_user}")" -M -d "/home/${login_user}" -s /bin/bash admin
@@ -94,6 +110,10 @@ admin_user_setup() {
       fi
     fi
   fi
+  # an earlier run may have created the home directory as root before admin existed;
+  # the jobs running as admin then cannot write their caches there
+  admin_home="$(getent passwd admin | cut -d: -f6)"
+  [ -d "${admin_home}" ] && chown admin:"$(id -gn admin)" "${admin_home}"
   if getent group docker >/dev/null && ! id -nG admin | tr ' ' '\n' | grep -qx docker; then
     usermod -aG docker admin
   fi
@@ -133,7 +153,7 @@ install_docker_if_not_installed() {
 
   apt-get -y install docker-ce docker-ce-cli containerd.io >/dev/null
   # add current user to docker group
-  [ "$(logname)" != "root" ] && usermod -aG docker "$(logname)"
+  [ "$(login_user)" != "root" ] && usermod -aG docker "$(login_user)"
   echo "docker is installed"
 }
 
@@ -258,6 +278,61 @@ updater_access_setup() {
   chmod 0600 "${ssh_dir}/authorized_keys"
 }
 
+# GitHub's published host key, so neither the clone below nor the deploys as admin stop at
+# an unknown host prompt.
+github_known_host() {
+  for home in /root "$(getent passwd admin | cut -d: -f6)"; do
+    mkdir -p "${home}/.ssh"
+    touch "${home}/.ssh/known_hosts"
+    grep -qxF "${github_host_key}" "${home}/.ssh/known_hosts" || echo "${github_host_key}" >>"${home}/.ssh/known_hosts"
+  done
+  chown -R admin:"$(id -gn admin)" "$(getent passwd admin | cut -d: -f6)/.ssh"
+}
+
+# Turns each restored checkout without .git back into a clone of its remote at origin/master,
+# keeping the restored files as the worktree: `git status` then shows what differed from the
+# remote at backup time. Needs the updater deploy key restored with private/.
+nested_repos_setup() {
+  [ -n "${nested_repos}" ] || return 0
+  [ -f ./private/updater_ssh_key ] || {
+    echo "private/updater_ssh_key is absent, nested checkouts stay without .git"
+    return 0
+  }
+  github_known_host
+  key="${PWD}/private/updater_ssh_key"
+  for entry in ${nested_repos}; do
+    dir="${entry%%=*}"
+    url="${entry#*=}"
+    [ -d "${dir}" ] || continue
+    if [ -e "${dir}/.git" ]; then
+      # a .git without a commit is what an interrupted earlier run leaves behind
+      git -c safe.directory='*' -C "${dir}" rev-parse -q --verify HEAD >/dev/null && continue
+      rm -rf "${dir}/.git"
+    fi
+    echo "turning ${dir} back into a clone of ${url}..."
+    (
+      cd "${dir}"
+      export GIT_SSH_COMMAND="ssh -i ${key} -o IdentitiesOnly=yes -o BatchMode=yes"
+      # root works on a tree that fix-rights already gave to admin
+      export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'
+      git init -q -b master
+      git remote add origin "${url}"
+      git fetch -q origin
+      git reset -q origin/master
+      git branch -q -u origin/master
+      echo "${dir}: $(git status --porcelain | wc -l) paths differ from origin/master"
+    )
+  done
+}
+
+# Site-specific steps live in the private overlay: private/scripts/dr-hook.sh is called with
+# "pre-start" before the containers start and with "post-db" after the DB is restored.
+private_hook() {
+  [ -x ./private/scripts/dr-hook.sh ] || return 0
+  echo "running private/scripts/dr-hook.sh $1..."
+  ./private/scripts/dr-hook.sh "$1"
+}
+
 # A second backup destination (BACKUP2_* in backup.env) needs its keys under its own profile.
 check_second_backup_destination() {
   [ -f ./private/environment/backup.env ] || return 0
@@ -304,9 +379,9 @@ backup_restore() {
   staging="${PWD}/.dr-restore"
   rm -rf "${staging}"
   mkdir -p "${staging}" "${PWD}/logs"
-  HOME=/home/admin duplicity \
+  env HOME=/home/admin ${restore_aws_profile:+"AWS_PROFILE=${restore_aws_profile}"} duplicity \
     --no-encryption \
-    --s3-endpoint-url https://storage.yandexcloud.net \
+    --s3-endpoint-url "${restore_s3_endpoint}" \
     --log-file "${PWD}/logs/duplicity.log" \
     --archive-dir /root/.cache/duplicity \
     --force \
@@ -320,6 +395,9 @@ backup_restore() {
   echo "merging restored files into ${PWD} (this can take a few minutes)..."
   cp -a "${staging}/." "${PWD}/"
   rm -rf "${staging}"
+  # The merge also brought back the backup's copies of this repository's own files, which can
+  # be older than the clone (the second run of the script would then be an old version).
+  git -c safe.directory='*' checkout -- .
   touch "${restore_marker}"
   echo "Server has latest backup of files restored!"
   echo "Linking logrotate configuration to /etc/logrotate.d/..."
@@ -340,8 +418,8 @@ restore_mysql() {
   #    gzip; see the size guard in scripts/mysql-dump.sh).
   #  - sort -k1,2 orders by the object's upload date+time so tail -1 is the newest good one.
   echo -n "looking for the last mysql backup in S3..."
-  backup_filepath=$(HOME=/home/admin /usr/local/bin/aws \
-    --endpoint-url=https://storage.yandexcloud.net \
+  backup_filepath=$(HOME=/home/admin /usr/local/bin/aws ${restore_aws_profile:+--profile "${restore_aws_profile}"} \
+    --endpoint-url="${restore_s3_endpoint}" \
     --recursive \
     s3 ls "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/" |
     grep -E "/[0-9]{4}-[0-9]{2}-[0-9]{2}/.*-mysqldump\.sql\.gz$" |
@@ -353,8 +431,8 @@ restore_mysql() {
   echo " found s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}"
   backup_dir=$(echo "${backup_filepath}" | cut -d "/" -f -1)
   if [ ! -f "${backup_directory_path}${backup_filepath}" ]; then
-    HOME=/home/admin /usr/local/bin/aws \
-      --endpoint-url=https://storage.yandexcloud.net \
+    HOME=/home/admin /usr/local/bin/aws ${restore_aws_profile:+--profile "${restore_aws_profile}"} \
+      --endpoint-url="${restore_s3_endpoint}" \
       s3 cp \
       "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}" \
       "${backup_directory_path}${backup_dir}/" >/dev/null
@@ -470,8 +548,12 @@ mysql_user_setup
 
 # Backup restoration
 backup_restore
+nested_repos_setup
+./scripts/fix-rights.sh
+private_hook pre-start
 start_services
 restore_mysql
+private_hook post-db
 create_host_cronjob_if_not_exist
 updater_access_setup
 
