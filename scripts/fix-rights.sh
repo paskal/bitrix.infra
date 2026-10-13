@@ -22,6 +22,49 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 0
 fi
 
+# On a server set up by disaster-recovery.sh the checkouts and the secrets belong
+# to the admin user (uid 1000): the deploy pulls and the host scripts run as admin,
+# the php containers run as www-data (also uid 1000), and git refuses a tree owned
+# by someone else. A clone made as root or files restored with a foreign uid would
+# break the next pull or a job that reads a secret. A developer checkout (no admin
+# user with uid 1000, e.g. macOS) keeps its owner, so compose and git still work
+# for the person who runs them. The blocks further down put cron, logrotate and
+# mysql files back to their own owners.
+if [ "$(id -u admin 2>/dev/null || true)" = 1000 ]; then
+  if command -v git >/dev/null 2>&1; then
+    echo "Fixing repository ownership..."
+    for repo in . ./private; do
+      [ -d "$repo/.git" ] || continue
+      chown -R 1000:1000 "$repo/.git"
+      # Tracked files and every directory on their way: git replaces a file by
+      # deleting and recreating it, and adds new files to existing directories.
+      # A path missing from the worktree makes chown fail, which is not an error here.
+      (
+        cd "$repo" || exit 0
+        git -c safe.directory='*' ls-files -z | xargs -0 chown -h 1000:1000 2>/dev/null
+        {
+          printf '.\0'
+          git -c safe.directory='*' ls-tree -r -d --name-only -z HEAD
+        } | xargs -0 chown 1000:1000 2>/dev/null
+      ) || true
+    done
+  fi
+
+  # Compose reads the secrets as root; the Zabbix agent (uid 1997) reads its own
+  # MySQL credentials. Nobody else needs to read any of them.
+  echo "Fixing private/environment permissions..."
+  if [ -d ./private/environment ]; then
+    for f in ./private/environment/*; do
+      [ -f "$f" ] || continue
+      case "$f" in
+      *.example) chown 1000:1000 "$f" ;;
+      */zabbix-*.conf | *zbx*.cnf) chown 1997:1997 "$f" && chmod 0400 "$f" ;;
+      *) chown 1000:1000 "$f" && chmod 0600 "$f" ;;
+      esac
+    done
+  fi
+fi
+
 # cron tasks should be owned by root, otherwise they won't run
 # and will be silently ignored
 echo "Fixing cron permissions..."
@@ -55,6 +98,9 @@ echo "Fixing php and nginx permissions..."
 [ -d ./logs/nginx ] && chown -R 1000:1000 ./logs/nginx
 [ -d ./logs/php ] && chown -R 1000:1000 ./logs/php
 [ -d ./logs/phpstan ] && chown -R 1000:1000 ./logs/phpstan
+[ -d ./logs/backup ] && chown -R 1000:1000 ./logs/backup
+[ -d ./logs/seo-reindex ] && chown -R 1000:1000 ./logs/seo-reindex
+[ -d ./private/seo-reindex ] && chown -R 1000:1000 ./private/seo-reindex
 [ -d ./private/letsencrypt ] && chown -R 1000:1000 ./private/letsencrypt
 [ -d ./private/nginx ] && chown -R 1000:1000 ./private/nginx
 [ -f ./private/msmtprc ] && chown 1000:1000 ./private/msmtprc
