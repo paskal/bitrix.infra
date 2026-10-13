@@ -109,9 +109,11 @@ admin_user_setup() {
 install_docker_if_not_installed() {
   command -v docker >/dev/null && return
   echo "docker is installing..."
-  # set low enough docker MTU to work with host machine MTU of 1450
-  mkdir -p /etc/docker
-  echo '{"mtu": 1422}' >/etc/docker/daemon.json
+  if on_yandex_cloud; then
+    # set low enough docker MTU to work with host machine MTU of 1450
+    mkdir -p /etc/docker
+    echo '{"mtu": 1422}' >/etc/docker/daemon.json
+  fi
 
   apt-get update >/dev/null
   apt-get -y install \
@@ -144,8 +146,14 @@ install_docker_compose_if_not_installed() {
   echo "docker-compose-plugin is installed"
 }
 
+# Yandex Cloud VMs report "Yandex" as the DMI system vendor; other hosts keep their own network settings.
+on_yandex_cloud() {
+  grep -qx Yandex /sys/class/dmi/id/sys_vendor 2>/dev/null
+}
+
 # Necessary for Yandex with DDoS Protection enabled https://cloud.yandex.com/en/docs/vpc/concepts/mtu-mss
 set_mtu_1450_if_not_set() {
+  on_yandex_cloud || return 0
   if [ "$(cat /sys/class/net/eth0/mtu)" -eq 1450 ]; then return; fi
   echo "setting mtu to 1450..."
   cat <<EOF >/etc/netplan/90-mtu.yaml
