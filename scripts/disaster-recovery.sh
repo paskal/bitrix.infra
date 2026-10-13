@@ -8,8 +8,12 @@ set -e -u
 # Forks must replace the variables in this block before use.
 domain="favor-group.ru"
 backup_s3_directory=favor-group-backup
-duplicity_backup_location="boto3+s3://${backup_s3_directory}/duplicity_web_favor-group"
-mysql_restore_hostname="favor-group"
+# Backups sit under the hostname of the machine that made them (duplicity_web_<host>,
+# mysql_<host>). After a failover the newest copies belong to the replacement host, so
+# restore from it with RESTORE_FROM_HOST=<its hostname>.
+restore_from_host="${RESTORE_FROM_HOST:-favor-group}"
+duplicity_backup_location="boto3+s3://${backup_s3_directory}/duplicity_web_${restore_from_host}"
+mysql_restore_hostname="${restore_from_host}"
 mysql_restore_db="favor_group_ru"
 
 ### Pre-checks
