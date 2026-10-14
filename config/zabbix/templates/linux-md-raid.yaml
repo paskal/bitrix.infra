@@ -18,7 +18,6 @@ zabbix_export:
           delay: 5m
           history: 7d
           value_type: TEXT
-          trends: '0'
           description: 'Full /proc/mdstat. Each array line ends with a member map such as [UU]; an underscore marks a missing or failed member, (F) marks a failed device.'
           tags:
             - tag: component
