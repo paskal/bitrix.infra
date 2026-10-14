@@ -126,3 +126,9 @@ REMAINING_LINES=$(wc -l <"$QUEUE")
 } >>"$PROGRESS"
 
 echo "=== $(ts) done: ok=$OK fail=$FAIL remaining=$REMAINING_LINES ==="
+
+# A run that tried URLs and got none accepted (API error, lost host verification, network)
+# exits non-zero, so cron-based monitoring sees it as failed.
+if [ "$ATTEMPTED" -gt 0 ] && [ "$OK" -eq 0 ]; then
+  exit 1
+fi
