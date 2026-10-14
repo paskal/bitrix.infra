@@ -321,6 +321,8 @@ return array(
 
 ## Getting Started
 
+The stack as shipped needs a host with at least 8 GB of RAM: `config/mysql/my.cnf` gives InnoDB a 4 GB buffer pool, and on a 4 GB host the kernel kills mysqld while it initialises the data directory (the container then restarts in a loop with `Killed ... --initialize-insecure` in its log). On a smaller machine shrink the buffer pool with a local override, see "Local overrides" below.
+
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/paskal/bitrix.infra.git

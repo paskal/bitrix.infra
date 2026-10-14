@@ -30,7 +30,7 @@ In the Bitrix wizard: DB host = `localhost`, DB name / user / password from `pri
 | Adding TLS | Provide a dhparam file ≥2048 bits (`openssl dhparam -out private/letsencrypt/dhparams.pem 2048`) and declare `ssl_dhparam` per vhost in the private overlay |
 | macOS bind-mount changes invisible | Docker Desktop bind mounts sometimes need `docker compose restart` → force-recreate to pick up inode changes |
 | File-level mounts track inodes | Deploy config changes with `tee` (write in-place) rather than `rsync`/`git pull`; see Readme.md nginx deploy notes |
-| `my.cnf` is sized for a dedicated server | `innodb_buffer_pool_size = 4G`; shrink via a gitignored compose override mounting your own cnf (see "Local overrides" in Readme.md) — keeps the tree clean |
+| `my.cnf` is sized for a dedicated server | `innodb_buffer_pool_size = 4G`, so the host needs at least 8 GB of RAM (on 4 GB the kernel kills mysqld during initialisation and the container restarts in a loop); shrink via a gitignored compose override mounting your own cnf (see "Local overrides" in Readme.md) — keeps the tree clean |
 | Optional services missing | `adminer`, `updater`, `certbot`, `zabbix-agent`, `ftp` sit behind compose profiles — enable with `COMPOSE_PROFILES` when needed; the core stack needs none |
 
 ## Automating the Bitrix installer
