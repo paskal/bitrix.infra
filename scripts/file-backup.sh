@@ -13,6 +13,9 @@ if [ ! -f "${BACKUP_ENV}" ]; then
 fi
 # shellcheck disable=SC1090
 . "${BACKUP_ENV}"
+# the deploy user keeps the S3 keys in its ~/.aws
+# shellcheck source=scripts/deploy-user.sh
+. ./scripts/deploy-user.sh
 : "${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET must be set in ${BACKUP_ENV}}"
 : "${S3_ENDPOINT_URL:?S3_ENDPOINT_URL must be set in ${BACKUP_ENV}}"
 
@@ -29,7 +32,7 @@ cache_dir="${src}/backup/.duplicity-cache"
 # the only protection — keep every destination bucket private. Matches the DR restore path,
 # which also runs --no-encryption (see scripts/disaster-recovery.sh).
 backup_to() {
-  env HOME="/home/admin" ${4:+"AWS_PROFILE=$4"} duplicity \
+  env HOME="${deploy_home}" ${4:+"AWS_PROFILE=$4"} duplicity \
     --no-encryption \
     --full-if-older-than 60D \
     --asynchronous-upload \

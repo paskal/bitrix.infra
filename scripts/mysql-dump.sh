@@ -14,6 +14,9 @@ if [ ! -f "${BACKUP_ENV}" ]; then
 fi
 # shellcheck disable=SC1090
 . "${BACKUP_ENV}"
+# the deploy user keeps the S3 keys in its ~/.aws
+# shellcheck source=scripts/deploy-user.sh
+. ./scripts/deploy-user.sh
 : "${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET must be set in ${BACKUP_ENV}}"
 : "${S3_ENDPOINT_URL:?S3_ENDPOINT_URL must be set in ${BACKUP_ENV}}"
 : "${DOMAIN:?DOMAIN must be set in ${BACKUP_ENV}}"
@@ -92,7 +95,7 @@ mv -f -- "${backup_tmp}" "${backup_path}"
 # holding that destination's keys (none = the default credentials).
 sync_to() {
   echo "Syncing backups to s3://$1"
-  HOME=/home/admin /usr/local/bin/aws ${3:+--profile "$3"} --endpoint-url="$2" s3 sync "${backup_directory_path}" "s3://$1/mysql_$(hostname)/" --exclude '.duplicity-cache*' --exclude '*.tmp'
+  HOME="${deploy_home}" /usr/local/bin/aws ${3:+--profile "$3"} --endpoint-url="$2" s3 sync "${backup_directory_path}" "s3://$1/mysql_$(hostname)/" --exclude '.duplicity-cache*' --exclude '*.tmp'
 }
 # A failed destination does not stop the other one: the second copy matters most exactly when
 # the first provider is down. The run still exits non-zero if either failed.

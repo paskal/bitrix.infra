@@ -17,7 +17,7 @@ mysql_restore_hostname="${restore_from_host}"
 mysql_restore_db="favor_group_ru"
 # Where the backups are read from. The defaults read Yandex Object Storage with the default
 # credentials; another store needs its endpoint and, when its keys are not the default ones,
-# the profile that holds them in /home/admin/.aws/credentials.
+# the profile that holds them in the deploy user's ~/.aws/credentials.
 restore_s3_endpoint="${RESTORE_S3_ENDPOINT:-https://storage.yandexcloud.net}"
 restore_aws_profile="${RESTORE_AWS_PROFILE:-}"
 # The backups leave out .git, so nested checkouts come back as plain files. List them as
@@ -37,6 +37,10 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 46
 fi
 
+# the deploy user (DEPLOY_USER, default admin) and its home
+# shellcheck source=scripts/deploy-user.sh
+. ./scripts/deploy-user.sh
+
 echo "Note: it's safe to run the script multiple times"
 
 ### Functions
@@ -47,9 +51,9 @@ login_user() {
 }
 
 setup_aws() {
-  # The backup scripts and this restore read the keys from /home/admin/.aws (see admin_user_setup).
-  mkdir -p /home/admin/.aws
-  chown admin:"$(id -gn admin)" /home/admin/.aws
+  # The backup scripts and this restore read the keys from the deploy user's ~/.aws (see admin_user_setup).
+  mkdir -p "${deploy_home}/.aws"
+  chown "${deploy_user}":"$(id -gn "${deploy_user}")" "${deploy_home}/.aws"
   if [ ! -f /usr/local/bin/aws ]; then
     curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     apt-get -y install unzip >/dev/null
@@ -57,16 +61,16 @@ setup_aws() {
     ./aws/install >/dev/null
     rm -rf awscliv2.zip ./aws
   fi
-  if [ ! -f /home/admin/.aws/config ]; then
-    echo "[default]\nregion = ru-central1\n" >/home/admin/.aws/config
-    chown admin:"$(id -gn admin)" /home/admin/.aws/config
+  if [ ! -f "${deploy_home}/.aws/config" ]; then
+    echo "[default]\nregion = ru-central1\n" >"${deploy_home}/.aws/config"
+    chown "${deploy_user}":"$(id -gn "${deploy_user}")" "${deploy_home}/.aws/config"
   fi
-  if [ ! -f /home/admin/.aws/credentials ]; then
+  if [ ! -f "${deploy_home}/.aws/credentials" ]; then
     echo "!! AWS credentials file is absent, won't be able to restore backups without it !!\n"
     echo "Please go by the link and create new static key for the existing service account:"
     echo "https://console.yandex.cloud/folders/<your-folder-id>/iam/service-accounts\n"
     echo "\
-You'll get ID and secret key, write them to /home/admin/.aws/credentials in the following format:\n\n\
+You'll get ID and secret key, write them to ${deploy_home}/.aws/credentials in the following format:\n\n\
 [default]\n\
 aws_access_key_id = KEY\n\
 aws_secret_access_key = SECRET_KEY\
@@ -83,39 +87,39 @@ install_host_packages() {
   apt-get -y install m4 pigz jq >/dev/null
 }
 
-# Host cron runs several jobs as admin, the backup scripts read /home/admin/.aws, and the
-# updater deploys over ssh as admin with passwordless sudo. Containers write as uid 1000, so
-# admin is uid 1000: an alias of the login user when that user already has uid 1000.
+# The deploy user (admin by default) runs several host cron jobs, keeps the backup keys in
+# ~/.aws, and receives the updater's deploys over ssh with passwordless sudo. Containers write
+# as uid 1000, so it is uid 1000: an alias of the login user when that user already has uid 1000.
 admin_user_setup() {
-  if id admin >/dev/null 2>&1; then
-    if [ "$(id -u admin)" -ne 1000 ]; then
-      echo "admin exists with uid $(id -u admin), but the containers write as uid 1000; fix admin by hand" >&2
+  if id "${deploy_user}" >/dev/null 2>&1; then
+    if [ "$(id -u "${deploy_user}")" -ne 1000 ]; then
+      echo "${deploy_user} exists with uid $(id -u "${deploy_user}"), but the containers write as uid 1000; fix it by hand" >&2
       exit 53
     fi
   else
     login_user=$(login_user)
     if [ "${login_user}" != "root" ] && [ "$(id -u "${login_user}")" -eq 1000 ]; then
-      echo "creating admin as an alias of ${login_user} (uid 1000)"
-      useradd -o -u 1000 -g "$(id -g "${login_user}")" -M -d "/home/${login_user}" -s /bin/bash admin
-      [ -e /home/admin ] || ln -s "/home/${login_user}" /home/admin
+      echo "creating ${deploy_user} as an alias of ${login_user} (uid 1000)"
+      useradd -o -u 1000 -g "$(id -g "${login_user}")" -M -d "/home/${login_user}" -s /bin/bash "${deploy_user}"
+      [ -e "/home/${deploy_user}" ] || ln -s "/home/${login_user}" "/home/${deploy_user}"
     elif getent passwd 1000 >/dev/null; then
-      echo "uid 1000 belongs to $(getent passwd 1000 | cut -d: -f1), not the login user; create admin by hand" >&2
+      echo "uid 1000 belongs to $(getent passwd 1000 | cut -d: -f1), not the login user; create ${deploy_user} by hand" >&2
       exit 52
     else
-      echo "creating admin user (uid 1000)"
-      if getent group admin >/dev/null; then
-        useradd -u 1000 -g admin -m -d /home/admin -s /bin/bash admin
+      echo "creating ${deploy_user} user (uid 1000)"
+      if getent group "${deploy_user}" >/dev/null; then
+        useradd -u 1000 -g "${deploy_user}" -m -d "/home/${deploy_user}" -s /bin/bash "${deploy_user}"
       else
-        useradd -u 1000 -U -m -d /home/admin -s /bin/bash admin
+        useradd -u 1000 -U -m -d "/home/${deploy_user}" -s /bin/bash "${deploy_user}"
       fi
     fi
   fi
-  # an earlier run may have created the home directory as root before admin existed;
-  # the jobs running as admin then cannot write their caches there
-  admin_home="$(getent passwd admin | cut -d: -f6)"
-  [ -d "${admin_home}" ] && chown admin:"$(id -gn admin)" "${admin_home}"
-  if getent group docker >/dev/null && ! id -nG admin | tr ' ' '\n' | grep -qx docker; then
-    usermod -aG docker admin
+  # an earlier run may have created the home directory as root before the user existed;
+  # the jobs running as that user then cannot write their caches there
+  admin_home="$(getent passwd "${deploy_user}" | cut -d: -f6)"
+  [ -d "${admin_home}" ] && chown "${deploy_user}":"$(id -gn "${deploy_user}")" "${admin_home}"
+  if getent group docker >/dev/null && ! id -nG "${deploy_user}" | tr ' ' '\n' | grep -qx docker; then
+    usermod -aG docker "${deploy_user}"
   fi
   # by uid: sudo names an alias after the first passwd entry with that uid, not "admin"
   if [ ! -f /etc/sudoers.d/90-bitrix-infra-admin ]; then
@@ -264,8 +268,8 @@ set_up_duplicity() {
 updater_access_setup() {
   [ -f ./private/updater_ssh_key ] || return 0
   pubkey=$(ssh-keygen -y -f ./private/updater_ssh_key)
-  # sshd looks in the home from passwd, which for an existing admin may not be /home/admin
-  ssh_dir="$(getent passwd admin | cut -d: -f6)/.ssh"
+  # sshd looks in the home from passwd, which for an existing user may not be /home/<user>
+  ssh_dir="$(getent passwd "${deploy_user}" | cut -d: -f6)/.ssh"
   mkdir -p "${ssh_dir}"
   touch "${ssh_dir}/authorized_keys"
   if ! grep -qxF "${pubkey}" "${ssh_dir}/authorized_keys"; then
@@ -273,7 +277,7 @@ updater_access_setup() {
     [ -z "$(tail -c1 "${ssh_dir}/authorized_keys")" ] || echo >>"${ssh_dir}/authorized_keys"
     echo "${pubkey}" >>"${ssh_dir}/authorized_keys"
   fi
-  chown -R admin:"$(id -gn admin)" "${ssh_dir}"
+  chown -R "${deploy_user}":"$(id -gn "${deploy_user}")" "${ssh_dir}"
   chmod 0700 "${ssh_dir}"
   chmod 0600 "${ssh_dir}/authorized_keys"
 }
@@ -281,12 +285,12 @@ updater_access_setup() {
 # GitHub's published host key, so neither the clone below nor the deploys as admin stop at
 # an unknown host prompt.
 github_known_host() {
-  for home in /root "$(getent passwd admin | cut -d: -f6)"; do
+  for home in /root "$(getent passwd "${deploy_user}" | cut -d: -f6)"; do
     mkdir -p "${home}/.ssh"
     touch "${home}/.ssh/known_hosts"
     grep -qxF "${github_host_key}" "${home}/.ssh/known_hosts" || echo "${github_host_key}" >>"${home}/.ssh/known_hosts"
   done
-  chown -R admin:"$(id -gn admin)" "$(getent passwd admin | cut -d: -f6)/.ssh"
+  chown -R "${deploy_user}":"$(id -gn "${deploy_user}")" "$(getent passwd "${deploy_user}" | cut -d: -f6)/.ssh"
 }
 
 # Turns each restored checkout without .git back into a clone of its remote at origin/master,
@@ -325,6 +329,28 @@ nested_repos_setup() {
   done
 }
 
+# The host cron jobs and the deploys read DEPLOY_USER from .env, which the restore brings back.
+# A user given on the command line is written there; a different one in the restored .env stops
+# the run, since the steps so far set up the wrong account.
+deploy_user_check() {
+  restored_user=$(env -u DEPLOY_USER sh -c '. ./scripts/deploy-user.sh; echo "${deploy_user}"')
+  [ "${restored_user}" = "${deploy_user}" ] && return 0
+  if [ -n "${DEPLOY_USER:-}" ]; then
+    { grep -v '^DEPLOY_USER=' ./.env 2>/dev/null || true; } >./.env.tmp
+    echo "DEPLOY_USER=${deploy_user}" >>./.env.tmp
+    mv ./.env.tmp ./.env
+    echo "wrote DEPLOY_USER=${deploy_user} to .env for the cron jobs and deploys"
+  else
+    echo "The restored .env sets DEPLOY_USER=${restored_user}: repeat this run with DEPLOY_USER=${restored_user}" >&2
+    echo "added to its environment, keeping any RESTORE_*, DR_NESTED_REPOS and COMPOSE_PROFILES you passed." >&2
+    if [ "$(id -u "${deploy_user}" 2>/dev/null || true)" = 1000 ] && ! id "${restored_user}" >/dev/null 2>&1; then
+      echo "This run already made ${deploy_user} the uid 1000 account; rename it first:" >&2
+      echo "  sudo usermod -l ${restored_user} -d /home/${restored_user} -m ${deploy_user}" >&2
+    fi
+    exit 54
+  fi
+}
+
 # Site-specific steps live in the private overlay: private/scripts/dr-hook.sh is called with
 # "pre-start" before the containers start and with "post-db" after the DB is restored.
 private_hook() {
@@ -338,9 +364,9 @@ check_second_backup_destination() {
   [ -f ./private/environment/backup.env ] || return 0
   profile=$(sed -n 's/^BACKUP2_AWS_PROFILE=//p' ./private/environment/backup.env | tr -d "\"'")
   [ -n "${profile}" ] || return 0
-  if ! grep -qx "\[${profile}\]" /home/admin/.aws/credentials; then
+  if ! grep -qx "\[${profile}\]" ${deploy_home}/.aws/credentials; then
     echo "\nbackup.env sends backups to a second destination with the AWS profile '${profile}',"
-    echo "but /home/admin/.aws/credentials has no [${profile}] section: add that destination's keys there."
+    echo "but ${deploy_home}/.aws/credentials has no [${profile}] section: add that destination's keys there."
   fi
 }
 
@@ -379,7 +405,7 @@ backup_restore() {
   staging="${PWD}/.dr-restore"
   rm -rf "${staging}"
   mkdir -p "${staging}" "${PWD}/logs"
-  env HOME=/home/admin ${restore_aws_profile:+"AWS_PROFILE=${restore_aws_profile}"} duplicity \
+  env HOME="${deploy_home}" ${restore_aws_profile:+"AWS_PROFILE=${restore_aws_profile}"} duplicity \
     --no-encryption \
     --s3-endpoint-url "${restore_s3_endpoint}" \
     --log-file "${PWD}/logs/duplicity.log" \
@@ -418,7 +444,7 @@ restore_mysql() {
   #    gzip; see the size guard in scripts/mysql-dump.sh).
   #  - sort -k1,2 orders by the object's upload date+time so tail -1 is the newest good one.
   echo -n "looking for the last mysql backup in S3..."
-  backup_filepath=$(HOME=/home/admin /usr/local/bin/aws ${restore_aws_profile:+--profile "${restore_aws_profile}"} \
+  backup_filepath=$(HOME="${deploy_home}" /usr/local/bin/aws ${restore_aws_profile:+--profile "${restore_aws_profile}"} \
     --endpoint-url="${restore_s3_endpoint}" \
     --recursive \
     s3 ls "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/" |
@@ -431,7 +457,7 @@ restore_mysql() {
   echo " found s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}"
   backup_dir=$(echo "${backup_filepath}" | cut -d "/" -f -1)
   if [ ! -f "${backup_directory_path}${backup_filepath}" ]; then
-    HOME=/home/admin /usr/local/bin/aws ${restore_aws_profile:+--profile "${restore_aws_profile}"} \
+    HOME="${deploy_home}" /usr/local/bin/aws ${restore_aws_profile:+--profile "${restore_aws_profile}"} \
       --endpoint-url="${restore_s3_endpoint}" \
       s3 cp \
       "s3://${backup_s3_directory}/mysql_${mysql_restore_hostname}/${backup_filepath}" \
@@ -548,6 +574,7 @@ mysql_user_setup
 
 # Backup restoration
 backup_restore
+deploy_user_check
 nested_repos_setup
 ./scripts/fix-rights.sh
 private_hook pre-start

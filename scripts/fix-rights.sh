@@ -23,14 +23,16 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # On a server set up by disaster-recovery.sh the checkouts and the secrets belong
-# to the admin user (uid 1000): the deploy pulls and the host scripts run as admin,
-# the php containers run as www-data (also uid 1000), and git refuses a tree owned
+# to the deploy user (uid 1000; DEPLOY_USER, admin by default): the deploy pulls and
+# the host scripts run as that user, the php containers run as www-data (also uid 1000), and git refuses a tree owned
 # by someone else. A clone made as root or files restored with a foreign uid would
-# break the next pull or a job that reads a secret. A developer checkout (no admin
+# break the next pull or a job that reads a secret. A developer checkout (no such
 # user with uid 1000, e.g. macOS) keeps its owner, so compose and git still work
 # for the person who runs them. The blocks further down put cron, logrotate and
 # mysql files back to their own owners.
-if [ "$(id -u admin 2>/dev/null || true)" = 1000 ]; then
+# shellcheck source=scripts/deploy-user.sh
+. ./scripts/deploy-user.sh
+if [ "$(id -u "${deploy_user}" 2>/dev/null || true)" = 1000 ]; then
   if command -v git >/dev/null 2>&1; then
     echo "Fixing repository ownership..."
     for repo in . ./private; do

@@ -60,3 +60,6 @@ id_ed25519.pub
 
 # python bytecode
 __pycache__/
+
+# marker written by scripts/disaster-recovery.sh after the file restore
+/.dr-file-restore-done

@@ -17,7 +17,9 @@ fi
 # Configuration
 BACKUP_DIR="./backup/restore"
 DEST="boto3+s3://${BACKUP_S3_BUCKET}/duplicity_web_$(hostname)"
-HOME_DIR="/home/admin" # Duplicity needs HOME to read AWS credentials
+# shellcheck source=scripts/deploy-user.sh
+. ./scripts/deploy-user.sh
+HOME_DIR="${deploy_home}" # Duplicity needs HOME to read AWS credentials
 LOGFILE="/web/logs/compare-backups.log"
 CACHE_DIR="/web/backup/.duplicity-cache" # Match location in file-backup.sh
 DIFF_FILE="${BACKUP_DIR}/backup_diff.txt"

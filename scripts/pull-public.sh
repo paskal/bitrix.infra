@@ -126,7 +126,9 @@ test_fresh_nginx_configuration() {
     "$nginx_image" -t
 }
 
-[ "$(id -un)" = admin ] || fail "must run as admin"
+# shellcheck source=scripts/deploy-user.sh
+. "$repo/scripts/deploy-user.sh"
+[ "$(id -un)" = "$deploy_user" ] || fail "must run as $deploy_user"
 [ -d "$repo" ] || fail "$repo does not exist"
 [ "$(git -C "$repo" rev-parse --is-inside-work-tree 2>/dev/null)" = true ] ||
   fail "$repo is not a git worktree"
@@ -163,8 +165,8 @@ trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
 permission_guard_active=1
 
-echo "pull-public: granting admin temporary write access to protected config directories"
-sudo -n chown admin:admin "$cron_dir" "$logrotate_dir"
+echo "pull-public: granting $deploy_user temporary write access to protected config directories"
+sudo -n chown "$deploy_user:$(id -gn)" "$cron_dir" "$logrotate_dir"
 
 echo "pull-public: pulling public infrastructure"
 git -C "$repo" pull --ff-only origin master
