@@ -58,6 +58,30 @@ zabbix_export:
               priority: AVERAGE
               description: 'claude-auth-check.sh runs every 30 min from the opc crontab on terrty. Check crontab -l, docker ps (fg-agent-dmitry must be up) and tg-agent/data/ads-cron/auth-check.log.'
               manual_close: 'YES'
+        - uuid: 4d0e133643454ea9abc21c01a4569592
+          name: 'tg-agent MySQL tunnel status on terrty'
+          type: TRAP
+          key: tgagent.mysql.tunnel
+          history: 90d
+          description: 'Pushed every 5 min by tg-agent/cron/mysql-tunnel-check.sh on terrty. Codes: 0 = claude_ro query succeeds; 1 = mysql-tunnel container is not running; 2 = no MySQL greeting through the tunnel; 3 = greeting received but claude_ro login or query fails. The container healthcheck tests only the local socket and can miss a refused SSH forward.'
+          tags:
+            - tag: Application
+              value: tg-agent
+          triggers:
+            - uuid: 73debf901d9f401a905d19543c16eb13
+              expression: 'count(/Favor-group tg-agent monitoring/tgagent.mysql.tunnel,#3,"gt",0)=3'
+              name: 'tg-agent MySQL tunnel check failed on terrty (code {ITEM.LASTVALUE})'
+              priority: HIGH
+              description: 'The last three reported checks failed; Telegram agents may be unable to read the site database. Clears on the next successful check. On terrty, start with tg-agent/data/ads-cron/mysql-tunnel-check.log, then cd ~/favor-group/tg-agent. Code 1: docker compose up -d mysql-tunnel. Code 2: docker compose logs mysql-tunnel; the host name, user tg-tunnel and host key are in secrets/tunnel-ssh-config and secrets/tunnel-ssh-known_hosts; on the site host the account comes from bitrix.infra-private ssh/ (from /web: sudo ./private/scripts/dr-hook.sh access). Code 3: check the logged error and verify the claude_ro account, query permissions and password. If the password seed is stale, refresh secrets/fgmysql-pass-cache-seed and run docker compose up -d --force-recreate --no-deps mysql-tunnel.'
+              tags:
+                - tag: notify
+                  value: admin
+            - uuid: 45f5cdebb5454f6d8ac9d4f8b5d91566
+              expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.mysql.tunnel,1h)=1'
+              name: 'tg-agent MySQL tunnel check on terrty has not reported for 1h'
+              priority: AVERAGE
+              description: 'No check results received for 1h. On terrty, inspect the opc crontab and tg-agent/data/ads-cron/mysql-tunnel-check.log, including zabbix_sender errors.'
+              manual_close: 'YES'
         - uuid: b3c6daf7c31444da8dcdaa57cf6a90f1
           name: 'tg-agent ads-cron run exit code'
           type: TRAP
