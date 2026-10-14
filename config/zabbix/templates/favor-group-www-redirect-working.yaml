@@ -19,10 +19,21 @@ zabbix_export:
           key: 'ssl_cert_check.sh[expire,"{HOST.HOST}"]'
           delay: 30m
           history: 90d
-          units: d
+          value_type: FLOAT
+          units: '!d'
+          description: 'Days left, negative once expired, -65535 when the certificate could not be read. FLOAT because an unsigned item turns unsupported on any negative value, which would blind the trigger exactly when the certificate expires.'
           tags:
             - tag: Application
               value: Web
+          triggers:
+            - uuid: 95c5bfd16e4d4e8ba24111e52b4ae03d
+              expression: 'last(/Favor-group www redirect working/ssl_cert_check.sh[expire,"{HOST.HOST}"])<{$SSL.EXPIRE.WARN} and last(/Favor-group www redirect working/ssl_cert_check.sh[expire,"{HOST.HOST}"])<>-65535'
+              name: 'SSL certificate expires in {ITEM.VALUE}'
+              priority: HIGH
+              description: 'dnsrobocert in the certbot container renews 30 days before expiry through the DNS provider, so this firing means renewal has failed for over two weeks. Read docker logs certbot on the site host; the DNS provider settings are in config/dnsrobocert.yml and the token in private/environment/dnsrobocert.env. -65535 means the check could not read the certificate and is left to the trigger below.'
+              tags:
+                - tag: notify
+                  value: admin
         - uuid: 318f48e92c894926a0614520b872216c
           name: 'SSL validity check'
           type: EXTERNAL
@@ -33,6 +44,23 @@ zabbix_export:
           tags:
             - tag: Application
               value: Web
+          triggers:
+            - uuid: 53b06882bac74704bb2e20db46fe5991
+              expression: 'count(/Favor-group www redirect working/ssl_cert_check.sh[valid,"{HOST.HOST}"],#2,"eq",0)=2'
+              name: 'SSL certificate is not valid'
+              priority: HIGH
+              description: 'Two checks in a row (30 min) found a certificate that does not verify against the system CA store for this host name: expired, wrong name or an incomplete chain. Check with openssl s_client -connect {HOST.HOST}:443 -servername {HOST.HOST}.'
+              tags:
+                - tag: notify
+                  value: admin
+            - uuid: 11ed6fc1c0c3460588cf811776405c0f
+              expression: 'max(/Favor-group www redirect working/ssl_cert_check.sh[valid,"{HOST.HOST}"],#4)=-65535'
+              name: 'SSL check could not read the certificate for an hour'
+              priority: WARNING
+              description: 'ssl_cert_check.sh on the Zabbix server returned -65535 four times in a row: no TLS answer on port 443, or openssl/timeout missing in the server image. While this is open, expiry and validity are not watched.'
+              tags:
+                - tag: notify
+                  value: admin
       httptests:
         - uuid: a6dec450c82c4d4d8678d72644ac2abb
           name: 'WWW redirect'
@@ -47,6 +75,10 @@ zabbix_export:
           tags:
             - tag: Application
               value: Web
+      macros:
+        - macro: '{$SSL.EXPIRE.WARN}'
+          value: '14'
+          description: 'Days before certificate expiry that raise the alert.'
   triggers:
     - uuid: 94f56399a08a4844a4b122275fa1e92d
       expression: 'length(last(/Favor-group www redirect working/web.test.error[WWW redirect]))>0 and min(/Favor-group www redirect working/web.test.fail[WWW redirect],#3)<>0'

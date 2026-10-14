@@ -1,0 +1,47 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 2adfa3552e834207aaac001e22429470
+      template: 'Linux MD RAID by Zabbix agent active'
+      name: 'Linux MD RAID by Zabbix agent active'
+      description: 'Linux software RAID (md) health from /proc/mdstat, read by an active Zabbix agent. Neither the stock Zabbix templates nor the Zabbix source ship one; the community template_md_raid needs UserParameter scripts on the agent, while this one uses the native vfs.file.contents item. A degraded array keeps serving data, so without this nothing shows that one disk has already failed.'
+      groups:
+        - name: Templates
+      items:
+        - uuid: 6ee93ee6fbab4e8e9a5668ef30adbe7e
+          name: 'MD RAID status (/proc/mdstat)'
+          type: ZABBIX_ACTIVE
+          key: 'vfs.file.contents[{$MDSTAT.PATH}]'
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          description: 'Full /proc/mdstat. Each array line ends with a member map such as [UU]; an underscore marks a missing or failed member, (F) marks a failed device.'
+          tags:
+            - tag: component
+              value: raid
+          triggers:
+            - uuid: 92436f144a904abfb542dd6d73fe7fab
+              expression: 'find(/Linux MD RAID by Zabbix agent active/vfs.file.contents[{$MDSTAT.PATH}],,"regexp","\\[U*_[U_]*\\]|\\(F\\)")=1'
+              name: 'MD RAID array is degraded'
+              opdata: '{ITEM.LASTVALUE}'
+              priority: HIGH
+              description: 'An md array has lost a member: the data now has no redundancy, and the next disk failure loses it. Check cat /proc/mdstat and mdadm --detail /dev/mdN on the host, then the disk health (SMART). Replace the disk and re-add it with mdadm --manage /dev/mdN --add.'
+            - uuid: 23a917215d614b1b9b60951f1b889312
+              expression: 'find(/Linux MD RAID by Zabbix agent active/vfs.file.contents[{$MDSTAT.PATH}],,"regexp","recovery|resync|reshape")=1'
+              name: 'MD RAID array is rebuilding'
+              opdata: '{ITEM.LASTVALUE}'
+              priority: INFO
+              description: 'An md array is resyncing or rebuilding. Expected after a disk replacement or an unclean shutdown; redundancy returns when it finishes.'
+            - uuid: 743a74897f444b7b83e01827dcf53713
+              expression: 'nodata(/Linux MD RAID by Zabbix agent active/vfs.file.contents[{$MDSTAT.PATH}],30m)=1'
+              name: 'MD RAID status has not been read for 30m'
+              priority: WARNING
+              description: 'The agent sent nothing for /proc/mdstat for 30 minutes, so RAID health is not watched. Check that the agent runs and can read {$MDSTAT.PATH}.'
+      macros:
+        - macro: '{$MDSTAT.PATH}'
+          value: /proc/mdstat
+          description: 'File the agent reads. /proc/mdstat is global, so an agent in a container sees the host arrays.'

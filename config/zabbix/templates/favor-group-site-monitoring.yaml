@@ -16,6 +16,64 @@ zabbix_export:
         - name: Favor-group
         - name: Templates
       items:
+        - uuid: 6e2520965d3547d88a91370819ad48ac
+          name: 'Domain registration days left: {HOST.HOST}'
+          type: EXTERNAL
+          key: 'ssl_cert_check.sh[domain,"{HOST.HOST}",,,15]'
+          delay: 6h
+          history: 90d
+          value_type: FLOAT
+          units: '!d'
+          description: 'Days until the registration of {HOST.HOST} expires, from whois (paid-till for .ru), via the domain mode of ssl_cert_check.sh on the Zabbix server. -65535 when whois gave no answer or no date.'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: fb7eee4305704b8eb2dee73670294daf
+              expression: 'last(/Favor-group site monitoring/ssl_cert_check.sh[domain,"{HOST.HOST}",,,15])<{$DOMAIN.EXPIRE.WARN} and last(/Favor-group site monitoring/ssl_cert_check.sh[domain,"{HOST.HOST}",,,15])<>-65535'
+              name: 'Domain {HOST.HOST} expires in {ITEM.VALUE}'
+              priority: HIGH
+              description: 'The domain registration runs out soon, and with it the site and its mail. Renew it at the registrar; check the date with whois {HOST.HOST}.'
+              tags:
+                - tag: notify
+                  value: admin
+            - uuid: e47252582ffe4a2c816d20ad9d2e52f5
+              expression: 'max(/Favor-group site monitoring/ssl_cert_check.sh[domain,"{HOST.HOST}",,,15],#4)=-65535'
+              name: 'Domain expiry of {HOST.HOST} could not be read for a day'
+              priority: WARNING
+              description: 'whois returned no answer or no expiry date four times in a row (24 hours), so the registration date is not watched. Run the check by hand on the Zabbix server: ssl_cert_check.sh domain {HOST.HOST}.'
+              tags:
+                - tag: notify
+                  value: admin
+        - uuid: f81bfcc0b1a047949f1adeb1720b8cf7
+          name: 'Domain registration days left: cdn-{HOST.HOST}'
+          type: EXTERNAL
+          key: 'ssl_cert_check.sh[domain,"cdn-{HOST.HOST}",,,15]'
+          delay: 6h
+          history: 90d
+          value_type: FLOAT
+          units: '!d'
+          description: 'Days until the registration of cdn-{HOST.HOST} expires, from whois (paid-till for .ru), via the domain mode of ssl_cert_check.sh on the Zabbix server. -65535 when whois gave no answer or no date.'
+          tags:
+            - tag: Application
+              value: Web
+          triggers:
+            - uuid: f6c83aa455d64a72aa423371a356ec5e
+              expression: 'last(/Favor-group site monitoring/ssl_cert_check.sh[domain,"cdn-{HOST.HOST}",,,15])<{$DOMAIN.EXPIRE.WARN} and last(/Favor-group site monitoring/ssl_cert_check.sh[domain,"cdn-{HOST.HOST}",,,15])<>-65535'
+              name: 'Domain cdn-{HOST.HOST} expires in {ITEM.VALUE}'
+              priority: HIGH
+              description: 'The domain registration runs out soon, and with it the site and its mail. Renew it at the registrar; check the date with whois cdn-{HOST.HOST}.'
+              tags:
+                - tag: notify
+                  value: admin
+            - uuid: c5406bedde5c4af6a26226f89d331145
+              expression: 'max(/Favor-group site monitoring/ssl_cert_check.sh[domain,"cdn-{HOST.HOST}",,,15],#4)=-65535'
+              name: 'Domain expiry of cdn-{HOST.HOST} could not be read for a day'
+              priority: WARNING
+              description: 'whois returned no answer or no expiry date four times in a row (24 hours), so the registration date is not watched. Run the check by hand on the Zabbix server: ssl_cert_check.sh domain cdn-{HOST.HOST}.'
+              tags:
+                - tag: notify
+                  value: admin
         - uuid: 72feeab898414fb1a4c652c12f81d352
           name: 'sitemap.xml newest entry age'
           type: EXTERNAL
@@ -33,3 +91,7 @@ zabbix_export:
               url: 'https://{HOST.HOST}/sitemap.xml'
               priority: WARNING
               description: 'sitemap.xml should be renewed automatically, this alert means that either we have no updates to any page on the site or that automatic renewal is broken.'
+      macros:
+        - macro: '{$DOMAIN.EXPIRE.WARN}'
+          value: '30'
+          description: 'Days before the domain registration expires that raise the alert.'
