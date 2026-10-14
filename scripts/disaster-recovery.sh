@@ -187,6 +187,8 @@ network:
     eth0:
       mtu: 1450
 EOF
+  # netplan refuses to keep its configuration readable by others
+  chmod 600 /etc/netplan/90-mtu.yaml
   netplan apply
   echo "done, mtu is $(cat /sys/class/net/eth0/mtu)"
 }
@@ -431,6 +433,13 @@ backup_restore() {
   ./scripts/fix-rights.sh
 }
 
+# true once the final mysqld (process 1 after the entrypoint's exec) accepts the root login
+mysql_ready() {
+  pid1=$(docker exec mysql sh -c 'tr "\000" "\n" </proc/1/cmdline | head -1' 2>/dev/null) || return 1
+  case "${pid1}" in mysqld | */mysqld) ;; *) return 1 ;; esac
+  docker exec -u0 mysql /bin/mysql --defaults-extra-file="${mysql_config_inside_container}" -N -e "select 1" >/dev/null 2>&1
+}
+
 restore_mysql() {
   rm -f ./private/mysql-data/deleteme_* || true
   backup_directory_path="./backup/"
@@ -478,14 +487,17 @@ restore_mysql() {
   echo "[client]\nuser = root\npassword = ${MYSQL_ROOT_PASSWORD}\ndefault-character-set = utf8mb4" >"${mysql_config_file}"
   trap 'rm -f -- "${mysql_config_file}"' EXIT
 
-  # start_services() returns as soon as `up -d` exits, but MySQL needs ~30s to initialise
-  # and accept socket connections. Without this wait the first query fails with
-  # "ERROR 2002 ... Can't connect ... through socket" and set -e aborts the whole restore.
-  echo -n "waiting for MySQL to accept connections..."
+  # start_services() returns as soon as `up -d` exits, but MySQL needs time to initialise.
+  # On an empty data directory the image's entrypoint first runs a temporary server on the
+  # same socket, where root has no password at first, and replaces itself with the real
+  # mysqld (exec) only when it is done. Wait until process 1 of the container is mysqld and
+  # the root login the import uses succeeds; otherwise the import fails with ERROR 2002 or
+  # 1045, or loses the temporary server mid-stream, and set -e aborts the whole restore.
+  echo -n "waiting for MySQL to accept the root login..."
   wait_i=0
-  until docker exec mysql mysqladmin ping --silent >/dev/null 2>&1; do
+  until mysql_ready; do
     wait_i=$((wait_i + 1))
-    if [ "${wait_i}" -gt 60 ]; then echo " timeout after 180s" && exit 50; fi
+    if [ "${wait_i}" -gt 100 ]; then echo " timeout after 300s" && exit 50; fi
     sleep 3
   done
   echo " ready"
