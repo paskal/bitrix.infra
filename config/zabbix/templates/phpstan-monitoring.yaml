@@ -38,6 +38,9 @@ zabbix_export:
                 PHPStan reported more than zero findings in owned code. Open /web/logs/phpstan/owned-latest.json on the server for the full list grouped by file. Either fix the offending file(s), or — if the finding is a legitimate Bitrix-API quirk that PHPStan misreads — add an ignoreErrors entry to bitrix.infra/private/phpstan/phpstan-owned.neon with a why-comment.
                 
                 Ships enabled. On a fresh install, drive the owned count to zero before linking the template to a host (run `./scripts/phpstan-scan.sh` manually, fix what surfaces in owned-latest.json, repeat); otherwise this trigger will fire from the first polling cycle. Once count=0 the trigger is silent until a real regression.
+              tags:
+                - tag: notify
+                  value: '{$PHPSTAN.NOTIFY}'
         - uuid: f366ecd91a4f4264b85cc69ef6c98db3
           name: 'PHPStan owned-scan failure marker'
           type: ZABBIX_ACTIVE
@@ -60,6 +63,9 @@ zabbix_export:
                 The scan script wrote a failure sentinel at /var/log/phpstan/owned_last_failure.txt — the latest run did not complete successfully. Read the sentinel for the failure category, then look at /web/logs/phpstan/stderr.log for stderr output and re-run manually with `ssh your-server 'cd /web && ./scripts/phpstan-scan.sh'`. The sentinel is auto-cleared by the next successful run.
                 
                 Ships enabled. The sentinel only exists after a real failure (the script clears it on success), so on a fresh install this trigger stays silent until something genuinely breaks.
+              tags:
+                - tag: notify
+                  value: '{$PHPSTAN.NOTIFY}'
         - uuid: c3d68f7b1e9846a3a4c1d4f4eb5d7a91
           name: 'PHPStan owned-scan XML age'
           type: ZABBIX_ACTIVE
@@ -85,3 +91,9 @@ zabbix_export:
                 The XML file at /var/log/phpstan/owned-latest.xml hasn't been rewritten in more than 8 days — the weekly scan probably failed silently. Check /web/logs/phpstan/stderr.log and any sentinel at /web/logs/phpstan/owned_last_failure.txt for the cause, then re-run manually with `ssh your-server 'cd /web && ./scripts/phpstan-scan.sh'`.
                 
                 Ships enabled. On a fresh install run the script once before linking the template so the XML file exists; otherwise this trigger fires until the first scheduled scan completes. After that it stays silent until a real failure persists for more than 8 days.
+              tags:
+                - tag: notify
+                  value: '{$PHPSTAN.NOTIFY}'
+      macros:
+        - macro: '{$PHPSTAN.NOTIFY}'
+          description: 'Value of the notify tag on PHPStan events. Empty by default; configure alert actions to match the chosen value.'
