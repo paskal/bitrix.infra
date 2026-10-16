@@ -22,7 +22,7 @@
 | Favor-group lead check monitoring (10659) | [12] Favor group deep tech | Dmitry лично `107408628` |
 | Favor-group 1C prices monitoring (10660) | [12] Favor group deep tech | Dmitry лично `107408628` |
 | Linux by Zabbix agent (10284), MySQL agent 2 (10635) | [12] Favor group deep tech | Dmitry лично `107408628` |
-| SMART by Zabbix agent 2 active (10537), Linux MD RAID by Zabbix agent active (10662), Favor-group jobs monitoring (10664) | [12] Favor group deep tech | Dmitry лично `107408628` |
+| SMART by Zabbix agent 2 active (10537), Linux MD RAID by Zabbix agent active (10662), Favor-group jobs monitoring (10664), Favor-group Selectel billing (10665) | [12] Favor group deep tech | Dmitry лично `107408628` |
 | всё прочее в группе Favor-group | [7] tech chat problems reporting | общий tech-чат `-1001455514139` |
 
 Общий tech-чат **делится с Евгением и предназначен только для проблем PHP и сайта**. Всё, что
