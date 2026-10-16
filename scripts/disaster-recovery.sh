@@ -212,7 +212,7 @@ zabbix_setup() {
   [ -f "/etc/systemd/system/set-zabbix-docker-acl.service" ] && return
   echo "creating zabbix user and group"
   groupadd -g 1997 zabbix
-  useradd -u 1997 -g zabbix -G docker zabbix
+  useradd -u 1997 -g zabbix -G docker -s /usr/sbin/nologin zabbix
   echo "creating a service 'set-zabbix-docker-acl' which will allow zabbix to read and write docker socket"
   cat <<EOF >/etc/systemd/system/set-zabbix-docker-acl.service
 [Unit]
@@ -258,7 +258,7 @@ memcached_user_setup() {
 
   if ! getent passwd | cut -d: -f3 | grep -qx '11211'; then
     echo "creating memcached user"
-    useradd -u 11211 -g memcached memcached
+    useradd -u 11211 -g memcached -s /usr/sbin/nologin memcached
   fi
 }
 
@@ -270,7 +270,7 @@ mysql_user_setup() {
 
   if ! getent passwd | cut -d: -f3 | grep -qx '1001'; then
     echo "creating mysql user"
-    useradd -u 1001 -g mysql mysql
+    useradd -u 1001 -g mysql -s /usr/sbin/nologin mysql
   fi
 }
 
