@@ -234,6 +234,22 @@ EOF
   echo "done the zabbix set up"
 }
 
+# dockerd recreates its socket whenever it restarts, a package upgrade included, and the new
+# socket has no ACL entry for zabbix, so the boot-time unit alone leaves the agent blind to
+# Docker until the next reboot. Re-apply the ACL every time docker.service starts.
+zabbix_docker_acl_dropin() {
+  dropin=/etc/systemd/system/docker.service.d/zabbix-acl.conf
+  [ -f "${dropin}" ] && return
+  mkdir -p "$(dirname "${dropin}")"
+  cat <<EOF >"${dropin}"
+[Service]
+# "-" keeps a failing setfacl from failing docker.service and stopping every container
+ExecStartPost=-/usr/bin/setfacl -m u:zabbix:rw /var/run/docker.sock
+EOF
+  systemctl daemon-reload
+  echo "created ${dropin}"
+}
+
 memcached_user_setup() {
   if ! getent group | cut -d: -f3 | grep -qx '11211'; then
     echo "creating memcached group"
@@ -579,6 +595,7 @@ install_docker_if_not_installed
 install_docker_compose_if_not_installed
 admin_user_setup
 zabbix_setup
+zabbix_docker_acl_dropin
 set_up_duplicity
 setup_aws
 memcached_user_setup
