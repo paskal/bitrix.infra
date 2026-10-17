@@ -447,10 +447,11 @@ echo "Copying files"
 # --inplace writes directly to destination file, avoids temp file overhead
 # --delete deletes files from destination if they are not present in the source
 # --force allows deletion of non-empty directories when their contents were excluded
-# --exclude excludes the DB connection files written above, backup, Bitrix caches, temp files, PDFs, and image caches from the sync
+# --exclude excludes the DB connection files written above, backup, Bitrix caches, temp files, PDFs, image caches
+# and the product feeds (/upload/acrit.export/, including the secret feed directory) from the sync
 # / in the end of src location avoid creating additional directory level at destination
 echo "Starting rsync at $(date '+%H:%M:%S'), estimated duration ~3 minutes, expected completion at $(date -d '+3 minutes' '+%H:%M:%S')"
-rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/php_interface/dbconn.php' --exclude '/bitrix/.settings.php' --exclude '/bitrix/backup' --exclude '/bitrix/cache/' --exclude '/bitrix/managed_cache/' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
+rsync --archive --whole-file --inplace --delete --force --exclude '/bitrix/php_interface/dbconn.php' --exclude '/bitrix/.settings.php' --exclude '/bitrix/backup' --exclude '/bitrix/cache/' --exclude '/bitrix/managed_cache/' --exclude '*.tmp*' --exclude '*.pdf' --exclude '/upload/delight.webpconverter/' --exclude '/upload/resize_cache/' --exclude '/upload/acrit.export/' "${PROD_LOCATION}/" "${DEV_LOCATION}"
 echo "Rsync completed at $(date '+%H:%M:%S')"
 
 # Cache entries left by the previous dev copy, or written while the files were
