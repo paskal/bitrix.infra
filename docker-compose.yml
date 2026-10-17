@@ -132,6 +132,10 @@ services:
       - ./config/php/90-php.ini:/etc/php/8.5/fpm/conf.d/90-php.ini:ro
       - ./config/php/91-disable-functions.ini:/etc/php/8.5/fpm/conf.d/91-disable-functions.ini:ro
       - ./config/php/zz-pm.conf:/etc/php/8.5/fpm/pool.d/zz-pm.conf:ro
+      # the release drain gate (zz-pm.conf prepends it) and its lock files, written by
+      # scripts/site-release.sh of bitrix.infra-private
+      - ./config/php/deploy-gate.php:/etc/php/deploy-gate.php:ro
+      - ./logs/deploy-gate:/deploy-gate:ro
       - ./config/php/xdebug.ini:/etc/php/8.5/mods-available/xdebug.ini:ro
       # for monitoring purposes
       - ./logs/nginx:/var/log/nginx:ro
