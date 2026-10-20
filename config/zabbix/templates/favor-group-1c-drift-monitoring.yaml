@@ -1,0 +1,130 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 95618eb1474e44ac91b00d5c9bc7e33a
+      name: Favor-group
+  templates:
+    - uuid: 7a7315dcc38f45ba885829e7e676bf75
+      template: 'Favor-group 1C drift monitoring'
+      name: 'Favor-group 1C drift monitoring'
+      description: 'Ежедневная проверка изменений в рабочей 1С не нашими выпусками: drift.py на FS-GR (20:00 МСК) присылает итог на /local/ajax/1c-drift.php, здесь он читается GET-ом. Исходники: favor-group.ru local/scripts/1c/release/server/drift.'
+      groups:
+        - name: Favor-group
+      items:
+        - uuid: 72715f098a0142a080606492450e6498
+          name: '1C drift: seconds since last completed check'
+          type: DEPENDENT
+          key: onec.drift.checked_age
+          history: 90d
+          units: s
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.checked_age
+          master_item:
+            key: onec.drift.status
+          triggers:
+            - uuid: 5e7346c52c074f14abf09b5e7e3e7be4
+              expression: 'last(/Favor-group 1C drift monitoring/onec.drift.checked_age)>{$ONEC.DRIFT.STALE}'
+              name: 'Проверка изменений 1С не выполнялась больше 50 часов ({HOST.NAME})'
+              opdata: 'последняя выполненная проверка {ITEM.LASTVALUE1} назад'
+              priority: AVERAGE
+              description: 'Задание «onec-drift» на FS-GR не запустилось, пропускает проверку (метка выпуска) или не может отправить итог на сайт.'
+        - uuid: c6d56dd51ed047fdbb44d5195debd8c7
+          name: '1C drift: changes not made by our releases'
+          type: DEPENDENT
+          key: onec.drift.count
+          history: 90d
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.count
+          master_item:
+            key: onec.drift.status
+          triggers:
+            - uuid: 22b3d31f778045f1bbc97bec87a6711e
+              expression: 'nodata(/Favor-group 1C drift monitoring/onec.drift.count,1h)=1'
+              name: 'Состояние проверки изменений 1С не читается ({HOST.NAME})'
+              priority: WARNING
+        - uuid: c4a9d16fe8c34611a2f99a267aa9d988
+          name: '1C drift: check error'
+          type: DEPENDENT
+          key: onec.drift.error
+          history: 90d
+          value_type: TEXT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.error
+          master_item:
+            key: onec.drift.status
+        - uuid: 9152213ab28d43f1ac6f414c1f290b3e
+          name: '1C drift: check failed'
+          type: DEPENDENT
+          key: onec.drift.failed
+          history: 90d
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.failed
+          master_item:
+            key: onec.drift.status
+        - uuid: e8fc426dcbf04529bc146823ad7243df
+          name: '1C drift: skipped because'
+          type: DEPENDENT
+          key: onec.drift.skipped
+          history: 90d
+          value_type: TEXT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.skipped
+          master_item:
+            key: onec.drift.status
+        - uuid: debcb216afeb4e31bbbec61a23b7edf7
+          name: '1C drift: check state (raw)'
+          type: HTTP_AGENT
+          key: onec.drift.status
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          timeout: 15s
+          url: '{$ONEC.DRIFT.URL}'
+          headers:
+            - name: X-Status-Token
+              value: '{$ONEC.DRIFT.STATUS.TOKEN}'
+        - uuid: 735ef04881914be3bb36990211f270f3
+          name: '1C drift: changes found (first five)'
+          type: DEPENDENT
+          key: onec.drift.summary
+          history: 90d
+          value_type: TEXT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.summary
+          master_item:
+            key: onec.drift.status
+      macros:
+        - macro: '{$ONEC.DRIFT.STALE}'
+          value: '180000'
+          description: 'Seconds since the last completed check before the stale trigger (50 h: the check runs daily at 20:00 MSK, one missed day plus margin)'
+        - macro: '{$ONEC.DRIFT.STATUS.TOKEN}'
+          type: SECRET_TEXT
+          description: 'Plain status token; its sha256 is b_option favorgroup.catalog onec_drift_status_token_sha256'
+        - macro: '{$ONEC.DRIFT.URL}'
+          value: 'https://favor-group.ru/local/ajax/1c-drift.php'
+          description: 'Status address; dev: https://dev.favor-group.ru/local/ajax/1c-drift.php'
+  triggers:
+    - uuid: 150d29feef3b497fae252e87e5a62064
+      expression: 'last(/Favor-group 1C drift monitoring/onec.drift.count)>0 and length(last(/Favor-group 1C drift monitoring/onec.drift.summary))>=0'
+      name: '1С изменена не нашим выпуском ({HOST.NAME})'
+      opdata: '{ITEM.LASTVALUE2}'
+      priority: AVERAGE
+      description: 'Разобрать изменение; если оно принято, release.py drift --accept (или swap --accept-current ИМЯ). Пока не принято, проверка находит его каждый день.'
+    - uuid: fdfd31a1ada14e70a069d972181c7f87
+      expression: 'last(/Favor-group 1C drift monitoring/onec.drift.failed)=1 and length(last(/Favor-group 1C drift monitoring/onec.drift.error))>=0'
+      name: 'Проверка изменений 1С не выполнена ({HOST.NAME})'
+      opdata: '{ITEM.LASTVALUE2}'
+      priority: AVERAGE
+      description: 'drift.py на FS-GR: C:\Матвеев\rv-1c\drift\status.json и logs\.'
