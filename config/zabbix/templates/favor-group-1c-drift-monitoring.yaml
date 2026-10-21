@@ -7,7 +7,7 @@ zabbix_export:
     - uuid: 7a7315dcc38f45ba885829e7e676bf75
       template: 'Favor-group 1C drift monitoring'
       name: 'Favor-group 1C drift monitoring'
-      description: 'Ежедневная проверка изменений в рабочей 1С не нашими выпусками: drift.py на FS-GR (20:00 МСК) присылает итог на /local/ajax/1c-drift.php, здесь он читается GET-ом. Исходники: favor-group.ru local/scripts/1c/release/server/drift.'
+      description: 'Ежедневная проверка изменений в рабочей 1С не нашими выпусками: drift.py на FS-GR (20:00 МСК) присылает итог на /local/ajax/1c-drift.php, здесь он читается GET-ом. Исходники: favor-group.ru local/scripts/1c/release/server/drift. Там же каждые 30 минут queues.py присылает застрявшие отложенные задания на /local/ajax/1c-queues.php (ремонт: favor-1c references/deferred-queues.md).'
       groups:
         - name: Favor-group
       items:
@@ -105,6 +105,111 @@ zabbix_export:
                 - $.summary
           master_item:
             key: onec.drift.status
+        - uuid: 1fc4c75b67464fb2ae6302da8c2c9696
+          name: '1C queues: seconds since last completed check'
+          type: DEPENDENT
+          key: onec.queues.checked_age
+          history: 90d
+          units: s
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.checked_age
+          master_item:
+            key: onec.queues.status
+          triggers:
+            - uuid: 0b810442aa4d44779990bfdfeb99d053
+              expression: 'last(/Favor-group 1C drift monitoring/onec.queues.checked_age)>{$ONEC.QUEUES.STALE}'
+              name: 'Проверка очередей 1С не выполнялась больше 2 часов ({HOST.NAME})'
+              opdata: 'последняя выполненная проверка {ITEM.LASTVALUE1} назад'
+              priority: AVERAGE
+              description: 'Задание «onec-queues» на FS-GR не запустилось или не может отправить итог на сайт.'
+        - uuid: 342c36bafbb0468db22ea1301f6730ab
+          name: '1C queues: check error'
+          type: DEPENDENT
+          key: onec.queues.error
+          history: 90d
+          value_type: TEXT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.error
+          master_item:
+            key: onec.queues.status
+        - uuid: 1e38b1949a554808ad21c552e29eeebf
+          name: '1C queues: check failed'
+          type: DEPENDENT
+          key: onec.queues.failed
+          history: 90d
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.failed
+          master_item:
+            key: onec.queues.status
+        - uuid: 930e683dbcd9452bb31100c921d217e1
+          name: '1C queues: rows flagged with an error'
+          type: DEPENDENT
+          key: onec.queues.flagged
+          history: 90d
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.flagged
+          master_item:
+            key: onec.queues.status
+          triggers:
+            - uuid: 0ee7b66770eb47b3abc772420bb0bdb7
+              expression: 'nodata(/Favor-group 1C drift monitoring/onec.queues.flagged,1h)=1'
+              name: 'Состояние проверки очередей 1С не читается ({HOST.NAME})'
+              priority: WARNING
+        - uuid: 3f5d08c13ee14d7a885f23e182b01f4b
+          name: '1C queues: queue-processing errors in the journal since the previous check'
+          type: DEPENDENT
+          key: onec.queues.journal
+          history: 90d
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.journal
+          master_item:
+            key: onec.queues.status
+        - uuid: 0a7aae8de704412ebf78155adfba4a85
+          name: '1C queues: age of the oldest flagged row'
+          type: DEPENDENT
+          key: onec.queues.oldest_age
+          history: 90d
+          units: s
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.oldest_age
+          master_item:
+            key: onec.queues.status
+        - uuid: e5faa709a61e4165a1f26cd459ee68db
+          name: '1C queues: check state (raw)'
+          type: HTTP_AGENT
+          key: onec.queues.status
+          delay: 5m
+          history: 7d
+          value_type: TEXT
+          timeout: 15s
+          url: '{$ONEC.QUEUES.URL}'
+          headers:
+            - name: X-Status-Token
+              value: '{$ONEC.QUEUES.STATUS.TOKEN}'
+        - uuid: 5c7a66f483204fdc84d10f0463172889
+          name: '1C queues: what is stuck'
+          type: DEPENDENT
+          key: onec.queues.summary
+          history: 90d
+          value_type: TEXT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.summary
+          master_item:
+            key: onec.queues.status
       macros:
         - macro: '{$ONEC.DRIFT.STALE}'
           value: '180000'
@@ -115,7 +220,31 @@ zabbix_export:
         - macro: '{$ONEC.DRIFT.URL}'
           value: 'https://favor-group.ru/local/ajax/1c-drift.php'
           description: 'Status address; dev: https://dev.favor-group.ru/local/ajax/1c-drift.php'
+        - macro: '{$ONEC.QUEUES.STALE}'
+          value: '7200'
+          description: 'Seconds since the last completed queue check before the stale trigger (2 h: the check runs every 30 min)'
+        - macro: '{$ONEC.QUEUES.STATUS.TOKEN}'
+          type: SECRET_TEXT
+          description: 'Plain status token; its sha256 is b_option favorgroup.catalog onec_queues_status_token_sha256'
+        - macro: '{$ONEC.QUEUES.STUCK}'
+          value: '1200'
+          description: 'Seconds a queue row may stay flagged with an error before the stuck trigger (20 min)'
+        - macro: '{$ONEC.QUEUES.URL}'
+          value: 'https://favor-group.ru/local/ajax/1c-queues.php'
+          description: 'Status address of the 30-minute deferred-queue check'
   triggers:
+    - uuid: 1db0e5b2f9cc446b83d63ea530ce350e
+      expression: 'last(/Favor-group 1C drift monitoring/onec.queues.flagged)>0 and last(/Favor-group 1C drift monitoring/onec.queues.oldest_age)>{$ONEC.QUEUES.STUCK} and length(last(/Favor-group 1C drift monitoring/onec.queues.summary))>=0'
+      name: '1С: застряли отложенные задания ({HOST.NAME})'
+      opdata: '{?last(/Favor-group 1C drift monitoring/onec.queues.summary)}'
+      priority: HIGH
+      description: 'Строки очереди с ошибкой сами не повторяются: оплаты и поступления не доходят до актов сверки. Ремонт: favor-1c references/deferred-queues.md.'
+    - uuid: 6508e68997a54e0a9c019da529386906
+      expression: 'last(/Favor-group 1C drift monitoring/onec.queues.journal)>0 and length(last(/Favor-group 1C drift monitoring/onec.queues.summary))>=0'
+      name: '1С: ошибки обработки очереди отложенных заданий ({HOST.NAME})'
+      opdata: '{?last(/Favor-group 1C drift monitoring/onec.queues.summary)}'
+      priority: AVERAGE
+      description: 'Ошибки «Обработка очереди заданий» в журнале 1С с прошлой проверки. Ремонт: favor-1c references/deferred-queues.md.'
     - uuid: 150d29feef3b497fae252e87e5a62064
       expression: 'last(/Favor-group 1C drift monitoring/onec.drift.count)>0 and length(last(/Favor-group 1C drift monitoring/onec.drift.summary))>=0'
       name: '1С изменена не нашим выпуском ({HOST.NAME})'
@@ -128,3 +257,9 @@ zabbix_export:
       opdata: '{ITEM.LASTVALUE2}'
       priority: AVERAGE
       description: 'drift.py на FS-GR: C:\Матвеев\rv-1c\drift\status.json и logs\.'
+    - uuid: 57180ebc40a64866a49bca8a298785ba
+      expression: 'last(/Favor-group 1C drift monitoring/onec.queues.failed)=1 and length(last(/Favor-group 1C drift monitoring/onec.queues.error))>=0'
+      name: 'Проверка очередей 1С не выполнена ({HOST.NAME})'
+      opdata: '{?last(/Favor-group 1C drift monitoring/onec.queues.error)}'
+      priority: AVERAGE
+      description: 'queues.py на FS-GR: C:\Матвеев\rv-1c\queues\status.json и logs\.'
