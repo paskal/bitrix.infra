@@ -9,6 +9,9 @@ LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>
 
 RUN apt-get update
 
+# Pull PHP security releases from the package repository even when the base image is stale.
+RUN apt-get -y --no-install-recommends upgrade
+
 RUN apt-get -y --no-install-recommends install \
     php8.5-gd \
     php8.5-imagick \
