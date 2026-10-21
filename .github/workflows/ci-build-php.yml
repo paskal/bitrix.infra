@@ -49,6 +49,7 @@ jobs:
           file: config/php/Dockerfile.${{ matrix.php-version }}
           platforms: ${{ matrix.arch.platform }}
           outputs: type=image,name=ghcr.io/paskal/bitrix-php,push-by-digest=true,name-canonical=true,push=true
+          build-args: APT_REFRESH=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha,scope=php-${{ matrix.php-version }}-${{ matrix.arch.artifact-suffix }}
           cache-to: type=gha,mode=max,scope=php-${{ matrix.php-version }}-${{ matrix.arch.artifact-suffix }}
 

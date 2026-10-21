@@ -8,10 +8,10 @@ LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>
       org.opencontainers.image.title="bitrix-php-8.3" \
       org.opencontainers.image.vendor="Dmitry Verkhoturov"
 
-RUN apt-get update
-
-# Pull PHP security releases from the package repository even when the base image is stale.
-RUN apt-get -y --no-install-recommends upgrade
+# Pull PHP security releases from the package repository even when the base image is stale. APT_REFRESH changes on
+# every CI run, so this layer and the ones after it are rebuilt instead of replayed from the build cache.
+ARG APT_REFRESH=0
+RUN echo "apt refresh ${APT_REFRESH}" && apt-get update && apt-get -y --no-install-recommends upgrade
 
 RUN apt-get -y --no-install-recommends install \
     php8.3-gd \
