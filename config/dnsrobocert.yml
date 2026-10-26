@@ -5,11 +5,10 @@ acme:
 profiles:
   - name: ${PROVIDER}
     provider: ${PROVIDER}
+    # a DNS provider that authenticates with one static API token (DigitalOcean, Cloudflare and
+    # others): the token goes into AUTH_KEY in private/environment/dnsrobocert.env
     provider_options:
       auth_token: ${AUTH_KEY}
-      cloud_id: ${CLOUD_ID}
-      folder_id: ${FOLDER_ID}
-      dns_zone_id: ${DNS_ZONE_ID}
 certificates:
   - profile: ${PROVIDER}
     domains:

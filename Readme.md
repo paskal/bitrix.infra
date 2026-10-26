@@ -46,7 +46,7 @@ flowchart TB
     end
 
     Backup -->|"incremental + dumps"| S3[("Yandex S3")]
-    Certbot -->|"DNS-01 challenge"| YcDNS["Yandex Cloud DNS"]
+    Certbot -->|"DNS-01 challenge"| DNS["DNS provider API"]
 
     subgraph Regions["Domains"]
         MSK["favor-group.ru"]
@@ -120,7 +120,7 @@ These run on the host machine outside Docker, scheduled via `config/cron/host.cr
 - **Upload deduplication** — runs monthly (1st, 02:20) via `scripts/dedup-upload.sh`, replacing byte-identical files under `web/prod/upload` with hard links (`hardlink -t -X` from util-linux: owner, mode and extended attributes must match, modification time is ignored). Module scratch, exchange, log and hidden `.*-backups` directories are excluded, a lock keeps runs apart, and the full `hardlink` output with its exit status goes to `logs/dedup-upload.log`. `./scripts/dedup-upload.sh --dry-run` shows what a run would save. Hard links share later in-place writes between the merged copies, so review the excluded directories for your own modules before enabling the cron; needs util-linux `hardlink` (with `--respect-xattrs`) and `flock` on the host
 - **Backups** — `scripts/file-backup.sh` daily (01:25) with duplicity, `scripts/mysql-dump.sh` twice a day (01:05 and 15:05), both to S3 under the host name: Yandex Object Storage, plus an optional second destination (`BACKUP2_*` in `backup.env`) that gets its own duplicity chain and the same dumps, so either copy restores on its own, and a failure at one destination does not stop the other. The file backup runs without encryption and includes `private/environment/*.env`, so every bucket has to stay private; the dump takes the database name from `DOMAIN` in `backup.env`, not from `MYSQL_DATABASE`
 - **Deploy user** — the host scripts, the deploy pulls and the backup credentials (`~/.aws`) belong to one account with uid 1000, `admin` unless `DEPLOY_USER` is set in the environment or in `.env`; `disaster-recovery.sh` creates it
-- **Housekeeping** — `scripts/fix-rights.sh` daily (01:00) restores container ownership, `scripts/update-dns-token.sh` refreshes the Yandex Cloud DNS token three times a day for the `certs` profile (a no-op when `DNS_ZONE_ID` and `FOLDER_ID` in `private/environment/dnsrobocert.env` are both empty, i.e. another DNS provider), `docker system prune -f` daily (03:10) removes stopped containers, unused networks, dangling images and build cache host-wide, mostly what the hourly minify runs leave behind
+- **Housekeeping** — `scripts/fix-rights.sh` daily (01:00) restores container ownership, `docker system prune -f` daily (03:10) removes stopped containers, unused networks, dangling images and build cache host-wide, mostly what the hourly minify runs leave behind
 - **PHPStan** — weekly (Monday 04:30) via `scripts/phpstan-scan.sh`, see the [monitoring section](#phpstan-static-analysis-monitoring)
 - **Log rotation** — configured in `config/logrotate/`: nginx (weekly for the production access log at 100 MB minimum, monthly for others, reopened via `nginx -s reopen`), PHP (monthly for error, cron and msmtp logs, php-fpm signalled with `USR1`; the site's reserve lead form logs monthly with 3 rotated copies, about four months in all, because they hold personal data), MySQL error and slow logs (monthly, `mysqladmin flush-logs`), duplicity, Bitrix cron logs under `local/cron/`, module logs under `upload/` (`bitrix-upload`, the S-Production log daily with 7 copies) and the FTP logs (daily, 365 copies)
 
@@ -412,7 +412,7 @@ To start the regular production stack: `COMPOSE_PROFILES=certs,dbadmin,monitorin
 
 - `cron/php-cron.cron` — cron tasks for the php-cron container. Only the standard `cron_events.php` Bitrix runner is kept here; site-specific jobs belong in a private overlay cron.d file. [Must](https://manpages.ubuntu.com/manpages/jammy/man8/cron.8.html) be owned by root:root with mode 0644 — run `scripts/fix-rights.sh` to fix.
 
-- `cron/host.cron` — cron tasks for the host machine (backups, image optimisation, JS/CSS minification, DNS token renewal). Site-specific jobs (seo-reindex, robots.txt patching) live in the private overlay.
+- `cron/host.cron` — cron tasks for the host machine (backups, image optimisation, JS/CSS minification). Site-specific jobs (seo-reindex, robots.txt patching) live in the private overlay.
 
 - `mysql/my.cnf` — MySQL configuration, applied on top of the package-provided defaults. Sized for a dedicated server (`innodb_buffer_pool_size = 4G`); shrink for local demos on laptops.
 
@@ -442,7 +442,7 @@ To start the regular production stack: `COMPOSE_PROFILES=certs,dbadmin,monitorin
 
 - `updater.yaml` — generic example of the webhook task list for the `updater` service; the private overlay maps its own file over it
 
-- `dnsrobocert.yml` — DNSroboCert configuration for the `certs` profile (Yandex Cloud DNS challenge)
+- `dnsrobocert.yml` — DNSroboCert configuration for the `certs` profile (DNS challenge through `CERTBOT_PROVIDER`, DigitalOcean by default)
 
 ### /logs
 
@@ -464,7 +464,7 @@ Site files in directories `web/prod` and `web/dev`.
 
 - `private/environment/` — environment files for docker-compose services. Copy `.env.example` files to `.env` and fill in your values. Each example file is commented with descriptions of every variable:
     - `mysql.env` — Percona MySQL credentials (root, application user, read-only agent user)
-    - `dnsrobocert.env` — Yandex Cloud DNS credentials for Let's Encrypt wildcard certificates (`certs` profile)
+    - `dnsrobocert.env` — the DNS provider's API token for Let's Encrypt wildcard certificates (`certs` profile)
     - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, key restrictions) (`monitoring` profile)
     - `zabbix-mysql-session.conf` — private MySQL named session for Agent 2; set `{$MYSQL.DSN}` to `LocalMysql` and leave `{$MYSQL.USER}` / `{$MYSQL.PASSWORD}` empty in Zabbix
     - `updater.env` — webhook server shared secret (`hooks` profile)
@@ -826,7 +826,7 @@ echo "flush_all" | docker exec -i memcached-sessions /usr/bin/nc 127.0.0.1 11211
 <details>
 <summary>Manual certificate renewal</summary>
 
-DNS verification of a wildcard certificate is set up automatically through Yandex Cloud DNS via the `certbot` service (which uses DNSroboCert technology via the `adferrand/dnsrobocert` image).
+DNS verification of a wildcard certificate is set up automatically through the DNS provider's API (`CERTBOT_PROVIDER`, DigitalOcean by default) via the `certbot` service (which uses DNSroboCert technology via the `adferrand/dnsrobocert` image).
 
 To renew the certificate manually, if needed, you can run the following command which uses the `certbot` command available within the `certbot` service's container (which runs `adferrand/dnsrobocert`):
 
@@ -841,7 +841,7 @@ docker compose run --rm --entrypoint "\
     --preferred-challenges dns" certbot
 ```
 
-To add required TXT entries, head to DNS entries page of your provider (Yandex Cloud).
+Add the required TXT records through your DNS provider's control panel.
 The `certbot` service is configured to handle renewals automatically.
 
 </details>
