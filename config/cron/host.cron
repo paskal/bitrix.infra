@@ -15,7 +15,7 @@ INFRA_DIR=/web
 0  1  *  *  * root cd $INFRA_DIR && ./scripts/fix-rights.sh >/dev/null 2>&1
 
 # once a week optimise images
-0  23  *  *  6 root cd $INFRA_DIR && ./scripts/optimise-images.sh >/dev/null 2>&1
+0  23  *  *  6 root cd $INFRA_DIR && ./scripts/optimise-images.sh >>logs/optimise-images.log 2>&1
 
 # once a month replace identical files under upload with hard links; the script logs its summary
 20  2  1  *  * root cd $INFRA_DIR && ./scripts/dedup-upload.sh >/dev/null 2>&1

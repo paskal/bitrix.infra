@@ -69,7 +69,8 @@ Below is a list of scripts and relevant files found in this directory:
 
 *   **`optimise-images.sh`**
     *   **Type:** Shell script (`.sh`)
-    *   **Purpose:** Optimizes PNG, JPEG, WebP, and GIF images using various tools. Uses SQLite database at `private/image-optimisation/optimised.db` to track processed files and avoid reprocessing.
+    *   **Purpose:** Losslessly optimises PNG, JPEG and GIF images (WebP is left alone). Uses SQLite database at `private/image-optimisation/optimised.db` to track processed files and avoid reprocessing.
+    *   **Notes:** Runs weekly from host cron, logging to `logs/optimise-images.log`; a lock file next to the database stops a second run while one is still going. `--originals-only` leaves out `web/prod/upload/resize_cache` (Bitrix thumbnails) and keeps their rows, for working through a large backlog of originals first. When `logs/heartbeat/` exists, every saved batch and every finished run touch `logs/heartbeat/optimise-images` for monitoring.
 
 *   **`pull-public.sh`**
     *   **Type:** Shell script (`.sh`)
