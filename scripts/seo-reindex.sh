@@ -109,9 +109,13 @@ done <"$QUEUE"
 # Remove the CONSUMED physical lines from the queue head (URLs plus any blank/comment
 # lines processed). Both submitted and failed URLs consume quota, and a persistent
 # failure should not block the queue head; the operator can re-queue from the logs.
-if [ "$CONSUMED" -gt 0 ]; then
+# A run with no URL accepted (API outage, e.g. HTTP 504 for every URL) keeps the queue
+# as it was, so the batch is retried on the next run instead of being dropped.
+REMOVED=0
+if [ "$CONSUMED" -gt 0 ] && [ "$OK" -gt 0 ]; then
   tail -n +"$((CONSUMED + 1))" "$QUEUE" >"$QUEUE.tmp"
   mv "$QUEUE.tmp" "$QUEUE"
+  REMOVED=$CONSUMED
 fi
 REMAINING_LINES=$(wc -l <"$QUEUE")
 
@@ -120,7 +124,7 @@ REMAINING_LINES=$(wc -l <"$QUEUE")
   echo "### $(date -u +'%Y-%m-%d %H:%M') UTC -- server cron"
   echo "- Attempted: $ATTEMPTED (ok $OK / fail $FAIL)"
   echo "- Quota at start: $REMAINING / $DAILY"
-  echo "- Removed from queue.txt: $CONSUMED"
+  echo "- Removed from queue.txt: $REMOVED"
   echo "- Remaining in queue.txt: $REMAINING_LINES"
   echo "- Log: $LOG"
 } >>"$PROGRESS"

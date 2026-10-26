@@ -209,7 +209,7 @@ search-reindex submit --bing-only /tmp/urls.txt
 search-reindex diagnostics && echo 'All OK'
 ```
 
-**Routine reindexing via the server-side cron:** for bulk Yandex submissions that exceed the ~960/day quota, append absolute URLs to `/web/private/seo-reindex/queue.txt` on the server. The `seo-reindex.sh` cron (00:15 MSK daily, runs as `admin`) drains the queue top-down up to remaining quota and removes attempted lines. Bing has a separate 10 000/day quota and is sent manually with `--bing-only` from a workstation.
+**Routine reindexing via the server-side cron:** for bulk Yandex submissions that exceed the ~960/day quota, append absolute URLs to `/web/private/seo-reindex/queue.txt` on the server. The `seo-reindex.sh` cron (00:15 MSK daily, runs as `admin`) drains the queue top-down up to remaining quota and removes attempted lines; a run in which no URL was accepted (API outage) leaves the queue as it was. Bing has a separate 10 000/day quota and is sent manually with `--bing-only` from a workstation.
 
 ### yandex-reviews — Yandex Maps organisation review sync
 
