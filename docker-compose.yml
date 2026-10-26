@@ -31,11 +31,14 @@ services:
       # https://dnsrobocert.readthedocs.io/en/latest/user_guide.html#configuration
       - ./config/dnsrobocert.yml:/etc/dnsrobocert/config.yml:ro
 
-    # AUTH_KEY: the DNS provider's API token
+    # For yandexcloud:
+    # AUTH_KEY must be provided, short-lived and set by scripts/update-dns-token.sh
+    # DNS_ZONE_ID from https://console.cloud.yandex.com/link/dns or
+    # CLOUD_ID, FOLDER_ID from https://console.cloud.yandex.com/cloud can be provided
     env_file: private/environment/dnsrobocert.env
     # used in config/dnsrobocert.yml
     environment:
-      - PROVIDER=${CERTBOT_PROVIDER:-digitalocean}
+      - PROVIDER=${CERTBOT_PROVIDER:-yandexcloud}
       - EMAIL=${CERTBOT_EMAIL:-admin@example.com}
       - DOMAIN=${DOMAIN:-example.com}
 
@@ -312,7 +315,7 @@ services:
     # ZBX_HOSTNAME, ZBX_SERVER_HOST
     env_file:
       - private/environment/zabbix.env
-      # for monitoring purposes: AUTH_KEY must be set for certificate renewal
+      # for monitoring purposes, as AUTH_TOKEN is supposed to be set by scripts/update-dns-token.sh
       - private/environment/dnsrobocert.env
     depends_on:
       - nginx

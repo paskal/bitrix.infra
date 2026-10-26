@@ -98,6 +98,11 @@ Below is a list of scripts and relevant files found in this directory:
     *   **Purpose:** Drains `/web/private/seo-reindex/queue.txt` into the Yandex Webmaster recrawl API, up to the account-wide daily quota (~960 URLs/day). Runs daily at 00:15 MSK as the `admin` user.
     *   **Notes:** Requires `private/environment/seo-reindex.env` with a valid Yandex Webmaster OAuth token. Logs go to `logs/seo-reindex/YYYY-MM-DD.log`. Bing reindexing is handled separately via `bin/search-reindex submit --bing-only`.
 
+*   **`update-dns-token.sh`**
+    *   **Type:** Shell script (`.sh`)
+    *   **Purpose:** Refreshes the Yandex Cloud IAM token (12-hour lifetime) that DNSroboCert uses for the DNS challenge; with Yandex Cloud DNS, uncomment its line in `config/cron/host.cron` to run it three times a day.
+    *   **Notes:** Calls the `yc` CLI from the `admin` user's home and writes the token into `private/environment/dnsrobocert.env`.
+
 *   **`urls.py`**
     *   **Type:** Python script (`.py`)
     *   **Purpose:** Python utility for checking URLs, finding redirects, broken links, and extracting page titles. Supports updating redirect maps.

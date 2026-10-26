@@ -31,6 +31,11 @@ INFRA_DIR=/web
 # twice a day make MySQL dump of production data
 5  1,15  *  *  * root cd $INFRA_DIR && ./scripts/mysql-dump.sh >/dev/null 2>&1
 
+# With Yandex Cloud DNS, uncomment to renew the token dnsrobocert uses three times a day (it lives
+# 12 hours). Runs as the deploy user (DEPLOY_USER in .env, admin by default), whose home holds the
+# yc CLI. Providers with a static token (DigitalOcean and others) need nothing here.
+#5  1,9,17  *  *  * root cd $INFRA_DIR && . ./scripts/deploy-user.sh && runuser -u "$deploy_user" -- env HOME="$deploy_home" ./scripts/update-dns-token.sh >/dev/null 2>&1
+
 # minify js and css files with atomic writes (write to .tmp, then mv)
 # to prevent race conditions with PHP reading partially-written files
 10  *  *  *  * root docker run --rm -v /web/web/dev/local:/www/dev -v /web/web/prod/local:/www/prod tdewolff/minify sh -c "find /www -name '*.js' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -n1 -I{} sh -c 'minify -o {}.min.js.tmp {}.js && mv {}.min.js.tmp {}.min.js || rm -f {}.min.js.tmp'; find /www -name '*.css' ! -name '*.min.*' | rev | cut -f 2- -d '.' | rev | xargs -n1 -I{} sh -c 'minify -o {}.min.css.tmp {}.css && mv {}.min.css.tmp {}.min.css || rm -f {}.min.css.tmp'"
