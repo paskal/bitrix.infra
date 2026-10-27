@@ -222,18 +222,16 @@ adopt_new_mtimes
 
 echo "Exporting database state..."
 sqlite3 "$DB" "SELECT path || '|' || mtime || '|' || size FROM optimised;" | sort >"$TMPDIR/db_state.txt"
-# rows of the files this run covers: without the thumbnails when they are left out
-db_rows_in_scope() {
-  if ((originals_only)); then
-    grep -c -v "^$RESIZE_CACHE/" "$1" || true
-  else
-    wc -l <"$1"
-  fi
-}
-db_count=$(db_rows_in_scope "$TMPDIR/db_state.txt")
 
 # Extract just paths for cleanup comparison
 cut -d'|' -f1 <"$TMPDIR/fs_state.txt" | sort >"$TMPDIR/fs_paths.txt"
+
+# Scanned images that have a row. The database also keeps rows of files the scan leaves out, such as
+# WebP images optimised before WebP was dropped, so its row count would overstate the share.
+optimised_in_scan() {
+  sort | comm -12 - "$TMPDIR/fs_paths.txt" | wc -l
+}
+db_count=$(cut -d'|' -f1 <"$TMPDIR/db_state.txt" | optimised_in_scan)
 
 display_stats_from_counts "$total_images" "$db_count"
 
@@ -268,7 +266,7 @@ if [[ "$tmp_count" -gt 0 ]]; then
 fi
 
 sqlite3 "$DB" "SELECT path FROM optimised;" >"$TMPDIR/db_final.txt"
-final_db_count=$(db_rows_in_scope "$TMPDIR/db_final.txt")
+final_db_count=$(optimised_in_scan <"$TMPDIR/db_final.txt")
 display_stats_from_counts "$total_images" "$final_db_count"
 
 heartbeat
