@@ -64,16 +64,16 @@ zabbix_export:
           type: TRAP
           key: tgagent.claude.auth
           history: 90d
-          description: 'Pushed every 30 min by tg-agent/cron/claude-auth-check.sh on terrty: `claude auth status --json` inside the agent-dmitry container, which shares the claude-auth volume with the other two Telegram bots and ads-cron. 0 = loggedIn true, 1 = logged out (OAuth session expired and could not be refreshed). A logged-out volume kills all three Telegram bots and every ads-cron run silently; recovery is the interactive re-login in tg-agent/README.md ("claude.ai session"). Added 25.08.2026 after three failed ads-cron runs (24-25.08) went unnoticed because the exit-code alert looked like any other tg-agent failure.'
+          description: 'Pushed every 30 min by tg-agent/cron/claude-auth-check.sh on terrty: `claude auth status --json` inside the agent-aleksandr container, which shares the claude-auth volume with ads-cron. 0 = loggedIn true, 1 = logged out (OAuth session expired and could not be refreshed). A logged-out volume kills the Telegram bot and every ads-cron run silently; recovery is the interactive re-login in tg-agent/README.md ("claude.ai session"). Added 25.08.2026 after three failed ads-cron runs (24-25.08) went unnoticed because the exit-code alert looked like any other tg-agent failure.'
           tags:
             - tag: Application
               value: tg-agent
           triggers:
             - uuid: 86e50fb30d5f4f8aad31b220ea4c19ca
               expression: 'last(/Favor-group tg-agent monitoring/tgagent.claude.auth)=1'
-              name: 'CLAUDE.AI LOGIN EXPIRED on terrty: Telegram bots and ads-cron are dead until re-login'
+              name: 'CLAUDE.AI LOGIN EXPIRED on terrty: Telegram bot and ads-cron are dead until re-login'
               priority: DISASTER
-              description: '`claude auth status` in the shared claude-auth volume reports loggedIn=false. Nothing that runs claude on terrty works until someone re-logs in: ssh -t terrty ''cd ~/favor-group/tg-agent && docker compose exec -it agent-dmitry claude'' -> /login, then docker compose up -d --force-recreate --no-deps agent-dmitry agent-aleksandr agent-maria. Clears automatically on the next 30-min check after the re-login.'
+              description: '`claude auth status` in the shared claude-auth volume reports loggedIn=false. Nothing that runs claude on terrty works until someone re-logs in: ssh -t terrty ''cd ~/favor-group/tg-agent && docker compose exec -it agent-aleksandr claude'' -> /login, then docker compose up -d --force-recreate --no-deps agent-aleksandr. Clears automatically on the next 30-min check after the re-login.'
               tags:
                 - tag: notify
                   value: admin
@@ -81,7 +81,7 @@ zabbix_export:
               expression: 'nodata(/Favor-group tg-agent monitoring/tgagent.claude.auth,3h)=1'
               name: 'claude.ai login watchdog has not reported for 3h'
               priority: AVERAGE
-              description: 'claude-auth-check.sh runs every 30 min from the opc crontab on terrty. Check crontab -l, docker ps (fg-agent-dmitry must be up) and tg-agent/data/ads-cron/auth-check.log.'
+              description: 'claude-auth-check.sh runs every 30 min from the opc crontab on terrty. Check crontab -l, docker ps (fg-agent-aleksandr must be up) and tg-agent/data/ads-cron/auth-check.log.'
               manual_close: 'YES'
         - uuid: 4d0e133643454ea9abc21c01a4569592
           name: 'tg-agent MySQL tunnel status on terrty'
@@ -97,7 +97,7 @@ zabbix_export:
               expression: 'count(/Favor-group tg-agent monitoring/tgagent.mysql.tunnel,#3,"gt",0)=3'
               name: 'tg-agent MySQL tunnel check failed on terrty (code {ITEM.LASTVALUE})'
               priority: HIGH
-              description: 'The last three reported checks failed; Telegram agents may be unable to read the site database. Clears on the next successful check. On terrty, start with tg-agent/data/ads-cron/mysql-tunnel-check.log, then cd ~/favor-group/tg-agent. Code 1: docker compose up -d mysql-tunnel. Code 2: docker compose logs mysql-tunnel; the host name, user tg-tunnel and host key are in secrets/tunnel-ssh-config and secrets/tunnel-ssh-known_hosts; on the site host the account comes from bitrix.infra-private ssh/ (from /web: sudo ./private/scripts/dr-hook.sh access). Code 3: check the logged error and verify the claude_ro account, query permissions and password. If the password seed is stale, refresh secrets/fgmysql-pass-cache-seed and run docker compose up -d --force-recreate --no-deps mysql-tunnel.'
+              description: 'The last three reported checks failed; the Telegram agent may be unable to read the site database. Clears on the next successful check. On terrty, start with tg-agent/data/ads-cron/mysql-tunnel-check.log, then cd ~/favor-group/tg-agent. Code 1: docker compose up -d mysql-tunnel. Code 2: docker compose logs mysql-tunnel; the host name, user tg-tunnel and host key are in secrets/tunnel-ssh-config and secrets/tunnel-ssh-known_hosts; on the site host the account comes from bitrix.infra-private ssh/ (from /web: sudo ./private/scripts/dr-hook.sh access). Code 3: check the logged error and verify the claude_ro account, query permissions and password. If the password seed is stale, refresh secrets/fgmysql-pass-cache-seed and run docker compose up -d --force-recreate --no-deps mysql-tunnel.'
               tags:
                 - tag: notify
                   value: admin
@@ -156,7 +156,7 @@ zabbix_export:
       name: 'tg-agent ads-cron run failed: {ITEM.LASTVALUE2}'
       opdata: '{ITEM.LASTVALUE2}'
       priority: DISASTER
-      description: 'The unattended ads report run exited non-zero; the name carries the last line of its output. An expired claude.ai login in the favor-tg-agent_claude-auth volume also kills all three Telegram bots: re-login per tg-agent/README.md (interactive claude session in any agent container). A usage limit clears by itself at the reset time it names. Full output: tg-agent/data/ads-cron/cron.log on terrty. Clears on the next successful run.'
+      description: 'The unattended ads report run exited non-zero; the name carries the last line of its output. An expired claude.ai login in the favor-tg-agent_claude-auth volume also kills the Telegram bot: re-login per tg-agent/README.md (interactive claude session in any agent container). A usage limit clears by itself at the reset time it names. Full output: tg-agent/data/ads-cron/cron.log on terrty. Clears on the next successful run.'
       manual_close: 'YES'
     - uuid: 573cd6005b58402fab901913e3f7274c
       expression: 'last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.days_left)<=7 and length(last(/Favor-group tg-agent monitoring/tgagent.yandex.tokens.report))>=0'
@@ -172,7 +172,7 @@ zabbix_export:
       name: 'Yandex OAuth token rejected on terrty: renew it'
       opdata: '{ITEM.LASTVALUE2}'
       priority: HIGH
-      description: 'A Yandex token in tg-agent/secrets/yandex-*.env is expired or revoked (the report line says which variable and file). Renew: open https://oauth.yandex.ru/authorize?response_type=token&client_id=c5e90f6082cd4baf8fbf28dfa947371c logged in as the Yandex account that owns the token (f.favor for Metrika and Webmaster, the ad login for a Direct token), copy access_token from the address after redirect, replace the value in that env file on terrty, then docker compose up -d --force-recreate --no-deps agent-dmitry agent-aleksandr agent-maria. Clears on the next daily check.'
+      description: 'A Yandex token in tg-agent/secrets/yandex-*.env is expired or revoked (the report line says which variable and file). Renew: open https://oauth.yandex.ru/authorize?response_type=token&client_id=c5e90f6082cd4baf8fbf28dfa947371c logged in as the Yandex account that owns the token (f.favor for Metrika and Webmaster, the ad login for a Direct token), copy access_token from the address after redirect, replace the value in that env file on terrty, then docker compose up -d --force-recreate --no-deps agent-aleksandr. Clears on the next daily check.'
       tags:
         - tag: notify
           value: admin
