@@ -111,7 +111,7 @@ The sections below are the maintainer's notes for operating the stack on the pro
 - Deploy via `tee` to write in-place: `ssh bitrix 'tee /web/config/nginx/file.conf' < config/nginx/file.conf > /dev/null`
 - Always test before reload: `docker exec nginx nginx -t && docker exec nginx nginx -s reload`
 - **If the inode was already swapped (e.g. you deployed via `git pull`), reload is not enough — re-bind with `docker restart nginx`** (plain docker; it re-resolves bind mounts from the stored host path on start). Validate the new file first WITHOUT touching the live container via an ephemeral run on the compose network: `docker run --rm --entrypoint nginx --network web_default -v /web/config/nginx/<each>.conf:/etc/nginx/<each>.conf:ro -v /web/private/nginx:/etc/nginx/private.conf.d:ro -v /web/private/letsencrypt:/etc/nginx/letsencrypt:ro ghcr.io/paskal/nginx:latest -t`
-- **`docker compose` needs the regular production profiles enabled or it errors `no such service: adminer`.** Regular optional services sit behind profiles (`certs`, `dbadmin`, `monitoring`, `hooks`); `nginx` `depends_on` `adminer` (profile `dbadmin`), so any bare `docker compose <cmd> nginx` fails to resolve the dependency. Always prefix with `COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks` (compose 2.6.0 here is too old for the `--profile "*"` wildcard). E.g. recreate: `cd /web && COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks docker compose up -d --force-recreate --no-deps nginx`. FTP is deliberately isolated under `ftp-manual` and must never be added to the shell default.
+- **`docker compose` needs the regular production profiles enabled or it errors `nginx depends on undefined service`.** Regular optional services sit behind profiles (`certs`, `monitoring`, `hooks`); the private overlay makes `nginx` `depends_on` `updater` (profile `hooks`), so any bare `docker compose <cmd> nginx` fails to resolve the dependency. Always prefix with `COMPOSE_PROFILES=certs,monitoring,hooks` (the shell default on the server and `/web/.env` carry the same list). E.g. recreate: `cd /web && COMPOSE_PROFILES=certs,monitoring,hooks docker compose up -d --force-recreate --no-deps nginx`. **Adminer is retired since 31.10.2026**: `dbadmin` is off everywhere, the overlay's adminer vhost answers 403 and MySQL `root@'%'` no longer exists, so do not add `dbadmin` back. FTP is deliberately isolated under `ftp-manual` and must never be added to the shell default.
 - Directory-level mounts (e.g. `conf.d/`) don't have the inode issue
 - `nginx -V` output from a running container may not match the image used on restart — don't trust module availability without testing in a fresh container
 
@@ -249,6 +249,22 @@ recovery expression 35 minutes after the prototypes changed.
 
 The inode triggers (17811, 17812) still have no hysteresis; the same pattern applies with the
 comparison reversed, recovery at `> {$VFS.FS.INODE.PFREE.MIN.*}+5`.
+
+## Zabbix server port 10051 is allow-listed (31.10.2026)
+
+The Zabbix server runs in Docker on terrty and publishes 10051 with `-p`, which bypasses firewalld
+(DNAT'ed traffic is accepted in FORWARD before the zone rules apply). The port is therefore closed
+in the `DOCKER-USER` chain through firewalld direct rules: a `RETURN` per known agent address, then
+a `DROP` for the rest of `tcp dport 10051` on the public interface; 10051/tcp was also removed from
+the public zone so the IPv6 docker-proxy path is closed. **A new active agent or `zabbix_sender`
+host gets no data through until its public IP is added**, so do that first:
+
+```sh
+ssh terrty 'for m in "" --permanent; do sudo firewall-cmd $m --direct --add-rule ipv4 filter DOCKER-USER 0 -i enp0s6 -p tcp --dport 10051 -s <agent-ip> -j RETURN; done; sudo iptables -S DOCKER-USER'
+```
+
+Current list: `ssh terrty sudo firewall-cmd --permanent --direct --get-all-rules`. The rule order
+matters: priority 0 for the allows, the drop sits at priority 1.
 
 ## Zabbix: disabled stock triggers and tuned thresholds (03.10.2026)
 

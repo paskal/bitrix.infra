@@ -541,13 +541,13 @@ restore_mysql() {
 }
 
 start_services() {
-  # The production overlay makes nginx depend on profile-gated services (adminer=dbadmin,
-  # updater=hooks), so a bare `docker compose <cmd>` errors at project load with
+  # The production overlay makes nginx depend on the profile-gated updater (profile hooks),
+  # so a bare `docker compose <cmd>` errors at project load with
   # "service nginx depends on undefined service updater". Default to the full prod set;
   # an operator can override BEFORE running (e.g. a rehearsal that must not touch the live
-  # DNS zone or Zabbix exports COMPOSE_PROFILES=dbadmin,hooks to skip certs+monitoring).
+  # DNS zone or Zabbix exports COMPOSE_PROFILES=hooks to skip certs+monitoring).
   # FTP is deliberately excluded and is started only through its manual profile.
-  : "${COMPOSE_PROFILES:=certs,dbadmin,monitoring,hooks}"
+  : "${COMPOSE_PROFILES:=certs,monitoring,hooks}"
   export COMPOSE_PROFILES
   echo "starting services with COMPOSE_PROFILES=${COMPOSE_PROFILES}"
   echo "pulling docker images..."
