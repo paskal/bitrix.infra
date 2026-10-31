@@ -25,7 +25,7 @@ jobs:
         run: docker compose config -q
 
       - name: Validate compose config (all profiles)
-        run: COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp docker compose config -q
+        run: COMPOSE_PROFILES=certs,dbadmin,monitoring,hooks,ftp-manual docker compose config -q
 
   nginx:
     name: nginx -t
