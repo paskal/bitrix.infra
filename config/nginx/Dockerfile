@@ -10,9 +10,11 @@ LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>
 # for shadow package
 RUN echo https://dl-2.alpinelinux.org/alpine/edge/community/ >> /etc/apk/repositories
 
+# upgrade the base image packages first: apk add alone leaves libssl3 and others at the
+# versions baked into alpine:edge, so nginx would run on an older OpenSSL than it was built for
 # shadow for usermod
 # brotli for compression
-RUN apk add --no-cache nginx-mod-http-brotli nginx-mod-http-lua shadow
+RUN apk upgrade --no-cache && apk add --no-cache nginx-mod-http-brotli nginx-mod-http-lua shadow
 
 RUN usermod -u 1000 nginx
 RUN groupmod -g 1000 nginx
