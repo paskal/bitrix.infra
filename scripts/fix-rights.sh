@@ -53,14 +53,14 @@ if [ "$(id -u "${deploy_user}" 2>/dev/null || true)" = 1000 ]; then
   fi
 
   # Compose reads the secrets as root; the Zabbix agent (uid 1997) reads its own
-  # MySQL credentials. Nobody else needs to read any of them.
+  # MySQL credentials and PSK. Nobody else needs to read any of them.
   echo "Fixing private/environment permissions..."
   if [ -d ./private/environment ]; then
     for f in ./private/environment/*; do
       [ -f "$f" ] || continue
       case "$f" in
       *.example) chown 1000:1000 "$f" ;;
-      */zabbix-*.conf | *zbx*.cnf) chown 1997:1997 "$f" && chmod 0400 "$f" ;;
+      */zabbix-*.conf | */zabbix-*.psk | *zbx*.cnf) chown 1997:1997 "$f" && chmod 0400 "$f" ;;
       *) chown 1000:1000 "$f" && chmod 0600 "$f" ;;
       esac
     done

@@ -339,6 +339,14 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # PSK shared with the Zabbix server: ZBX_TLSCONNECT and ZBX_TLSACCEPT in zabbix.env require
+      # it for active checks, passive checks and zabbix_sender, so a forged server cannot pull data
+      - type: bind
+        source: ./private/environment/zabbix-agent.psk
+        target: /var/lib/zabbix/enc/agent.psk
+        read_only: true
+        bind:
+          create_host_path: false
       # PHPStan output (read-only): system.run["cat /var/log/phpstan/owned_errors_count.txt"]
       - ./logs/phpstan:/var/log/phpstan:ro
       # backup status files (read-only): mysql-last-size.txt / files-last.txt, written by

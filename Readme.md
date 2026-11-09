@@ -334,8 +334,9 @@ The stack as shipped needs a host with at least 8 GB of RAM: `config/mysql/my.cn
     ```bash
     for f in private/environment/*.env.example; do cp "$f" "${f%.example}"; done
     cp config/zabbix/mysql-session.conf.example private/environment/zabbix-mysql-session.conf
+    openssl rand -hex 32 > private/environment/zabbix-agent.psk
     ```
-    Edit each copied file. At minimum you need `mysql.env`; the others are for optional services (FTP, monitoring, certificates, webhooks). For MySQL monitoring, `zabbix-mysql-session.conf` keeps the monitoring credentials in an Agent 2 named session instead of expanded item keys. Compose refuses to start the monitoring service if this file is absent.
+    Edit each copied file. At minimum you need `mysql.env`; the others are for optional services (FTP, monitoring, certificates, webhooks). For MySQL monitoring, `zabbix-mysql-session.conf` keeps the monitoring credentials in an Agent 2 named session instead of expanded item keys. Compose refuses to start the monitoring service if this file is absent. The same holds for `zabbix-agent.psk`: the agent talks to the Zabbix server only over PSK encryption, so enter the identity from `zabbix.env` and the key from that file on the host in Zabbix (Encryption tab, PSK in both directions). Give both files to the agent's user: `sudo chown 1997:1997` and `chmod 0400`.
 
     Optionally copy `.env.example` to `.env` to override ports or other compose variables (e.g. if port 80 is taken on the host):
     ```bash
@@ -465,8 +466,9 @@ Site files in directories `web/prod` and `web/dev`.
 - `private/environment/` — environment files for docker-compose services. Copy `.env.example` files to `.env` and fill in your values. Each example file is commented with descriptions of every variable:
     - `mysql.env` — Percona MySQL credentials (root, application user, read-only agent user)
     - `dnsrobocert.env` — Yandex Cloud DNS credentials for Let's Encrypt wildcard certificates (`certs` profile)
-    - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, key restrictions) (`monitoring` profile)
+    - `zabbix.env` — Zabbix Agent 2 configuration (hostname, server address, PSK encryption, key restrictions) (`monitoring` profile)
     - `zabbix-mysql-session.conf` — private MySQL named session for Agent 2; set `{$MYSQL.DSN}` to `LocalMysql` and leave `{$MYSQL.USER}` / `{$MYSQL.PASSWORD}` empty in Zabbix
+    - `zabbix-agent.psk` — pre-shared key for the agent's traffic with the Zabbix server; without encryption, whoever answers for the server's name could request Docker inspect output, environment secrets included
     - `updater.env` — webhook server shared secret (`hooks` profile)
     - `ftp.env` — Pure-FTPD credentials (`ftp-manual` profile)
     - `seo-reindex.env` — Yandex Webmaster OAuth token and quota host for the daily SEO reindex cron

@@ -257,7 +257,11 @@ The Zabbix server runs in Docker on terrty and publishes 10051 with `-p`, which 
 in the `DOCKER-USER` chain through firewalld direct rules: a `RETURN` per known agent address, then
 a `DROP` for the rest of `tcp dport 10051` on the public interface; 10051/tcp was also removed from
 the public zone so the IPv6 docker-proxy path is closed. **A new active agent or `zabbix_sender`
-host gets no data through until its public IP is added**, so do that first:
+host gets no data through until its public IP is added**, so do that first. The favor-group
+agent and `zabbix_sender` also need the host's PSK (identity in `zabbix.env`, key in
+`private/environment/zabbix-agent.psk`): the host accepts only encrypted connections.
+
+Allow-list command:
 
 ```sh
 ssh terrty 'for m in "" --permanent; do sudo firewall-cmd $m --direct --add-rule ipv4 filter DOCKER-USER 0 -i enp0s6 -p tcp --dport 10051 -s <agent-ip> -j RETURN; done; sudo iptables -S DOCKER-USER'
