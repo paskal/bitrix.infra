@@ -72,7 +72,7 @@ You bet! Here is a performance on Yandex.Cloud server with Intel Cascade Lake 8 
 ### Core
 
 - [Nginx](https://www.nginx.com/) ([ghcr.io/paskal/nginx](https://github.com/paskal/bitrix.infra/pkgs/container/nginx)) with [brotli](https://github.com/google/ngx_brotli), HTTP/3 (QUIC) and Lua modules — proxies requests to php-fpm and serves static assets directly
-- [php-fpm](https://www.php.net/manual/en/install.fpm.php) 8.3 / 8.4 / 8.5 ([ghcr.io/paskal/bitrix-php](https://github.com/paskal/bitrix.infra/pkgs/container/bitrix-php)) for Bitrix with msmtp for mail sending
+- [php-fpm](https://www.php.net/manual/en/install.fpm.php) 8.2 / 8.3 / 8.4 / 8.5 ([ghcr.io/paskal/bitrix-php](https://github.com/paskal/bitrix.infra/pkgs/container/bitrix-php)) for Bitrix with msmtp for mail sending
 - [Percona MySQL 8.4](https://www.percona.com/software/mysql-database/percona-server) because of its monitoring capabilities
 - [memcached](https://memcached.org/) for Bitrix cache and user sessions
 - a second instance of the php image running cron (`php-cron`) for Bitrix agents and site jobs, with the same settings as the web PHP
@@ -583,7 +583,7 @@ Here are the available profiles and the services they enable:
 
 ### Switching PHP Versions
 
-Dockerfiles for PHP 8.3, 8.4 and 8.5 live in `config/php/`, and CI builds every one of them as `ghcr.io/paskal/bitrix-php:<version>`, so switching needs no local build:
+Dockerfiles for PHP 8.2 (until its end of life on 31 December 2026), 8.3, 8.4 and 8.5 live in `config/php/`, and CI builds every one of them as `ghcr.io/paskal/bitrix-php:<version>`, so switching needs no local build:
 
 1. In `docker-compose.yml`, change the `image` tag of both `php` and `php-cron` (for example `ghcr.io/paskal/bitrix-php:8.5`) and the `/etc/php/<version>/...` destination paths of the config binds under both services (`90-php.ini`, `91-disable-functions.ini`, `zz-pm.conf`, `xdebug.ini`). With the old paths the files land in a directory the new PHP never reads and the settings silently disappear. `php-cron` has no `build` block; only `php` builds locally, so also point `build.dockerfile` under `php` at the selected version before any local build.
 2. `docker compose pull php php-cron && docker compose up -d php php-cron`, then `docker exec nginx nginx -s reload`: nginx resolves `php:9000` once, when it loads its configuration, so after the php container is recreated with a new address every page answers 502 until nginx reloads. Build locally only after changing a Dockerfile: `docker compose build php`.
